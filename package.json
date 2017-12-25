@@ -1,0 +1,23 @@
+{
+  "name": "async-dom",
+  "version": "1.0.0",
+  "description": "Async Dom libs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lifeart/async-dom.git"
+  },
+  "keywords": [
+    "DOM",
+    "Async"
+  ],
+  "author": "Aleksandr Kanunnikov <lifeart92@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lifeart/async-dom/issues"
+  },
+  "homepage": "https://github.com/lifeart/async-dom#readme"
+}
