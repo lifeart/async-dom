@@ -1,0 +1,6 @@
+// onpopstate
+// hashchange
+
+class Window {
+
+}
