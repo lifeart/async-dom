@@ -4,7 +4,9 @@
   "description": "Async Dom libs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "compile-domino": "browserify ./src/lib/dom/domino-async.js -o ./src/lib/dom/domino-async-bundle.js",
+    "s": "http-server ./src -p 8080"
   },
   "repository": {
     "type": "git",
@@ -19,5 +21,9 @@
   "bugs": {
     "url": "https://github.com/lifeart/async-dom/issues"
   },
-  "homepage": "https://github.com/lifeart/async-dom#readme"
+  "homepage": "https://github.com/lifeart/async-dom#readme",
+  "devDependencies": {
+    "browserify": "^16.1.0",
+    "domino": "^2.0.1"
+  }
 }
