@@ -657,8 +657,15 @@ function removeNode(data) {;
   } else {
     node.remove();
   }
-
 }
+
+// removeChild
+function customRemoveChild(data) {
+    var node = getNode(data.id);
+    var child = getNode(data.childrenId);
+    node.removeChild(child);
+}
+
 // DOM action classList.remove
 function removeClass(data) {
 	return getNode(data.id).classList.remove(data.class);
@@ -846,6 +853,12 @@ function customInsertBefore(data) {
     }
   }
 }
+function setParentNode(data) {
+    var node = getNode(data.id,data);
+    var parent = getNode(data.parent);
+    node.parent = parent;
+}
+
 function styleSheetAddRule(data) {
   var node = getNode(data.id,data);
   var name = data.selector;
@@ -899,8 +912,10 @@ function evaluateAction(data, callback) {
 		'focus': focusEl,
 		'setHTML': setHTML,
 		'insertBefore': customInsertBefore,
-		'appendHTML': appendHTML,
-		'getInnerHTML': getInnerHTML,
+        'appendHTML': appendHTML,
+        'removeChild': customRemoveChild,
+        'getInnerHTML': getInnerHTML,
+        'setParentNode': setParentNode,
 		'getStyleValue': getStyleValue,
 		'pushState': customPushState,
 		'replaceState': customReplaceState,

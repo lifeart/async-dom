@@ -25,5 +25,8 @@
   "devDependencies": {
     "browserify": "^16.1.0",
     "domino": "^2.0.1"
+  },
+  "dependencies": {
+    "eslint": "^4.18.1"
   }
 }
