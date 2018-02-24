@@ -7,4 +7,6 @@ require('initializer.js');
 
 const transport = getTransport();
 
+initDominoImplementation();
 createInitialDomStructure();
+importApp('glimmer');
