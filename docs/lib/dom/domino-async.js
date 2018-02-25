@@ -1,0 +1,1 @@
+self.domino = require('domino');
