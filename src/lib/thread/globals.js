@@ -11,24 +11,24 @@ self.animationFrameTime = 100;
 self.lastFrame = 0;
 
 var onVisibilityChange = (result) => {
-    if (result === 'visible') {
-        // console.log(self.lastCallback);
+	if (result === 'visible') {
+		// console.log(self.lastCallback);
         
-        // cancelAnimationFrame(self.lastFrame);
+		// cancelAnimationFrame(self.lastFrame);
         
-        // self.lastCallback();
-        setAnimationFrameTime(100);
-    } else {
-        setAnimationFrameTime(2000);
-    }
-}
+		// self.lastCallback();
+		setAnimationFrameTime(100);
+	} else {
+		setAnimationFrameTime(2000);
+	}
+};
 
 var requestAnimationFrame = function(cb) {
-    // console.log('requestAnimationFrame');
-    // self.lastCallback = cb;
-    self.lastFrame = setTimeout(cb, self.animationFrameTime);
-    return self.lastFrame;
-}
+	// console.log('requestAnimationFrame');
+	// self.lastCallback = cb;
+	self.lastFrame = setTimeout(cb, self.animationFrameTime);
+	return self.lastFrame;
+};
 
 var cancelAnimationFrame = clearTimeout;
 self.requestAnimationFrame  = requestAnimationFrame;
@@ -42,25 +42,25 @@ let nodeCounter = 0;
 let hasAlertMicrotask = false;
 
 var alert = function(text) {
-    // console.log(arguments);
-    // console.log(arguments.callee);
+	// console.log(arguments);
+	// console.log(arguments.callee);
 
-    asyncMessage({action: 'alert', text: text},()=>{
-        hasAlertMicrotask = false;
-    });
+	asyncMessage({action: 'alert', text: text},()=>{
+		hasAlertMicrotask = false;
+	});
 
-    hasAlertMicrotask = true;
+	hasAlertMicrotask = true;
 
-    var e = performance.now() + 0.8;
+	var e = performance.now() + 0.8;
 
-    while (performance.now() < e) {
-      // Artificially long execution time.
-    }
+	while (performance.now() < e) {
+		// Artificially long execution time.
+	}
 
-    // while(hasAlertMicrotask) {
-    //     setTimeout(()=>{
+	// while(hasAlertMicrotask) {
+	//     setTimeout(()=>{
 
-    //     });
-    // }
-}
+	//     });
+	// }
+};
 self.alert = alert;
