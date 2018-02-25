@@ -276,6 +276,9 @@ function isEvent(action) {
     if (action.action === 'addEventListener') {
         return true;
     }
+    if (action.action === 'createComment') {
+        return true;
+    }
     return false;
 }
 
