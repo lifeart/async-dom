@@ -2,7 +2,6 @@ function importApp(appName='glimmer') {
 	if (APP_NODE_HOOKS[appName]) {
 		proxyGet = Object.assign(proxyGet, APP_NODE_HOOKS[appName]);
 	}
-	requireJS(`/apps/${appName}.js`);
 }
 
 function getDOMImplementation() {
