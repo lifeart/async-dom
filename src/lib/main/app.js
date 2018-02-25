@@ -36,7 +36,7 @@ class Thread {
 	createThread(config) {
 		let threadName = config.name;
 		let uid = this.getUID();
-		let thread = new Worker('../../lib/thread/ww.js?t='+Math.random());
+		let thread = new Worker('../lib/thread/ww.js?t='+Math.random());
 		this.uids[uid] = thread;
 		this._bindThreadActions(thread,uid);
 		this.threads[threadName] = thread;
