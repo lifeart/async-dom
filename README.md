@@ -5,6 +5,8 @@ Async Dom
 # Demos in https://github.com/lifeart/demo-async-dom/
 ------------------------------------------
 
+2 apps separately running in web-workers, using async dom https://lifeart.github.io/async-dom/
+
 # Logic
 
 1. All DOM modifications collected in single pool
