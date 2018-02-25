@@ -11,5 +11,14 @@ const transport = getTransport();
 
 initDominoImplementation();
 createInitialDomStructure();
-importApp('glimmer');
+
+// importApp('glimmer');
+// importApp('glimmer');
+// importApp('glimmer');
+// importApp('demo');
+// importApp('demo');
 importApp('demo');
+
+setTimeout(()=>{
+	importApp('glimmer');
+},3000);

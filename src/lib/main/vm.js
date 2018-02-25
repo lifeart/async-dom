@@ -242,6 +242,7 @@
 	}
 	// sorting DOM actions to get maximum painting performance
 	function smartBatchSort(actions) {
+		return actions;
 		const priorityActionsMap = {
 			createNode: 1,
 			setAttribute: 2,
@@ -255,11 +256,6 @@
 		let sortedActions = actions.sort((a, b) => {
 			return priorityActionsMap[a.action] - priorityActionsMap[b.action];
 		});
-
-		if (sortedActions.length > 10) {
-			console.log(sortedActions);
-			debuger;
-		}
 
 		return sortedActions;
 		// priority - create, style, append

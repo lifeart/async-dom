@@ -4,8 +4,8 @@
 	var middlewareActions = [];
 	var actionsList = [];
 	var updateTimeout = null;
-	var packSize = 30;
-	var batchTimeout = 4;
+	var packSize = 2000;
+	var batchTimeout = 6;
 	var WAITING_LIST = [];
 	var maxId = 0;
     
@@ -235,6 +235,7 @@
 	var asyncBatch = function(action) {
 		actionsList.push(action);
 		if (actionsList.length > packSize) {
+			// console.log('packSize!',actionsList.length);
 			sendBatch();
 		}
 		clearTimeout(updateTimeout);
@@ -243,6 +244,7 @@
 		}, batchTimeout);
 	};
     
+	// self.asyncSendMessage = asyncBatch;
 	self.asyncSendMessage = asyncSendMessage;
 
 })(self);
