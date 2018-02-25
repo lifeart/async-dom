@@ -115,12 +115,12 @@
 	// send single message to ww
 	function sendMessage(data) {
 		log('sendMessage', data);
-		thread.postMessage(data);
+		thread.sendMessage(data);
 	}
 
-	thread.onmessage = function(e) {
+	thread.onmessage(function(e){
 		actionScheduler(e.data);
-	};
+	});
 
 	// Listen for scroll events
 	window.addEventListener(
