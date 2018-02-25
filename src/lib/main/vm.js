@@ -1,4 +1,7 @@
-// "our web-worker"
+(function(){
+
+
+    // "our web-worker"
 // var worker =  new Worker('ww2.js');
 // viewportHeight (recalculated on each frame size)
 var viewportHeight = 0;
@@ -28,7 +31,7 @@ var _navigator = {
 // body style node
 var pointerEventsStyleNode = document.body.style['pointer-events'];
 // imagine how many milliseconds we can take for each frame
-var fpsMs = 16;
+var fpsMs = 11;
 // here we store actions timings
 var actionTimes = {};
 // this is list of async actions
@@ -116,7 +119,7 @@ function sendMessage(data) {
   thread.postMessage(data);
 }
 
-thread.onmessage = (e)=>{
+thread.onmessage = function(e) {
   actionScheduler(e.data);
 };
 
@@ -1004,3 +1007,6 @@ document.addEventListener("visibilitychange", function() {
         value: document.visibilityState
 	});
 });
+
+
+})();
