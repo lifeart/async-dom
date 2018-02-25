@@ -1,5 +1,8 @@
-// const require = importScripts;
-const requireJS = importScripts;
+/* global importScripts, getTransport, initDominoImplementation */
+
+const requireJS = function(scriptName) {
+	importScripts(`${scriptName}?t=${Math.random()}`);
+};
  
 requireJS('globals.js');
 requireJS('utils.js');
@@ -10,15 +13,14 @@ requireJS('app-hooks.js');
 const transport = getTransport();
 
 initDominoImplementation();
-createInitialDomStructure();
 
-// importApp('glimmer');
-// importApp('glimmer');
-// importApp('glimmer');
-// importApp('demo');
-// importApp('demo');
-importApp('demo');
 
-setTimeout(()=>{
-	importApp('glimmer');
-},3000);
+
+// createInitialDomStructure();
+
+
+// importApp('demo');
+
+// setTimeout(()=>{
+// 	importApp('glimmer');
+// },3000);

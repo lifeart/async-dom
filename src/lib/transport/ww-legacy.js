@@ -4,8 +4,6 @@
 	var middlewareActions = [];
 	var actionsList = [];
 	var updateTimeout = null;
-	var packSize = 2000;
-	var batchTimeout = 6;
 	var WAITING_LIST = [];
 	var maxId = 0;
     
@@ -184,6 +182,9 @@
 	});
     
 	var uids = {
+		'_configure': function(data) {
+			configureThread(data);
+		},
 		'_setNavigator': function(data) {
 			navigator = data.navigator;
 		},
@@ -234,17 +235,25 @@
     
 	var asyncBatch = function(action) {
 		actionsList.push(action);
-		if (actionsList.length > packSize) {
+		if (actionsList.length > _this.packSize) {
 			// console.log('packSize!',actionsList.length);
 			sendBatch();
 		}
 		clearTimeout(updateTimeout);
 		updateTimeout = setTimeout(function() {
 			sendBatch();
-		}, batchTimeout);
+		}, _this.batchTimeout);
 	};
-    
+	
+	
+	function transportChooser(data) {
+		if (self.batchTransport) {
+			return asyncBatch(data);
+		} else {
+			return asyncSendMessage(data);
+		}
+	}
 	// self.asyncSendMessage = asyncBatch;
-	self.asyncSendMessage = asyncSendMessage;
+	self.asyncSendMessage = transportChooser;
 
 })(self);

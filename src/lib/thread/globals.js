@@ -7,8 +7,15 @@ self.Element = Element;
 self.document = document;
 
 self.animationFrameTime = 100;
+self.batchTransport = false;
+
+
+self.packSize = 2000;
+self.batchTimeout = 6;
+
 // self.lastCallback = ()=>{};
 self.lastFrame = 0;
+self.AppUID = null;
 
 var onVisibilityChange = (result) => {
 	if (result === 'visible') {

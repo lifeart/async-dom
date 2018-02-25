@@ -1,3 +1,5 @@
+/* global ORIGINAL_KEY */
+
 const proxyMap = new WeakMap();
 
 function getProxy(obj, proxyName='asyncProxy') {
@@ -90,7 +92,7 @@ const proxyList = {
 
 const NOOP_HOOKS = {
 	insertAfter() {
-		console.log('insertAfter',insertAfter);
+		console.log('insertAfter');
 	},
 	replaceWith() {
 		console.log('replaceWith',arguments);

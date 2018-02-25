@@ -37,11 +37,9 @@ function nodeId(maybeElement,debug) {
 			if (element.id === 'app') {
 				_cache.set(element, 'app');
 			} else {
-				_cache.set(element, `n-${nodeCounter}`);
+				_cache.set(element, `a-${self.AppUID}-${nodeCounter}`);
 			}
-         
 		}
-     
 	}
 	return _cache.get(element);
 }
@@ -64,15 +62,29 @@ function EventAdapter(callback) {
 	return EventTransformer.bind(null, callback);
 }
 
-
 // function EventAdapter(callback) {
 // 	return function(e) {
-// 		e.currentTarget =document.getElementById(e.currentTarget);
-// 		e.srcElement =document.getElementById(e.srcElement);
-// 		e.target =document.getElementById(e.target) || e.currentTarget || null;
-// 		e.toElement =document.getElementById(e.toElement);
-// 		e.eventPhase =document.getElementById(e.eventPhase);
+// 		e.currentTarget = document.getElementById(e.currentTarget);
+// 		e.srcElement = document.getElementById(e.srcElement);
+// 		e.target = document.getElementById(e.target) || e.currentTarget || null;
+// 		e.toElement = document.getElementById(e.toElement);
+// 		e.eventPhase = document.getElementById(e.eventPhase);
 // 		e.preventDefault = ()=>{};
 // 		callback(e);
 // 	};
 // }
+
+function configureThread(data) {
+	self.AppUID = data.appUID;
+	self.animationFrameTime = data.frameTime || self.animationFrameTime;
+	self.batchTransport = data.batchTransport || self.batchTransport;
+
+	self.packSize = data.packSize || self.packSize;
+	self.batchTimeout = data.batchTimeout || self.batchTimeout;
+
+	if (data.createInitialDomStructure) {
+		createInitialDomStructure();
+	}
+
+	importApp(data.app);
+}
