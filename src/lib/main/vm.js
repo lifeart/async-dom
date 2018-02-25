@@ -1,6 +1,7 @@
+/* global thread */
+
 (function() {
-	// "our web-worker"
-	// var worker =  new Worker('ww2.js');
+
 	// viewportHeight (recalculated on each frame size)
 	var viewportHeight = 0;
 	// viewportWidth (recalculated on each frame size)
@@ -99,7 +100,7 @@
 		return result;
 	}
 	// send list of messages to ww
-	function sendMessages(items) {
+	function sendMessages() {
 		var args = Array.prototype.slice.call(arguments);
 		args.forEach(items => {
 			if (Array.isArray(items)) {
@@ -292,11 +293,6 @@
 		} else {
 			skip(action);
 		}
-	}
-
-	// clear all existing actions
-	function clearActions() {
-		actionsList = [];
 	}
 
 	// get some render and evaluate priority for actions

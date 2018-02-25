@@ -1,9 +1,9 @@
 (function(_this){
 
 	var removedNodes = [];
-    var middlewareActions = [];
-    var actionsList = [];
-    var updateTimeout = null;
+	var middlewareActions = [];
+	var actionsList = [];
+	var updateTimeout = null;
 	var packSize = 30;
 	var batchTimeout = 4;
 	var WAITING_LIST = [];
@@ -216,6 +216,8 @@
 		}
 	};
     
+	_this.uids = uids;
+
 	function sendBatch() {
 		let actionsToSend = actionsList.splice(0, actionsList.length);
 		asyncBatchMessages(actionsToSend);
@@ -226,6 +228,7 @@
 		if (actionsList.length > packSize) {
 			sendBatch();
 		}
+		clearTimeout(updateTimeout);
 		updateTimeout = setTimeout(function() {
 			sendBatch();
 		}, batchTimeout);
