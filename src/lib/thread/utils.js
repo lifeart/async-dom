@@ -50,14 +50,29 @@ function setAnimationFrameTime(time) {
 	self.animationFrameTime = time;
 }
 
-function EventAdapter(callback) {
-	return function(e) {
-		e.currentTarget =document.getElementById(e.currentTarget);
-		e.srcElement =document.getElementById(e.srcElement);
-		e.target =document.getElementById(e.target) || e.currentTarget || null;
-		e.toElement =document.getElementById(e.toElement);
-		e.eventPhase =document.getElementById(e.eventPhase);
-		e.preventDefault = ()=>{};
-		callback(e);
-	};
+function EventTransformer(callback,e) {
+	e.currentTarget =document.getElementById(e.currentTarget);
+	e.srcElement =document.getElementById(e.srcElement);
+	e.target =document.getElementById(e.target) || e.currentTarget || null;
+	e.toElement =document.getElementById(e.toElement);
+	e.eventPhase =document.getElementById(e.eventPhase);
+	e.preventDefault = ()=>{};
+	callback(e);
 }
+
+function EventAdapter(callback) {
+	return EventTransformer.bind(null, callback);
+}
+
+
+// function EventAdapter(callback) {
+// 	return function(e) {
+// 		e.currentTarget =document.getElementById(e.currentTarget);
+// 		e.srcElement =document.getElementById(e.srcElement);
+// 		e.target =document.getElementById(e.target) || e.currentTarget || null;
+// 		e.toElement =document.getElementById(e.toElement);
+// 		e.eventPhase =document.getElementById(e.eventPhase);
+// 		e.preventDefault = ()=>{};
+// 		callback(e);
+// 	};
+// }

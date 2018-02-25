@@ -248,11 +248,20 @@
 			addEventListener: 3,
 			appendChild: 4,
 			bodyAppendChild: 5,
-			removeNode: 6
+			insertBefore: 6,
+			removeNode: 7
 		};
-		return actions.sort((a, b) => {
+
+		let sortedActions = actions.sort((a, b) => {
 			return priorityActionsMap[a.action] - priorityActionsMap[b.action];
 		});
+
+		if (sortedActions.length > 10) {
+			console.log(sortedActions);
+			debuger;
+		}
+
+		return sortedActions;
 		// priority - create, style, append
 	}
 
@@ -270,7 +279,13 @@
 	let noop = () => {};
 
 	function isEvent(action) {
+		// return false;
+		// return false;
 		// console.log('isEvent',action);
+		// if (action.action === 'insertBefore') {
+		// 	return true;
+		// }
+		
 		if (action.action === 'createNode') {
 			return true;
 		}
@@ -283,12 +298,17 @@
 		return false;
 	}
 
+	function handleNonBlickingActionResult(data) {
+		// console.log(data);
+		sendMessage(data);
+	}
+
 	function actionScheduler(action) {
 		if (!shouldSkip(action)) {
 			if (!isEvent(action)) {
 				actionsList.push(action);
 			} else {
-				performAction(action, noop);
+				performAction(action, handleNonBlickingActionResult);
 			}
 		} else {
 			skip(action);
@@ -456,7 +476,18 @@
 		if (totalActions) {
 			performanceFeedback(feedbackDelta, totalActions);
 		}
-		requestAnimationFrame(actionLoop);
+
+		let frameFinish = performance.now() - startMs;
+
+		if ((frameFinish+1)>fpsMs) {
+			requestAnimationFrame(actionLoop);
+		} else {
+			// console.log('soFast!',frameFinish, fpsMs, fpsMs-frameFinish);
+			setTimeout(()=>{
+				requestAnimationFrame(actionLoop);
+			},(fpsMs-frameFinish));
+		}
+		
 	}
 
 	// simple logging function
@@ -922,7 +953,7 @@
 		log('evaluateAction', data);
 		if (shouldSkip(data)) {
 			log('skip', data);
-			return callback({ skip: true });
+			return callback({ skip: true});
 		}
 		var start = performance.now();
 
@@ -960,7 +991,7 @@
 		};
 
 		if (data.action) {
-			callback({ result: actions[data.action](data) });
+			callback({ uid: data.uid, cb: true, result: actions[data.action](data) });
 			if (data.action === 'alert') {
 				sendMessage(data);
 			}

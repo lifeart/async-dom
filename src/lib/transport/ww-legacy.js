@@ -12,30 +12,33 @@
 	function _initWebApp() {
 		console.log('_initWebApp');
 	}
-    
+	
+	const uidsMap = new Map();
+
 	_this.sendMessage = function(data, callback) {
 		maxId++;
-		data.uid = maxId;
+		let uid = `${maxId}`;
+		data.uid = parseInt(uid);
 		if (callback) {
-			uids[maxId] = callback;
+			uidsMap.set(String(uid),callback);
 		}
 		if (typeof data.callback === 'function') {
-			uids[`_${maxId}_${data.name}`] = data.callback;
+			uidsMap.set(`_${uid}_${data.name}`,data.callback);
 			delete data.callback;
 		}
 		if (typeof data.onerror === 'function') {
-			uids[`onerror_${data.id}`] = data.onerror;
+			uidsMap.set(`onerror_${data.id}`,data.onerror);
 			delete data.onerror;
 		}
 		if (typeof data.onload === 'function') {
-			uids[`onload_${data.id}`] = data.onload;
+			uidsMap.set(`onload_${data.id}`,data.onload);
 			delete data.onload;
 		}
 		if (data.length) {
 			data.forEach((el)=>{
 				if (typeof el.callback === 'function') {
 					maxId++;
-					uids[`_${maxId}_${el.name}`] = el.callback;
+					uidsMap.set(`_${uid}_${el.name}`,el.callback);
 					el.uid = maxId;
 					delete el.callback;
 				}
@@ -48,9 +51,11 @@
     
 	_this.onmessage = function(e) {
 		var uid = String(e.data.uid);
-		uids[uid] && uids[uid](e.data);
-		if (String(uid).charAt(0) !== '_') {
-			delete uids[uid];
+		// console.log(uid);
+		let cb = uidsMap.get(uid);
+		cb && cb(e.data);
+		if (uid.charAt(0) !== '_') {
+			uidsMap.delete(uid);
 		}
 	};
 
@@ -215,8 +220,12 @@
 			_initWebApp();
 		}
 	};
-    
-	_this.uids = uids;
+	
+	Object.keys(uids).forEach((uidKey)=>{
+		uidsMap.set(uidKey,uids[uidKey]);
+	});
+	
+	_this.uids = uidsMap;
 
 	function sendBatch() {
 		let actionsToSend = actionsList.splice(0, actionsList.length);
