@@ -1,15 +1,18 @@
 function importApp(appName='glimmer') {
-    require(`/apps/${appName}.js`)
+    if (APP_NODE_HOOKS[appName]) {
+        proxyGet = Object.assign(proxyGet, APP_NODE_HOOKS[appName]);
+    }
+    requireJS(`/apps/${appName}.js`)
 }
 
 function getDOMImplementation() {
-    require('../dom/domino-async-bundle.js');
-    // require('../dom/pseudo-dom.js');
+    requireJS('../dom/domino-async-bundle.js');
+    // requireJS('../dom/pseudo-dom.js');
     return self.domino;
 }
 
 function getTransport() {
-    require('../transport/ww-legacy.js');
+    requireJS('../transport/ww-legacy.js');
     return {
         sendMessage: self.asyncSendMessage,
         receiveMessage: self.onmessage
@@ -41,4 +44,20 @@ function nodeId(maybeElement,debug) {
      
     }
     return _cache.get(element);
+}
+
+function setAnimationFrameTime(time) {
+    self.animationFrameTime = time;
+}
+
+function EventAdapter(callback) {
+    return function(e) {
+      e.currentTarget =document.getElementById(e.currentTarget);
+      e.srcElement =document.getElementById(e.srcElement);
+      e.target =document.getElementById(e.target) || e.currentTarget || null;
+      e.toElement =document.getElementById(e.toElement);
+      e.eventPhase =document.getElementById(e.eventPhase);
+      e.preventDefault = ()=>{};
+      callback(e);
+    }
 }

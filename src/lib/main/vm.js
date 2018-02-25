@@ -263,9 +263,27 @@ function performanceFeedback(delta, actions) {
 
 let pushedBackActions = 0;
 
+let noop = ()=>{};
+
+function isEvent(action) {
+    // console.log('isEvent',action);
+    if (action.action === 'createNode') {
+        return true;
+    }
+    if (action.action === 'addEventListener') {
+        return true;
+    }
+    return false;
+}
+
 function actionScheduler(action) {
   if (!shouldSkip(action)) {
-    actionsList.push(action);
+    if (!isEvent(action)) {
+        actionsList.push(action);
+    } else {
+        performAction(action,noop);
+    }
+   
   } else {
     skip(action);
   }
@@ -287,24 +305,28 @@ function prioritySort(a,b) {
 	if (a.priority && b.priority) {
 		return b.priority - a.priority;
 	}
-  if (a.optional && !b.optional) {
-    return 1;
-  }
-  if (!a.optional && b.optional) {
-    return -1;
-  }
-  if (a.length && !b.length) {
-    return -1;
-  }
-  if (!a.length && b.length) {
-    return 1;
-  }
-  return a.uid - b.uid;
+    if (a.optional && !b.optional) {
+        return 1;
+    }
+    if (!a.optional && b.optional) {
+        return -1;
+    }
+    if (a.length && !b.length) {
+        return -1;
+    }
+    if (!a.length && b.length) {
+        return 1;
+    }
+    // if (a.action === 'setStyle' && b.action !== 'setStyle') {
+    //     return -1;
+    // }
+    return a.uid - b.uid;
 }
 
 // get actions, that should be executed at requested frame
 function getActionsForLoop() {
-  var optimalCap = getOptimalActionsCap();
+//   var optimalCap = getOptimalActionsCap();
+    var optimalCap = actionsList.length > 25000 ? actionsList.length : 2000;
   actionsList = actionsList.sort(prioritySort);
   var actions = actionsList.splice(0,optimalCap);
   return actions;
@@ -380,6 +402,7 @@ function pushBackActions(actions) {
 
 // main render thread
 function actionLoop(startMs) {
+    let _actionLoop = performance.now();
   frameId++;
   calcViewportSize();
   var newActions = getActionsForLoop();
@@ -387,13 +410,16 @@ function actionLoop(startMs) {
   var totalActions = newActions.length;
   const totalActionsSize = totalActions;
   pushedBackActions = 0;
+
+  let initLag = performance.now()-_actionLoop;
+  startMs = startMs - initLag;
   for (let i = 0; i < newActions.length; i++) {
     let action = newActions[i];
-    if (totalActionsSize < flushSize && performance.now() - startMs > (fpsMs + 1)) {
+    if ((totalActionsSize < flushSize) && (performance.now() - startMs) > fpsMs) {
       let skipSize = newActions.length - i;
       totalActions -= skipSize;
       pushedBackActions += skipSize;
-      log('pushBackAction', performance.now() - startMs);
+    //   console.log('pushBackAction', performance.now() - startMs);
       pushBackActions(newActions.splice(i, skipSize));
       break;
     }
@@ -783,7 +809,7 @@ function eventToObject(e) {
 // Alert implementation
 function customAlert(data) {
 	var blockStart = performance.now();
-	alert(data.text);
+    alert(data.text);
 	return {
 		timeShift: performance.now()-blockStart
 	}
@@ -940,9 +966,12 @@ function evaluateAction(data, callback) {
 	}
 
 	if (data.action) {
-		callback({result: actions[data.action](data)});
-    setTimePerAction(data.action, performance.now()-start);
-    log('action',data);
+        callback({result: actions[data.action](data)});
+        if (data.action === 'alert') {
+            sendMessage(data);
+        }
+        setTimePerAction(data.action, performance.now()-start);
+        log('action',data);
 	} else {
 		callback({});
     log('no-action',data);
@@ -954,12 +983,12 @@ function performAction(data,callback) {
 	var result = [];
 	if (data.length) {
 		smartBatchSort(data).forEach(adata => {
-      evaluateAction(adata, (item)=>{
-        result.push(item);
-        if (result.length === data.length) {
-          callback(result);
-        }
-      });
+            evaluateAction(adata, (item)=>{
+                result.push(item);
+                if (result.length === data.length) {
+                callback(result);
+                }
+            });
 		});
 	} else {
 		evaluateAction(data,callback);
@@ -968,3 +997,10 @@ function performAction(data,callback) {
 }
 // start the world
 requestAnimationFrame(actionLoop);
+
+document.addEventListener("visibilitychange", function() {
+    sendMessage({
+        uid: '_visibilitychange',
+        value: document.visibilityState
+	});
+});

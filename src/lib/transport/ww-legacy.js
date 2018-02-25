@@ -243,6 +243,9 @@
             if (window.onblur)
                 window.onblur();
         },
+        '_visibilitychange': function(data) {
+            onVisibilityChange(data.value);
+        },
         '_onPerformanceFeedback': function(data) {
             adjustSpeed(data);
         },

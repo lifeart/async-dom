@@ -2294,6 +2294,10 @@ Element.prototype = Object.create(ContainerNode.prototype, {
 
   // Set the attribute without error checking. The parser uses this.
   _setAttribute: { value: function _setAttribute(qname, value) {
+    if (qname !== 'style') {
+      console.log('setAttribute', qname, value);
+    }
+
     // XXX: the spec says that this next search should be done
     // on the local name, but I think that is an error.
     // email pending on www-dom about it.
@@ -2905,6 +2909,7 @@ EventTarget.prototype = {
   // tree as well.  Then, in dispatch event, the capturing phase can
   // abort if it sees any node with a zero count.
   addEventListener: function addEventListener(type, listener, capture) {
+    console.log('registerChangeHandler',type, listener, capture);
     if (!listener) return;
     if (capture === undefined) capture = false;
     if (!this._listeners) this._listeners = Object.create(null);
@@ -3169,6 +3174,7 @@ EventTarget.prototype = {
   // of event dispatch.
   //
   _setEventHandler: function _setEventHandler(type, handler) {
+    console.log(type);
     if (!this._handlers) this._handlers = Object.create(null);
     this._handlers[type] = handler;
   },
@@ -19718,6 +19724,7 @@ function EventHandlerChangeHandler(elt, name, oldval, newval) {
 }
 
 function addEventHandlers(c, eventHandlerTypes) {
+  // console.log('addEventHandlers',c,eventHandlerTypes);
   var p = c.prototype;
   eventHandlerTypes.forEach(function(type) {
     // Define the event handler registration IDL attribute for this type
@@ -19726,6 +19733,7 @@ function addEventHandlers(c, eventHandlerTypes) {
         return this._getEventHandler(type);
       },
       set: function(v) {
+        // console.log('_setEventHandler', v);
         this._setEventHandler(type, v);
       },
     });
