@@ -68,6 +68,7 @@ Transport.createThread({
 	app: 'glimmer',
 	createInitialDomStructure: true,
 	batchTransport: true,
+	implementation: 'simple',
 	packSize: 2000,
 	batchTimeout: 5,
 	frameTime: 250

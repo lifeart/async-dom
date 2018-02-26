@@ -7,6 +7,11 @@ function getProxy(obj, proxyName='asyncProxy') {
 		return obj;
 	}
 	if (!proxyMap.has(obj)) {
+		// console.log(obj);
+		// simple style hook;
+		if (typeof obj === 'string') {
+			return obj;
+		}
 		proxyMap.set(obj,new Proxy(obj, proxyList[proxyName]));
 	}
 	return proxyMap.get(obj);
@@ -171,6 +176,9 @@ const NODE_HOOKS = {
 	},
 	remove() {
 		asyncMessage({action:'removeNode',id: nodeId(this)});
+		if (!this.remove) {
+			return this.parentNode.removeChild(this);
+		}
 		return this.remove();
 	},
 	insertBefore(newElement, referenceElement) {
@@ -195,7 +203,6 @@ const NODE_HOOKS = {
 	setAttribute(attribute, value) {
 		// console.log('attribute', attribute);
 		if (attribute in DOM_ATTR_EVENT_HOOKS) {
-			console.log('attr', attribute, value);
 			return DOM_ATTR_EVENT_HOOKS[attribute].apply(this, [value]);
 		}
 		let result = this.setAttribute.apply(this, [attribute, value]);
@@ -208,6 +215,9 @@ const NODE_HOOKS = {
 		return this.removeAttribute(attribute);
 	}
 };
+	
+//@todo fix simple-dom getElementById;
+const customDomCache = {};
 
 const DOCUMENT_HOOKS = {
 	documentElement() {
@@ -215,6 +225,10 @@ const DOCUMENT_HOOKS = {
 	},
 	// document
 	getElementById(id) {
+		//@todo fix simple-dom getElementById;
+		if (!this.getElementById) {
+			return getProxy(customDomCache[id]) || self.appNode;
+		}
 		let node = this.getElementById.apply(this, [id]);
 		// console.log('node',node);
 		return getProxy(originalNode(node));
@@ -290,6 +304,8 @@ const proxySet = Object.assign(
 		},
 		id(newId) {
 			let result = this.id = newId;
+			//@todo glimmer fix
+			customDomCache[this.id] = this;
 			asyncMessage({action:'setAttribute',id:nodeId(this),attribute:'id',value:newId});
 			return result;
 		},
