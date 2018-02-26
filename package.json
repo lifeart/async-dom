@@ -7,6 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "compile-domino": "browserify ./src/lib/dom/domino-async.js -o ./src/lib/dom/domino-async-bundle.js",
     "compile-simple-dom": "browserify ./src/lib/dom/simple-dom.js -o ./src/lib/dom/simple-dom-bundle.js",
+    "compile-jsdom": "browserify ./src/lib/dom/jsdom.js -o ./src/lib/dom/jsdom-bundle.js",
     "s": "http-server ./src -p 8080"
   },
   "repository": {
@@ -27,6 +28,7 @@
     "browserify": "^16.1.0",
     "domino": "^2.0.1",
     "http-server": "^0.11.1",
+    "jsdom": "^11.6.2",
     "simple-dom": "^1.4.0-alpha.82914663"
   },
   "dependencies": {

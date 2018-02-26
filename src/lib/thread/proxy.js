@@ -113,41 +113,40 @@ const NOOP_HOOKS = {
 
 const DOM_ATTR_EVENT_HOOKS = {
 	onclick(callback) {
-		DOM_EVENT_HOOKS.addEventListener.apply(this,['click', callback]);
+		return DOM_EVENT_HOOKS.addEventListener.apply(this,['click', callback]);
 	},
 	onmouseenter(callback) {
-		// console.log('onmouseenter');
-		DOM_EVENT_HOOKS.addEventListener.apply(this,['mouseenter', callback]);
+		return DOM_EVENT_HOOKS.addEventListener.apply(this,['mouseenter', callback]);
 	},
 	onmouseup(callback) {
-		DOM_EVENT_HOOKS.addEventListener.apply(this,['mouseup', callback]);
+		return DOM_EVENT_HOOKS.addEventListener.apply(this,['mouseup', callback]);
 	},
 	oncontextmenu(callback) {
-		DOM_EVENT_HOOKS.addEventListener.apply(this,['contextmenu', callback]);
+		return DOM_EVENT_HOOKS.addEventListener.apply(this,['contextmenu', callback]);
 	},
 	ondblclick(callback) {
-		DOM_EVENT_HOOKS.addEventListener.apply(this,['dblclick', callback]);
+		return DOM_EVENT_HOOKS.addEventListener.apply(this,['dblclick', callback]);
 	},
 	onmousedown(callback) {
-		DOM_EVENT_HOOKS.addEventListener.apply(this,['mousedown', callback]);
+		return DOM_EVENT_HOOKS.addEventListener.apply(this,['mousedown', callback]);
 	},
 	onmousemove(callback) {
-		DOM_EVENT_HOOKS.addEventListener.apply(this,['mousemove', callback]);
+		return DOM_EVENT_HOOKS.addEventListener.apply(this,['mousemove', callback]);
 	},
 	onmouseover(callback) {
-		DOM_EVENT_HOOKS.addEventListener.apply(this,['mouseover', callback]);
+		return DOM_EVENT_HOOKS.addEventListener.apply(this,['mouseover', callback]);
 	},
 	onmouseleave(callback) {
-		DOM_EVENT_HOOKS.addEventListener.apply(this,['mouseleave', callback]);
+		return DOM_EVENT_HOOKS.addEventListener.apply(this,['mouseleave', callback]);
 	},
 	onkeyup(callback) {
-		DOM_EVENT_HOOKS.addEventListener.apply(this,['keyup', callback]);
+		return DOM_EVENT_HOOKS.addEventListener.apply(this,['keyup', callback]);
 	},
 	onkeypress(callback) {
-		DOM_EVENT_HOOKS.addEventListener.apply(this,['keypress', callback]);
+		return DOM_EVENT_HOOKS.addEventListener.apply(this,['keypress', callback]);
 	},
 	onkeydown(callback) {
-		DOM_EVENT_HOOKS.addEventListener.apply(this,['keydown', callback]);
+		return DOM_EVENT_HOOKS.addEventListener.apply(this,['keydown', callback]);
 	}
 };
 
@@ -163,6 +162,7 @@ const DOM_EVENT_HOOKS = {
 		if (!name) {
 			return;
 		}
+		return this;
 		// console.log('addEventListener',addEventListener, name, callback);
 		asyncMessage({action:'addEventListener',id:nodeId(this),name:name,callback:EventAdapter(callback)});
 	}

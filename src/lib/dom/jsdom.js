@@ -1,0 +1,1 @@
+self.jsdom = require('jsdom');

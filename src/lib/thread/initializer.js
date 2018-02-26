@@ -10,6 +10,8 @@ function configureThread(data) {
 			initSimpleImplementation();
 		} else if (data.implementation === 'domino') {
 			initDominoImplementation();
+		} else if (data.implementation === 'jsdom') {
+			initJsDomImplementation();
 		} else {
 			initDominoImplementation();
 		}
@@ -30,6 +32,20 @@ function configureThread(data) {
 
 	importApp(data.app);
 }
+
+function initJsDomImplementation() {
+	getDOMImplementation('jsdom-bundle');
+	const implementation = self.jsdom.JSDOM;
+	let node = new implementation(`<body></body>`);
+	window = getProxy(node.window, 'window');
+	Element = window.Element;
+	document = window.document;
+	window.screen = {
+		width: 1280,
+		height: 720
+	};
+}
+
 
 function initDominoImplementation() {
 	getDOMImplementation('domino-async-bundle');
