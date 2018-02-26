@@ -29,10 +29,12 @@
     "domino": "^2.0.1",
     "http-server": "^0.11.1",
     "jsdom": "^11.6.2",
+    "promise": "^8.0.1",
     "simple-dom": "^1.4.0-alpha.82914663"
   },
   "dependencies": {
     "eslint": "^4.18.1",
-    "workbox-sw": "^2.1.2"
+    "workbox-sw": "^2.1.2",
+    "ws": "^4.1.0"
   }
 }

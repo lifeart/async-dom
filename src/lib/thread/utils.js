@@ -1,3 +1,5 @@
+/* global APP_NODE_HOOKS, proxyGet, requireJS, ORIGINAL_KEY, nodeCounter, _cache */
+
 function importApp(appName='glimmer') {
 	if (APP_NODE_HOOKS[appName]) {
 		proxyGet = Object.assign(proxyGet, APP_NODE_HOOKS[appName]);
@@ -5,12 +7,36 @@ function importApp(appName='glimmer') {
 	requireJS(`../../apps/${appName}.js`);
 }
 
-function getTransport() {
-	requireJS('../transport/ww-legacy.js');
-	return {
-		sendMessage: self.asyncSendMessage,
-		receiveMessage: self.onmessage
-	};
+function getTransport(transportType) {
+	if (transportType === 'websocket') {
+		const WebSocket = require('ws');
+		const wss = new WebSocket.Server({ port: 8010 });
+
+		return new Promise((resolve)=>{
+			wss.on('connection', function connection(ws) {
+				console.log('hasConnection');
+				ws.on('message', function incoming(message) {
+					self.onmessage(message);
+				});
+
+				resolve({
+					sendMessage(msg) {
+						ws.send(msg);
+					},
+					receiveMessage: self.onmessage
+				});
+
+			});
+	
+		});
+
+	} else {
+		requireJS('../transport/ww-legacy.js');
+		return Promise.resolve({
+			sendMessage: self.asyncSendMessage,
+			receiveMessage: self.onmessage
+		});
+	}
 }
 
 function originalNode(node) {

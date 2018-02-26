@@ -36,18 +36,55 @@ class Thread {
 	createThread(config) {
 		let threadName = config.name;
 		let uid = this.getUID();
-		let thread = new Worker('lib/thread/ww.js?t='+Math.random());
-		this.uids[uid] = thread;
-		this._bindThreadActions(thread,uid);
-		this.threads[threadName] = thread;
-		this.threadsList.push(thread);
+		let thread = null;
 
+		if (config.type && config.type === 'websocket') {
 
-		thread.postMessage(Object.assign({
-			uid: '_configure',
-			appUID: uid
-		},config));
+			thread = new WebSocket('ws://localhost:8010');
+
+			thread.postMessage = thread.send;
+
+			thread.onopen = function() {
+				console.log('Соединение установлено.');
+
+				
+				thread.postMessage(Object.assign({
+					uid: '_configure',
+					appUID: uid
+				}, config));
+				
+
+			};
+
+			thread.onclose = function(event) {
+				if (event.wasClean) {
+					console.log('Соединение закрыто чисто');
+				} else {
+					console.log('Обрыв соединения'); // например, "убит" процесс сервера
+				}
+				console.log('Код: ' + event.code + ' причина: ' + event.reason);
+			};
+
+			thread.onerror = function(error) {
+				console.log('Ошибка ' + error.message);
+			};
+
 		
+		} else {
+			thread = new Worker('lib/thread/ww.js?t='+Math.random());
+			this.uids[uid] = thread;
+			this._bindThreadActions(thread,uid);
+			this.threads[threadName] = thread;
+			this.threadsList.push(thread);
+
+			
+			thread.postMessage(Object.assign({
+				uid: '_configure',
+				appUID: uid
+			}, config));
+			
+
+		}
 
 		return thread;
 	}
@@ -69,17 +106,18 @@ Transport.createThread({
 	createInitialDomStructure: true,
 	batchTransport: true,
 	implementation: 'simple',
+	// type: 'websocket',
 	packSize: 2000,
 	batchTimeout: 5,
 	frameTime: 250
 });
 
-Transport.createThread({
-	name: 'webWorkerApp2',
-	app: 'demo',
-	createInitialDomStructure: false,
-	batchTransport: false,
-	frameTime: 100
-});
+// Transport.createThread({
+// 	name: 'webWorkerApp2',
+// 	app: 'demo',
+// 	createInitialDomStructure: false,
+// 	batchTransport: false,
+// 	frameTime: 100
+// });
 
 const thread = Transport;

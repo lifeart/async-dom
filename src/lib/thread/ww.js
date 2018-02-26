@@ -10,7 +10,10 @@ requireJS('proxy.js');
 requireJS('initializer.js');
 requireJS('app-hooks.js');
 
-const transport = getTransport();
+var transport = {};
+getTransport().then((obj)=>{
+	transport = obj;
+});
 
 
 // createInitialDomStructure();
