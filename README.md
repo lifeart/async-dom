@@ -7,6 +7,13 @@ Async Dom
 
 2 apps separately running in web-workers, using async dom https://lifeart.github.io/async-dom/
 
+# Supported WebWorker dom implementations
+* Pseudo Dom
+* JSDom
+* Simple Dom
+* Domino
+
+
 # Logic
 
 1. All DOM modifications collected in single pool
