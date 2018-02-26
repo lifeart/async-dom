@@ -1,3 +1,5 @@
+/* global proxyGet */
+
 function getDOMImplementation(name) {
 	console.log('domImplemented', name);
 	requireJS(`../dom/${name}.js`);
@@ -30,7 +32,7 @@ function configureThread(data) {
 		createInitialDomStructure();
 	}
 
-	importApp(data.app);
+	importApp(data.app, proxyGet);
 }
 
 function initJsDomImplementation() {

@@ -24,9 +24,9 @@ var onVisibilityChange = (result) => {
 		// cancelAnimationFrame(self.lastFrame);
         
 		// self.lastCallback();
-		setAnimationFrameTime(100);
+		setAnimationFrameTime(self, 100);
 	} else {
-		setAnimationFrameTime(2000);
+		setAnimationFrameTime(self, 2000);
 	}
 };
 

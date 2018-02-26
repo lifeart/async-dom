@@ -19,3 +19,11 @@ let APP_NODE_HOOKS = {
 		}
 	}
 };
+
+if (typeof module === 'undefined') {
+	module = {
+		exports: {}
+	};	
+}
+
+module.exports.APP_NODE_HOOKS = APP_NODE_HOOKS;

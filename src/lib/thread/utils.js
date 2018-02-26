@@ -1,34 +1,39 @@
-/* global APP_NODE_HOOKS, proxyGet, requireJS, ORIGINAL_KEY, nodeCounter, _cache */
+/* global APP_NODE_HOOKS, requireJS, ORIGINAL_KEY, nodeCounter, _cache */
 
-function importApp(appName='glimmer') {
+function importApp(appName='glimmer', proxyGet) {
+	if (typeof APP_NODE_HOOKS === 'undefined') {
+		APP_NODE_HOOKS = require('app-hooks.js').APP_NODE_HOOKS;
+	}
 	if (APP_NODE_HOOKS[appName]) {
-		proxyGet = Object.assign(proxyGet, APP_NODE_HOOKS[appName]);
+		Object.assign(proxyGet, APP_NODE_HOOKS[appName]);
 	}
 	requireJS(`../../apps/${appName}.js`);
 }
 
+function getWSTransport() {
+	const WebSocket = require('ws');
+	const Promise = require('promise/setimmediate');
+	const wss = new WebSocket.Server({ port: 8010 });
+
+	return new Promise((resolve)=>{
+		wss.on('connection', function connection(ws) {
+			console.log('hasConnection');
+			ws.on('message', function incoming(message) {
+				self.onmessage(message);
+			});
+			resolve({
+				sendMessage(msg) {
+					ws.send(msg);
+				},
+				receiveMessage: self.onmessage
+			});
+		});
+	});
+}
+
 function getTransport(transportType) {
 	if (transportType === 'websocket') {
-		const WebSocket = require('ws');
-		const wss = new WebSocket.Server({ port: 8010 });
-
-		return new Promise((resolve)=>{
-			wss.on('connection', function connection(ws) {
-				console.log('hasConnection');
-				ws.on('message', function incoming(message) {
-					self.onmessage(message);
-				});
-
-				resolve({
-					sendMessage(msg) {
-						ws.send(msg);
-					},
-					receiveMessage: self.onmessage
-				});
-
-			});
-	
-		});
+		return getWSTransport();
 
 	} else {
 		requireJS('../transport/ww-legacy.js');
@@ -64,16 +69,16 @@ function nodeId(maybeElement,debug) {
 	return _cache.get(element);
 }
 
-function setAnimationFrameTime(time) {
-	self.animationFrameTime = time;
+function setAnimationFrameTime(context, time) {
+	context.animationFrameTime = time;
 }
 
 function EventTransformer(callback,e) {
-	e.currentTarget =document.getElementById(e.currentTarget);
-	e.srcElement =document.getElementById(e.srcElement);
-	e.target =document.getElementById(e.target) || e.currentTarget || null;
-	e.toElement =document.getElementById(e.toElement);
-	e.eventPhase =document.getElementById(e.eventPhase);
+	e.currentTarget = document.getElementById(e.currentTarget);
+	e.srcElement = document.getElementById(e.srcElement);
+	e.target = document.getElementById(e.target) || e.currentTarget || null;
+	e.toElement = document.getElementById(e.toElement);
+	e.eventPhase = document.getElementById(e.eventPhase);
 	e.preventDefault = ()=>{};
 	callback(e);
 }
@@ -94,3 +99,17 @@ function EventAdapter(callback) {
 // 	};
 // }
 
+
+if (typeof module === 'undefined') {
+	module = {
+		exports: {}
+	};	
+}
+
+module.exports.getTransport = getTransport;
+module.exports.originalNode = originalNode;
+module.exports.nodeId = nodeId;
+module.exports.importApp = importApp;
+module.exports.setAnimationFrameTime = setAnimationFrameTime;
+module.exports.EventAdapter = EventAdapter;
+module.exports.EventTransformer = EventTransformer;
