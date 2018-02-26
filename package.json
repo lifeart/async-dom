@@ -6,6 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "compile-domino": "browserify ./src/lib/dom/domino-async.js -o ./src/lib/dom/domino-async-bundle.js",
+    "compile-simple-dom": "browserify ./src/lib/dom/simple-dom.js -o ./src/lib/dom/simple-dom-bundle.js",
     "s": "http-server ./src -p 8080"
   },
   "repository": {
@@ -24,7 +25,9 @@
   "homepage": "https://github.com/lifeart/async-dom#readme",
   "devDependencies": {
     "browserify": "^16.1.0",
-    "domino": "^2.0.1"
+    "domino": "^2.0.1",
+    "http-server": "^0.11.1",
+    "simple-dom": "^1.4.0-alpha.82914663"
   },
   "dependencies": {
     "eslint": "^4.18.1",
