@@ -112,12 +112,14 @@ Transport.createThread({
 	frameTime: 250
 });
 
-// Transport.createThread({
-// 	name: 'webWorkerApp2',
-// 	app: 'demo',
-// 	createInitialDomStructure: false,
-// 	batchTransport: false,
-// 	frameTime: 100
-// });
+Transport.createThread({
+	name: 'webWorkerApp2',
+	app: 'demo',
+	implementation: 'domino',
+	createInitialDomStructure: false,
+	batchTransport: false,
+	frameTime: 100
+});
 
 const thread = Transport;
+

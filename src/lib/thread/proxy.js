@@ -51,6 +51,7 @@ const proxyList = {
 	},
 	document: {
 		get(target, prop) {
+			// console.log('prop',prop);
 			// console.log(prop);
 			if (patches[prop]) {
 				return patches[prop].bind(target);
@@ -93,7 +94,7 @@ const proxyList = {
 			// || self[prop];
 		},
 		set(target, prop, value) {
-			console.log(prop,value);
+			// console.log(prop,value);
 			target[prop] = value;
 			return true;
 		}
