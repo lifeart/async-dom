@@ -104,22 +104,24 @@ Transport.createThread({
 	name: 'webWorkerApp',
 	app: 'glimmer',
 	createInitialDomStructure: true,
-	batchTransport: true,
-	implementation: 'simple',
+	batchTransport: false,
+	implementation: 'domino',
 	// type: 'websocket',
 	packSize: 2000,
 	batchTimeout: 5,
 	frameTime: 250
 });
 
-Transport.createThread({
-	name: 'webWorkerApp2',
-	app: 'demo',
-	implementation: 'domino',
-	createInitialDomStructure: false,
-	batchTransport: false,
-	frameTime: 100
-});
+this.debug = true;
+
+// Transport.createThread({
+// 	name: 'webWorkerApp2',
+// 	app: 'demo',
+// 	implementation: 'domino',
+// 	createInitialDomStructure: false,
+// 	batchTransport: false,
+// 	frameTime: 100
+// });
 
 const thread = Transport;
 

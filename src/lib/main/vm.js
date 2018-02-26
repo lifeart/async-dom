@@ -592,6 +592,8 @@
 			// return;
 		}
 		if (!children) {
+			//@todo react hack
+			// parent.appendChild(getNode('app'));
 			console.log('appendChild: unable to find children', data);
 			return;
 		}

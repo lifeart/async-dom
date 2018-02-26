@@ -123,6 +123,7 @@ const DOM_ATTR_EVENT_HOOKS = {
 	},
 	onmouseenter(callback) {
 		// console.log('onmouseenter', this);
+		// debugger;
 		return DOM_EVENT_HOOKS.addEventListener.apply(this,['mouseenter', callback]);
 	},
 	onmouseup(callback) {
@@ -176,19 +177,22 @@ const DOM_EVENT_HOOKS = {
 			return  getProxy(this);
 		}
 		// console.log('addEventListener',addEventListener, name, callback);
-		asyncMessage({action:'addEventListener',id:nodeId(this),name:name,callback:EventAdapter(callback)});
+		asyncMessage({action:'addEventListener',id:nodeId(this,'addEventListener'),name:name,callback:EventAdapter(callback)});
 		return getProxy(this);
 	}
 };
 
 const NODE_HOOKS = {
+	// parentNode() {
+	// 	console.log('parentNode');
+	// },
 	removeChild(child) {
 		let result = this.removeChild.apply(this, [originalNode(child)]);
-		asyncMessage({action:'removeChild',id: nodeId(this),childrenId:nodeId(child)});
+		asyncMessage({action:'removeChild',id: nodeId(this,'removeChild'),childrenId:nodeId(child,'removeChild')});
 		return result;
 	},
 	remove() {
-		asyncMessage({action:'removeNode',id: nodeId(this)});
+		asyncMessage({action:'removeNode',id: nodeId(this,'remove')});
 		if (!this.remove) {
 			return this.parentNode.removeChild(this);
 		}
@@ -199,32 +203,36 @@ const NODE_HOOKS = {
 		let result = this.insertBefore.apply(this, [originalNode(newElement), originalNode(referenceElement)]);
 		asyncMessage({
 			action:'insertBefore',
-			id: nodeId(this),
-			newId: nodeId(newElement), 
-			refId: referenceElement?nodeId(referenceElement):null
+			id: nodeId(this,'insertBefore'),
+			newId: nodeId(newElement,'insertBefore'), 
+			refId: referenceElement?nodeId(referenceElement,'insertBefore'):null
 		});
 		return result;
 	},
+	getAttribute(name) {
+		console.log('getAttribute',name);
+		return this.getAttribute(name);
+	},
 	appendChild(element) {
 		let result = this.appendChild.apply(this, [originalNode(element)]);
-		asyncMessage({action:'appendChild',id: nodeId(this),childrenId: nodeId(element)});
+		asyncMessage({action:'appendChild',id: nodeId(this,'appendChild'),childrenId: nodeId(element,'appendChild')});
 		return result;
 	},
 	setAttributeNS() {
 		console.log('setAttributeNS', arguments);
 	},
 	setAttribute(attribute, value) {
-		// console.log('attribute', attribute);
+		
 		if (attribute in DOM_ATTR_EVENT_HOOKS) {
 			return DOM_ATTR_EVENT_HOOKS[attribute].apply(this, [value]);
 		}
 		let result = this.setAttribute.apply(this, [attribute, value]);
-		asyncMessage({action:'setAttribute',id:nodeId(this),attribute:attribute,value:value});
+		asyncMessage({action:'setAttribute',id:nodeId(this,'setAttribute'),attribute:attribute,value:value});
 		return result;
 	},
 	removeAttribute(attribute) {
 		// console.log('removeAttribure');
-		asyncMessage({action:'removeAttribute',id:nodeId(this),attribute:attribute});
+		asyncMessage({action:'removeAttribute',id:nodeId(this,'removeAttribute'),attribute:attribute});
 		return this.removeAttribute(attribute);
 	}
 };
@@ -250,14 +258,14 @@ const DOCUMENT_HOOKS = {
 	},
 	createComment(text) {
 		let element = this.createComment.apply(this, [text]);
-		asyncMessage({ action: 'createComment', id: nodeId(element), textContent: text || '' });
+		asyncMessage({ action: 'createComment', id: nodeId(element,'createComment'), textContent: text || '' });
 		return getProxy(element);
 	},
 	createElement(tagName, content) {
 		let element = this.createElement.apply(this, [tagName, content]);
 		let textContent = content ? content : '';
 		// console.log('createElement', tagName);
-		asyncMessage({action:'createNode',id: nodeId(element),tag:element.tagName, textContent});
+		asyncMessage({action:'createNode',id: nodeId(element,'createElement'),tag:element.tagName, textContent});
 		return getProxy(element);
 	},
 	createDocumentFragment() {
@@ -267,14 +275,21 @@ const DOCUMENT_HOOKS = {
 	},
 	createTextNode(text) {
 		let node = this.createTextNode.apply(this, [text]);
-		asyncMessage({action:'createNode',id: nodeId(node),tag:'#text',textContent:text});
+		asyncMessage({action:'createNode',id: nodeId(node,'createTextNode'),tag:'#text',textContent:text});
 		return getProxy(node);
 	},
 
 };
 
 let proxyGet = Object.assign(
-	{},
+	// {
+	// 	firstChild() {
+	// 		console.log('proxyGet=firstChilde');
+	// 	},
+	// 	parentNode() {
+	// 		console.log('proxyGet=parentNode',arguments);
+	// 	}
+	// },
 	DOCUMENT_HOOKS,
 	NODE_HOOKS,
 	DOM_EVENT_HOOKS,
@@ -287,6 +302,38 @@ let proxyGet = Object.assign(
 );
 
 let staticGet = {
+	children() {
+		console.log('children', this.children);
+		return this.children;
+	},
+	attributes() {
+		console.log('attributes',this.attributes);
+		return this.attributes;
+	},
+	firstChild() {
+		return  getProxy(this.firstChild);
+	},
+	lastChild() {
+		return  getProxy(this.lastChild);
+	},
+	//legacy
+	parentElement() {
+		return  getProxy(this.parentNode);
+	},
+	parentNode() {
+		return  getProxy(this.parentNode);
+	},
+	nextSibling() {
+		return  getProxy(this.nextSibling);
+	},
+	previousSibling() {
+		return  getProxy(this.previousSibling);
+	},
+	
+	ownerDocument() {
+		// console.log('ownerDocument',arguments);
+		return getProxy(document,'document');
+	},
 	style() {
 		return getProxy(this.style,'style');
 	}
@@ -354,6 +401,7 @@ const patches = Object.assign({}, {
 }, DOM_ATTR_EVENT_HOOKS);
 
 function extendedSet(target, prop, value) {
+	// console.log(prop);
 	if (proxySet[prop]) {
 		return proxySet[prop].apply(target,[value]);
 	}

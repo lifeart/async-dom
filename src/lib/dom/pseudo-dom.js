@@ -114,6 +114,7 @@ class Element {
 		this.addEventListener('click', callback);
 	}
 	set onmouseenter(callback) {
+		// console.log('onmouseenter');
 		this.addEventListener('mouseenter', callback);
 	}
 	set onmouseup(callback) {
@@ -712,34 +713,12 @@ var styleProxy = {
 	}
 };
 
-var realWindowProxy = {
-	get(target, prop) {
-		return target[prop] || self[prop];
-	},
-	set(target, prop, value) {
-		target[prop] = value;
-		return true;
-	}
-};
 
-var windowProxy = {
-	get(target, prop) {
-		return target[prop];
-	},
-	set(target, prop, value) {
-		target[prop] = value;
-		return true;
-	}
-};
-
-
-
-
-class CustomEvent {
-	constructor() {
-		console.log(arguments);
-	}
-}
+// class CustomEvent {
+// 	constructor() {
+// 		console.log(arguments);
+// 	}
+// }
 
 class Document {
 	_syncDom(id) {
@@ -770,6 +749,8 @@ class Document {
 		console.log('removeEventListener', arguments);
 	}
 	get defaultView() {
+
+		//foo
 		return window;
 	}
 	get ownerDocument() {
@@ -972,9 +953,7 @@ function getComputedStyle(el) {
 	console.log('getComputedStyle', arguments);
 	return el.getComputedStyle();
 }
-
-// var window = new Proxy({}, realWindowProxy);
-window.requestAnimationFrame = requestAnimationFrame;
+// window.requestAnimationFrame = requestAnimationFrame;
 var _localStorage = {};
 
 window.localStorage = {
@@ -1024,24 +1003,24 @@ window.scrollTo = function() {
 	// asyncMessage({action:'scrollTo',id:'window'});
 	// console.log('scrollTo', arguments);
 };
-window.addEventListener = function(name, callback) {
-	console.log('addEventListener', name, callback);
-	if (name === 'load') {
-		setTimeout(callback, 200);
-	}
-	asyncMessage({
-		action: 'addEventListener',
-		id: 'window',
-		name: name,
-		callback: EventAdapter(callback)
-	});
-};
-window.removeEventListener = function(name, callback) {
-	console.log('removeEventListener', name, callback);
-};
-window.dispatchEvent = function() {
-	console.log('dispatchEvent', arguments);
-};
+// window.addEventListener = function(name, callback) {
+// 	console.log('addEventListener', name, callback);
+// 	if (name === 'load') {
+// 		setTimeout(callback, 200);
+// 	}
+// 	asyncMessage({
+// 		action: 'addEventListener',
+// 		id: 'window',
+// 		name: name,
+// 		callback: EventAdapter(callback)
+// 	});
+// };
+// window.removeEventListener = function(name, callback) {
+// 	console.log('removeEventListener', name, callback);
+// };
+// window.dispatchEvent = function() {
+// 	console.log('dispatchEvent', arguments);
+// };
 
 // instanse of Text
 class Text {}
