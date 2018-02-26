@@ -1,6 +1,6 @@
 /* global thread */
 
-(function() {
+(function(self) {
 
 	// viewportHeight (recalculated on each frame size)
 	var viewportHeight = 0;
@@ -20,6 +20,8 @@
 	// all nodes cache
 	var nodesCache = {};
 
+	self.nodesCache = nodesCache;
+	self.debug  = debug;
 	// navigator object mirror
 	var _navigator = {
 		userAgent: navigator.userAgent,
@@ -1025,4 +1027,4 @@
 			value: document.visibilityState
 		});
 	});
-})();
+})(this);

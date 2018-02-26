@@ -25,7 +25,7 @@ const proxyList = {
 		},
 		set(target, prop, value) {
 			// console.log(target, prop, value);
-			asyncMessage({action:'setStyle',id:nodeId(target._element),attribute:prop,value:value,optional:true});
+			asyncMessage({action:'setStyle',id:nodeId(target._element||target,'proxyList'),attribute:prop,value:value,optional:true});
 			target[prop] = value;
 			return true;
 		}
@@ -51,6 +51,7 @@ const proxyList = {
 	},
 	document: {
 		get(target, prop) {
+			// console.log(prop);
 			if (patches[prop]) {
 				return patches[prop].bind(target);
 			}
@@ -85,10 +86,14 @@ const proxyList = {
 				}
 				return documentProxy; 
 			}
+			if (DOM_EVENT_HOOKS[prop]) {
+				return DOM_EVENT_HOOKS[prop].bind(target);
+			}
 			return target[prop];
 			// || self[prop];
 		},
 		set(target, prop, value) {
+			console.log(prop,value);
 			target[prop] = value;
 			return true;
 		}
@@ -116,6 +121,7 @@ const DOM_ATTR_EVENT_HOOKS = {
 		return DOM_EVENT_HOOKS.addEventListener.apply(this,['click', callback]);
 	},
 	onmouseenter(callback) {
+		// console.log('onmouseenter', this);
 		return DOM_EVENT_HOOKS.addEventListener.apply(this,['mouseenter', callback]);
 	},
 	onmouseup(callback) {
@@ -157,14 +163,20 @@ const DOM_EVENT_HOOKS = {
 		}
 		// asyncMessage({action:'addEventListener',id:this.id,name:name,callback:callback)});
 		// console.log('removeEventListener',arguments);
+		return getProxy(this);
 	},
 	addEventListener(name, callback) {
 		if (!name) {
 			return;
 		}
-		return this;
+		if (name === 'load') {
+			//|| name === 'DOMContentLoaded'
+			setTimeout(callback,100);
+			return  getProxy(this);
+		}
 		// console.log('addEventListener',addEventListener, name, callback);
 		asyncMessage({action:'addEventListener',id:nodeId(this),name:name,callback:EventAdapter(callback)});
+		return getProxy(this);
 	}
 };
 
@@ -222,6 +234,8 @@ const customDomCache = {};
 const DOCUMENT_HOOKS = {
 	documentElement() {
 		console.log('documentElement');
+		// return getProxy(originalNode(this.documentElement),'document');
+		// return window;
 	},
 	// document
 	getElementById(id) {
@@ -282,49 +296,47 @@ const proxySet = Object.assign(
 	{},
 	DOM_ATTR_EVENT_HOOKS,
 	{ 
-		// ownerDocument() {
-		// console.log('ownerDocument');
-		// },
+
 		parentNode(value) {
 			// console.log('parentNode',this);
 			// setParentNode
-			asyncMessage({action:'setParentNode',id:nodeId(this),parent:nodeId(value)});
+			asyncMessage({action:'setParentNode',id:nodeId(this,'parentNode'),parent:nodeId(value,'parentNode')});
 			return this.parentNode = value;
 		},
 		className(value) {
 			let result = this.className = value;
-			asyncMessage({action:'setClassName',id:nodeId(this),name:value});
+			asyncMessage({action:'setClassName',id:nodeId(this,'className'),name:value});
 			return result;
 		},
 		style(value) {
 			// console.log('DOM_ATTR_EVENT_HOOKS=STYLE');
 			// console.log('setAttribute','style');
-			asyncMessage({action:'setAttribute',id:nodeId(this),attribute:'style',value:value});
+			asyncMessage({action:'setAttribute',id:nodeId(this,'style'),attribute:'style',value:value});
 			return  this.style = value;
 		},
 		id(newId) {
 			let result = this.id = newId;
 			//@todo glimmer fix
 			customDomCache[this.id] = this;
-			asyncMessage({action:'setAttribute',id:nodeId(this),attribute:'id',value:newId});
+			asyncMessage({action:'setAttribute',id:nodeId(this,'id'),attribute:'id',value:newId});
 			return result;
 		},
 		nodeValue(value) {
 			// console.log('nodeValue', value);
 			let result = this.nodeValue = value;
-			asyncMessage({action:'setProperty',id: nodeId(this),property:'nodeValue',value:value});
+			asyncMessage({action:'setProperty',id: nodeId(this,'nodeValue'),property:'nodeValue',value:value});
 			return result;
 		},
 		textContent(value) {
 			// console.log('textContent', value);
-			asyncMessage({action:'setTextContent',id:nodeId(this),textContent: value});
+			asyncMessage({action:'setTextContent',id:nodeId(this,'textContent'),textContent: value});
 			let result = this.textContent = value;
 			return value;
 		},
 		innerHTML(value) {
 			let result = this.innerHTML = value;
 			console.log('innerhtml', value);
-			asyncMessage({action:'setHTML',id:nodeId(this),html:value});
+			asyncMessage({action:'setHTML',id:nodeId(this,'innerHTML'),html:value});
 			return value;
 		}
 	});

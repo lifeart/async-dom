@@ -14,6 +14,8 @@ function configureThread(data) {
 			initDominoImplementation();
 		} else if (data.implementation === 'jsdom') {
 			initJsDomImplementation();
+		} else if (data.implementation === 'pseudo') {
+			initPseudoDomImplementation();
 		} else {
 			initDominoImplementation();
 		}
@@ -35,11 +37,31 @@ function configureThread(data) {
 	importApp(data.app, proxyGet);
 }
 
+
+
+function initPseudoDomImplementation() {
+	getDOMImplementation('pseudo-dom');
+	const implementation = self.pseudoDom;
+	// console.log('implementation',implementation);
+	// console.log(implementation,window.Element);
+	// let node = new implementation(`<body></body>`);
+	window = getProxy(implementation, 'window');
+	asyncMessage = transport.sendMessage;
+	
+	Element = window.Element;
+	document = window.document;
+	window.screen = {
+		width: 1280,
+		height: 720
+	};
+}
+
 function initJsDomImplementation() {
 	getDOMImplementation('jsdom-bundle');
 	const implementation = self.jsdom.JSDOM;
 	let node = new implementation(`<body></body>`);
 	window = getProxy(node.window, 'window');
+	asyncMessage = transport.sendMessage;
 	Element = window.Element;
 	document = window.document;
 	window.screen = {
@@ -90,18 +112,13 @@ function createInitialDomStructure() {
 	document.body.appendChild(node);
 	//@todo fix simple-dom getE
 	self.appNode = node;
+
 	// let secondNode = document.createElement('div');
 	// secondNode.innerHTML = 'foo-bar';
-
 	// node.insertBefore(secondNode, null);
 
-
 	// let firdNode = document.createElement('div');
-   
 	// firdNode.innerHTML = 'lool';
-
-   
-
 
 	// node.insertBefore(firdNode,secondNode);
 }

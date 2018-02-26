@@ -7,6 +7,7 @@ function importApp(appName='glimmer', proxyGet) {
 	if (APP_NODE_HOOKS[appName]) {
 		Object.assign(proxyGet, APP_NODE_HOOKS[appName]);
 	}
+
 	requireJS(`../../apps/${appName}.js`);
 }
 
@@ -52,17 +53,27 @@ function originalNode(node) {
 }
 
 function nodeId(maybeElement,debug) {
+	if (!maybeElement) {
+		console.log('maybeElement',maybeElement,debug);
+	}
 	let element = maybeElement[ORIGINAL_KEY] || maybeElement;
 	if (!_cache.has(element)) {
 		nodeCounter++;
 		// console.log('element.tagName',element.tagName);
+		//window
 		if (element.tagName === 'BODY') {
 			_cache.set(element, 'async-body');
 		} else {
 			if (element.id === 'app') {
 				_cache.set(element, 'app');
 			} else {
-				_cache.set(element, `a-${self.AppUID}-${nodeCounter}`);
+				// react fix
+				if ('Uint8Array' in element) {
+					_cache.set(element, `window`);
+				} else {
+					_cache.set(element, `a-${self.AppUID}-${nodeCounter}`);
+				}
+
 			}
 		}
 	}

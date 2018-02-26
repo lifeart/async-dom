@@ -1,4 +1,8 @@
+(function(_this){
+
 /* globals asyncImageLoad asyncMessage */
+
+const asyncMessage = () => Promise.resolve({});
 
 const hexToRgba = function(hex, a) {
 	if (hex.charAt(0) !== '#') {
@@ -420,6 +424,9 @@ class Element {
 		}
 		asyncMessage({ action: 'getElementById', id: this.id }).then(result => {
 			var node = result.result;
+			if (!node) {
+				return;
+			}
 			if (!result.result.style) {
 				// console.log(result.result);
 				return;
@@ -726,10 +733,6 @@ var windowProxy = {
 };
 
 
-var document = new Proxy(new Document(), windowProxy);
-window.document = document;
-window.document.location = window.location;
-window.Element = Element;
 
 
 class CustomEvent {
@@ -776,7 +779,7 @@ class Document {
 		return 9;
 	}
 	createComment(text) {
-		return new Proxy(this._createCommentElement(text), windowProxy);
+		return this._createCommentElement(text);
 		// return `<!--${text}-->`;
 	}
 	getElementsByTagName(tagName) {
@@ -872,7 +875,7 @@ class Document {
 	}
 	createElement(nodeName) {
 		// console.log('createElement',nodeName,arguments);
-		return new Proxy(this._createElement(nodeName), windowProxy);
+		return this._createElement(nodeName);
 	}
 	_createCommentElement(textContent) {
 		this.nodeCounter++;
@@ -887,7 +890,7 @@ class Document {
 			id: node.id,
 			textContent: textContent || ''
 		});
-		return new Proxy(node, windowProxy);
+		return node;
 	}
 	_createElement(name, textContent) {
 		this.nodeCounter++;
@@ -951,12 +954,26 @@ class Document {
 	}
 }
 
+class Proxy {
+	constructor() {
+		return arguments[0];
+	}
+}
+
+var window = {};
+
+var document = new Document();
+window.document = document;
+window.document.location = window.location;
+window.Element = Element;
+
+
 function getComputedStyle(el) {
 	console.log('getComputedStyle', arguments);
 	return el.getComputedStyle();
 }
 
-var window = new Proxy({}, realWindowProxy);
+// var window = new Proxy({}, realWindowProxy);
 window.requestAnimationFrame = requestAnimationFrame;
 var _localStorage = {};
 
@@ -1029,32 +1046,36 @@ window.dispatchEvent = function() {
 // instanse of Text
 class Text {}
 
-function initApp() {
-	let node = document.createElement('div');
-	node.setAttribute('id', 'app');
-	document.body.appendChild(node);
-}
+// function initApp() {
+// 	let node = document.createElement('div');
+// 	node.setAttribute('id', 'app');
+// 	document.body.appendChild(node);
+// }
 
-initApp();
+// initApp();
 
-function cancelAnimationFrame(id) {
-	_this.clearTimeot(id);
-}
+// function cancelAnimationFrame(id) {
+// 	_this.clearTimeot(id);
+// }
 
-function requestAnimationFrame(callback) {
-	frameActions.push(callback);
-}
+// function requestAnimationFrame(callback) {
+// 	frameActions.push(callback);
+// }
 
-function goFrame() {
-	let p = performance.now();
-	let length = frameActions.length;
+// function goFrame() {
+// 	let p = performance.now();
+// 	let length = frameActions.length;
 
-	for (let i = 0; i < length; i++) {
-		frameActions[i](p);
-	}
-	frameActions.splice(0, length);
-	const delta = (frameWindow - (performance.now() - p)) / 1000;
-	setTimeout(goFrame, delta);
-}
+// 	for (let i = 0; i < length; i++) {
+// 		frameActions[i](p);
+// 	}
+// 	frameActions.splice(0, length);
+// 	const delta = (frameWindow - (performance.now() - p)) / 1000;
+// 	setTimeout(goFrame, delta);
+// }
 
-goFrame();
+_this.pseudoDom = window;
+// goFrame();
+
+
+})(self);
