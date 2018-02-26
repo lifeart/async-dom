@@ -5,12 +5,6 @@ function importApp(appName='glimmer') {
 	requireJS(`../../apps/${appName}.js`);
 }
 
-function getDOMImplementation() {
-	requireJS('../dom/domino-async-bundle.js');
-	// requireJS('../dom/pseudo-dom.js');
-	return self.domino;
-}
-
 function getTransport() {
 	requireJS('../transport/ww-legacy.js');
 	return {
@@ -74,17 +68,3 @@ function EventAdapter(callback) {
 // 	};
 // }
 
-function configureThread(data) {
-	self.AppUID = data.appUID;
-	self.animationFrameTime = data.frameTime || self.animationFrameTime;
-	self.batchTransport = data.batchTransport || self.batchTransport;
-
-	self.packSize = data.packSize || self.packSize;
-	self.batchTimeout = data.batchTimeout || self.batchTimeout;
-
-	if (data.createInitialDomStructure) {
-		createInitialDomStructure();
-	}
-
-	importApp(data.app);
-}

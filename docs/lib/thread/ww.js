@@ -12,9 +12,6 @@ requireJS('app-hooks.js');
 
 const transport = getTransport();
 
-initDominoImplementation();
-
-
 
 // createInitialDomStructure();
 

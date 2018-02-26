@@ -1,0 +1,1 @@
+self.simpleDom = require('simple-dom');
