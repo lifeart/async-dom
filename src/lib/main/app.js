@@ -42,18 +42,32 @@ class Thread {
 
 			thread = new WebSocket('ws://localhost:8010');
 
-			thread.postMessage = thread.send;
+			thread.postMessage = function (data) {
+				// thread.send(data);
+				thread.send(JSON.stringify(data));
+			};
 
+		
 			thread.onopen = function() {
-				console.log('Соединение установлено.');
+				thread.send('foo-bar');
+				// console.log('Соединение установлено.');
 
-				
 				thread.postMessage(Object.assign({
 					uid: '_configure',
 					appUID: uid
 				}, config));
 				
+			};
 
+			thread.onmessage = function (event) {
+				console.log(typeof event.data);
+				let reader = new FileReader();
+						console.log(arguments);
+				reader.onload = function(result) {
+					console.log(arguments, reader);
+				};
+				reader.readAsText(event.data);
+		
 			};
 
 			thread.onclose = function(event) {
@@ -106,7 +120,7 @@ Transport.createThread({
 	createInitialDomStructure: true,
 	batchTransport: false,
 	implementation: 'domino',
-	// type: 'websocket',
+	type: 'websocket',
 	packSize: 2000,
 	batchTimeout: 5,
 	frameTime: 250
