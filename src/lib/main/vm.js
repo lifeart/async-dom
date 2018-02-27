@@ -1,6 +1,5 @@
 /* global thread */
-
-(function(self) {
+function runVM(self) {
 
 	// viewportHeight (recalculated on each frame size)
 	var viewportHeight = 0;
@@ -1029,4 +1028,4 @@
 			value: document.visibilityState
 		});
 	});
-})(this);
+}

@@ -1,3 +1,5 @@
+/* lobal runVM */
+
 class Thread {
 	constructor() {
 		this.threads = {};
@@ -28,10 +30,23 @@ class Thread {
 		});
 	}
 	_bindThreadActions(thread, appUID) {
-		thread.onmessage  = (data) => {
-			data.data.appUID = appUID;
-			this.__get(data);
-		};
+		if (thread.type && thread.type === 'ws') {
+			thread.onmessage  = (data) => {
+				console.log('raw',data);
+				let parsedData = {
+					data: JSON.parse(data.data)
+				};
+				parsedData.data.appUID = appUID;
+			
+				this.__get(parsedData);
+			};
+		} else {
+			thread.onmessage  = (data) => {
+				data.data.appUID = appUID;
+				this.__get(data);
+			};
+		}
+
 	}
 	createThread(config) {
 		let threadName = config.name;
@@ -39,35 +54,18 @@ class Thread {
 		let thread = null;
 
 		if (config.type && config.type === 'websocket') {
-
 			thread = new WebSocket('ws://localhost:8010');
-
+			thread.type = 'ws';
+			
 			thread.postMessage = function (data) {
-				// thread.send(data);
 				thread.send(JSON.stringify(data));
 			};
-
-		
-			thread.onopen = function() {
-				thread.send('foo-bar');
-				// console.log('Соединение установлено.');
-
+			thread.onopen = () => {
+				console.log('opened');
 				thread.postMessage(Object.assign({
 					uid: '_configure',
 					appUID: uid
 				}, config));
-				
-			};
-
-			thread.onmessage = function (event) {
-				console.log(typeof event.data);
-				let reader = new FileReader();
-						console.log(arguments);
-				reader.onload = function(result) {
-					console.log(arguments, reader);
-				};
-				reader.readAsText(event.data);
-		
 			};
 
 			thread.onclose = function(event) {
@@ -82,6 +80,11 @@ class Thread {
 			thread.onerror = function(error) {
 				console.log('Ошибка ' + error.message);
 			};
+
+			this.uids[uid] = thread;
+			this._bindThreadActions(thread,uid);
+			this.threads[threadName] = thread;
+			this.threadsList.push(thread);
 
 		
 		} else {
@@ -137,5 +140,13 @@ this.debug = true;
 // 	frameTime: 100
 // });
 
+Transport.ready = ()=>{
+	runVM(this);
+};
+
 const thread = Transport;
+
+setTimeout(()=>{
+	Transport.ready();
+},1500);
 
