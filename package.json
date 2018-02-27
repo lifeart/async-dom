@@ -34,6 +34,7 @@
   },
   "dependencies": {
     "eslint": "^4.18.1",
+    "webworker-threads": "^0.7.13",
     "workbox-sw": "^2.1.2",
     "ws": "^4.1.0"
   }
