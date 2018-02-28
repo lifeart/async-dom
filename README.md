@@ -14,6 +14,12 @@ Async Dom
 * Domino
 
 
+# How to run glimmer streaming from websockets?
+
+1. `npm install`
+2. `npm run serve`
+3. `visit http://127.0.0.1:8080`
+
 # Logic
 
 1. All DOM modifications collected in single pool
