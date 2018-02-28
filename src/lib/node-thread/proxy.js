@@ -1,13 +1,33 @@
 const noop = () => {};
 
 const asyncMessage = noop;
-const EventAdapter = noop;
-const originalNode = noop;
+
 const proxyMap = new WeakMap();
-let nodeCounter = nodeCounter;
+let nodeCounter = 0;
 
 const _cache = new WeakMap();
 const ORIGINAL_KEY = '__ORIGINAL__';
+
+function originalNode(node) {
+	if (!node) {
+		return null;
+	}
+	return node[ORIGINAL_KEY] || node;
+}
+
+function EventTransformer(callback,e) {
+	e.currentTarget = document.getElementById(e.currentTarget);
+	e.srcElement = document.getElementById(e.srcElement);
+	e.target = document.getElementById(e.target) || e.currentTarget || null;
+	e.toElement = document.getElementById(e.toElement);
+	e.eventPhase = document.getElementById(e.eventPhase);
+	e.preventDefault = ()=>{};
+	callback(e);
+}
+
+function EventAdapter(callback) {
+	return EventTransformer.bind(null, callback);
+}
 
 function nodeId(maybeElement,debug) {
 	if (!maybeElement) {
@@ -51,24 +71,6 @@ function getProxy(obj, proxyName = 'asyncProxy') {
 }
 
 const proxyList = {
-	style: {
-		get(target, prop) {
-			// console.log(prop);
-			return target[prop];
-		},
-		set(target, prop, value) {
-			// console.log(target, prop, value);
-			asyncMessage({
-				action: 'setStyle',
-				id: nodeId(target._element || target, 'proxyList'),
-				attribute: prop,
-				value: value,
-				optional: true
-			});
-			target[prop] = value;
-			return true;
-		}
-	},
 	asyncProxy: {
 		get: extendedGet,
 		set: extendedSet
@@ -371,25 +373,19 @@ const DOCUMENT_HOOKS = {
 	}
 };
 
-let proxyGet = Object.assign(
-	// {
-	// 	firstChild() {
-	// 		console.log('proxyGet=firstChilde');
-	// 	},
-	// 	parentNode() {
-	// 		console.log('proxyGet=parentNode',arguments);
-	// 	}
-	// },
-	DOCUMENT_HOOKS,
-	NODE_HOOKS,
-	DOM_EVENT_HOOKS,
-	NOOP_HOOKS,
-	{
-		[ORIGINAL_KEY]() {
-			return this;
+let proxyGet = function() {
+	return Object.assign(
+		DOCUMENT_HOOKS,
+		NODE_HOOKS,
+		DOM_EVENT_HOOKS,
+		NOOP_HOOKS,
+		{
+			[ORIGINAL_KEY]() {
+				return this;
+			}
 		}
-	}
-);
+	);
+};
 
 let staticGet = {
 	children() {
@@ -547,5 +543,44 @@ function extendedGet(target, prop) {
 }
 
 
-module.exports.getProxy = getProxy;
-module.exports.proxyGet = proxyGet;
+class DOMProxy {
+	constructor(config={}) {
+		this.transport = config.transport || null;
+		this.proxyGetHooks = config.getters || {};
+		this.proxySetHooks = config.setters || {};
+		this.set = config.set || noop;
+		this.get = config.get || noop;
+		return this;
+	}
+	setTransport(transport) {
+		this.transport = transport;
+	}
+	extendGetHooks(newHooks) {
+		Object.assign(this.proxyGetHooks, newHooks);
+	}
+	extendedSetHooks(newHooks)  {
+		Object.assign(this.proxySetHooks, newHooks);
+	}
+}
+
+const DOMProxies = {
+	style: new DOMProxy({
+		get(target, prop) {
+			return target[prop];
+		},
+		set(target, prop, value) {
+			this.transport.asyncMessage({
+				action: 'setStyle',
+				id: nodeId(target._element || target, 'proxyList'),
+				attribute: prop,
+				value: value,
+				optional: true
+			});
+			target[prop] = value;
+			return true;
+		}
+	})
+};
+
+module.exports.DOMProxy = DOMProxy;
+module.exports.DOMProxies = DOMProxies;
