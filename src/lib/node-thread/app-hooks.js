@@ -1,7 +1,7 @@
 let APP_NODE_HOOKS = {
 	'ember': {
 		ownerDocument() {
-			console.log('ownerDocument',arguments);
+			// console.log('ownerDocument',arguments);
 		},
 		querySelector(selector) {
 			//		.querySelector('meta[name="'
@@ -52,7 +52,7 @@ let APP_NODE_HOOKS = {
 			} else {
 				return this.querySelector(selector);
 			}
-			console.log('querySelector', arguments);
+			// console.log('querySelector', arguments);
 		},
 		cloneNode() {
 			return {

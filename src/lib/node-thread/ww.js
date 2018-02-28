@@ -1,23 +1,23 @@
 // const globals = require('./globals');
 const { ProcessTransport } = require('./../transport/process-transport');
+const configureThread = require('./initializers');
 
 const transportInstance = new ProcessTransport();
-const noop = () => {};
 
-const configureThread = noop;
-const onVisibilityChange = noop;
-const adjustSpeed = noop;
-const _initWebApp = noop;
+// const noop = () => {};
 
-let navigator = null;
+// const onVisibilityChange = noop;
+
+// let navigator = null;
 let window = {};
 
 let uids = {
 	_configure: (data) => {
 		configureThread(data);
 	},
-	_setNavigator: (data) => {
-		navigator = data.navigator;
+	_setNavigator: () => {
+		// data
+		// navigator = data.navigator;
 	},
 	_setLocation: ({ location }) => {
 		window.location = location;
@@ -39,26 +39,18 @@ let uids = {
 		}
 	},
 	_visibilitychange: ({ value }) => {
-		onVisibilityChange(value);
+		console.log('onVisibilityChange');
+		// onVisibilityChange(value);
 	},
 	_onPerformanceFeedback: data => {
-		adjustSpeed(data);
+		console.log('adjustSpeed');
 	},
 	_setScreen: ({ screen }) => {
 		window.screen = screen;
 	},
 	init: () => {
-		_initWebApp();
+		console.log('init');
 	}
 };
 
 transportInstance.addUids(uids);
-
-// console.log('globals',globals);
-
-process.on('message', msg => {
-	// const sum = longComputation();
-	process.send(msg);
-});
-
-exports.navigator = navigator;

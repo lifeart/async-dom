@@ -1,94 +1,175 @@
 const ProxyConstructor = require('./proxy');
 const APP_NODE_HOOKS = require('./app-hooks');
-
-function getDOMImplementation(name) {
-	console.log('domImplemented', name);
-	return require(`../dom/${name}.js`);
-}
+const fs = require('fs');
 
 function configureThread(data) {
 
+	const self = {};
+	let result = null;
 	if (data.implementation) {
 		if (data.implementation === 'simple') {
-			initSimpleImplementation();
+			result = initSimpleImplementation();
 		} else if (data.implementation === 'domino') {
-			initDominoImplementation();
+			result = initDominoImplementation();
 		} else if (data.implementation === 'jsdom') {
-			initJsDomImplementation();
+			result = initJsDomImplementation();
 		} else if (data.implementation === 'pseudo') {
-			initPseudoDomImplementation();
+			result = initPseudoDomImplementation();
 		} else {
-			initDominoImplementation();
+			result = initDominoImplementation();
 		}
 	} else {
-		initDominoImplementation();
+		result = initDominoImplementation();
 	}
 
+	//instance
 	self.AppUID = data.appUID;
 	self.animationFrameTime = data.frameTime || self.animationFrameTime;
 	self.batchTransport = data.batchTransport || self.batchTransport;
 
 	self.packSize = data.packSize || self.packSize;
 	self.batchTimeout = data.batchTimeout || self.batchTimeout;
-
-	if (data.createInitialDomStructure) {
-		createInitialDomStructure();
-	}
-
-	importApp(data.app);
-}
-
-function importApp(appName='glimmer') {
-	if (APP_NODE_HOOKS[appName]) {
-		Object.assign(proxyGet, APP_NODE_HOOKS[appName]);
-	}
-	requireJS(`../../apps/${appName}.js`);
-}
-
-
-function initPseudoDomImplementation(transport) {
-	let self = getDOMImplementation('pseudo-dom');
-	const implementation = self.pseudoDom;
-	const instance = ProxyConstructor(implementation, transport.transport);
-
+	
+	Object.assign(self,result);
 	// window.screen = {
 	// 	width: 1280,
 	// 	height: 720
 	// };
 
+
+	if (data.createInitialDomStructure) {
+		createInitialDomStructure(result.document);
+	}
+
+	importApp(data.app, result);
+
+	return self;
+}
+
+
+function WindowContext(jsFile, windowContext) {
+	const self = {};
+
+	var window = windowContext.window;
+	var Element = windowContext.Element;
+	var document = windowContext.document;
+
+	self.window = window;
+	self.Element = Element;
+	self.document = document;
+
+	self.animationFrameTime = 100;
+	self.batchTransport = false;
+
+	self.packSize = 2000;
+	self.batchTimeout = 6;
+
+	self.lastCallback = ()=>{};
+	self.lastFrame = 0;
+	self.AppUID = null;
+
+	var onVisibilityChange = (result) => {
+		if (result === 'visible') {
+			setAnimationFrameTime(self, 100);
+		} else {
+			setAnimationFrameTime(self, 2000);
+		}
+	};
+
+	var setAnimationFrameTime = function(ctx, time) {
+		ctx.animationFrameTime = time;
+	};
+
+	var requestAnimationFrame = function(cb) {
+		self.lastFrame = setTimeout(cb, self.animationFrameTime);
+		return self.lastFrame;
+	};
+
+	var cancelAnimationFrame = clearTimeout;
+
+	self.requestAnimationFrame = requestAnimationFrame;
+	self.onVisibilityChange = onVisibilityChange;
+	self.requestAnimationFrame  = requestAnimationFrame;
+	self.cancelAnimationFrame = cancelAnimationFrame;
+
+	self.asyncMessage = () => {};
+
+
+	self.nodeCounter = 0;
+	self.hasAlertMicrotask = false;
+
+	var alert = function(text) {
+
+		self.asyncMessage({action: 'alert', text: text},()=>{
+			self.hasAlertMicrotask = false;
+		});
+
+		self.hasAlertMicrotask = true;
+
+		var e = performance.now() + 0.8;
+
+		while (performance.now() < e) {
+			// Artificially long execution time.
+		}
+	};
+	
+	self.alert = alert;
+
+
+	eval(jsFile);
+
+	return self;
+}
+
+function importApp(appName='glimmer', windowContext) {
+	if (APP_NODE_HOOKS[appName]) {
+		Object.assign(windowContext.proxyGet, APP_NODE_HOOKS[appName]);
+	}
+	let app = fs.readFileSync(`../../apps/${appName}.js`,'utf8');
+	WindowContext(app, windowContext);
+}
+
+
+function initPseudoDomImplementation(transport) {
+	let self = require('../dom/pseudo-dom.js');
+	const implementation = self.pseudoDom;
+	const instance = ProxyConstructor(implementation, transport.transport);
 	return {
 		Element: instance.window.Element,
 		document: instance.window.document,
-		window: instance.window
+		window: instance.window,
+		instance
 	};
 }
 
 function initJsDomImplementation(transport) {
-	const self = getDOMImplementation('jsdom-bundle');
+	const self = require('../dom/jsdom-bundle.js');
 	const implementation = self.jsdom.JSDOM;
-	let node = new implementation(`<body></body>`);
+	let node = new implementation('<body></body>');
 	const instance = ProxyConstructor(node.window, transport.transport);
 	return {
 		Element: instance.window.Element,
 		document: instance.window.document,
-		window: instance.window
+		window: instance.window,
+		instance
 	};
 }
 
 
 function initDominoImplementation(transport) {
-	const implementation = getDOMImplementation('domino-async-bundle');
+	const implementation = require('../dom/domino-async-bundle.js');
 	const win = implementation.createWindow('', 'http://localhost:8080/');
 	const instance = ProxyConstructor(win, transport.transport);
 	return {
 		Element: instance.window.Element,
 		document: instance.window.document,
-		window: instance.window
+		window: instance.window,
+		instance
 	};
 }
 
 function initSimpleImplementation(transport) {
-	const implementation = getDOMImplementation('simple-dom-bundle');
+	const implementation = require('../dom/simple-dom-bundle.js');
 	let doc = new implementation.Document();
 	doc.createElementNS = function(...args) {
 		return doc.createElement.apply(doc, args);
@@ -96,11 +177,11 @@ function initSimpleImplementation(transport) {
 	const instance = ProxyConstructor({
 		document: doc
 	}, transport.transport);
-
 	return {
 		Element: instance.window.Element,
 		document: instance.window.document,
-		window: instance.window
+		window: instance.window,
+		instance
 	};
 }
 
