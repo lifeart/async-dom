@@ -130,7 +130,7 @@ function importApp(appName='glimmer', windowContext) {
 	if (APP_NODE_HOOKS[appName]) {
 		Object.assign(windowContext.proxyGet, APP_NODE_HOOKS[appName]);
 	}
-	let app = fs.readFileSync(`apps/${appName}.js`,'utf8');
+	let app = fs.readFileSync(`src/apps/${appName}.js`,'utf8');
 	WindowContext(app, windowContext);
 }
 

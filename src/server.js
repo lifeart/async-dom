@@ -64,6 +64,10 @@ wss.on('connection', function connection(ws) {
 
 		if (!batchTransport && mid < 100) {
 			worker.send(message);
+		} else {
+			if (message.indexOf('currentTarget') > -1) {
+				worker.send(message);
+			}
 		}
 		
 	});
