@@ -121,11 +121,11 @@ Transport.createThread({
 	app: 'glimmer',
 	createInitialDomStructure: true,
 	batchTransport: true,
-	implementation: 'jsom',
+	implementation: 'pseudo',
 	type: 'websocket',
 	packSize: 2000,
-	batchTimeout: 5,
-	frameTime: 16
+	batchTimeout: 10,
+	frameTime: 30
 });
 
 

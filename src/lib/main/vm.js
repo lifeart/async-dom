@@ -309,7 +309,13 @@ function runVM(self, thread) {
 	function actionScheduler(action) {
 		if (!shouldSkip(action)) {
 			if (!isEvent(action)) {
-				actionsList.push(action);
+				if (action.length) {
+					action.forEach((item)=>{
+						actionsList.push(item);
+					});
+				} else {
+					actionsList.push(action);
+				}
 			} else {
 				performAction(action, handleNonBlickingActionResult);
 			}
