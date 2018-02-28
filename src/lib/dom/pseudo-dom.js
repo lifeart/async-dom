@@ -1,5 +1,5 @@
-(function(_this){
-
+(function (exports) {
+	const _this = this;
 /* globals asyncImageLoad asyncMessage */
 
 const asyncMessage = () => Promise.resolve({});
@@ -1053,8 +1053,7 @@ class Text {}
 // 	setTimeout(goFrame, delta);
 // }
 
-_this.pseudoDom = window;
+	exports.pseudoDom = window;
 // goFrame();
 
 
-})(self);

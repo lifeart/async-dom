@@ -41,7 +41,7 @@ function configureThread(data) {
 
 function initPseudoDomImplementation() {
 	getDOMImplementation('pseudo-dom');
-	const implementation = self.pseudoDom;
+	const implementation = self.pseudoDom.pseudoDom;
 	// console.log('implementation',implementation);
 	// console.log(implementation,window.Element);
 	// let node = new implementation(`<body></body>`);

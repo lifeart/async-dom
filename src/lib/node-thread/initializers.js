@@ -138,7 +138,7 @@ function importApp(appName='glimmer', windowContext) {
 function initPseudoDomImplementation(transport) {
 	let self = require('../dom/pseudo-dom.js');
 	const implementation = self.pseudoDom;
-	const instance = ProxyConstructor(implementation, transport.transport);
+	const instance = ProxyConstructor(implementation, transport.transport.bind(transport));
 	return {
 		Element: instance.window.Element,
 		document: instance.window.document,
@@ -148,10 +148,10 @@ function initPseudoDomImplementation(transport) {
 }
 
 function initJsDomImplementation(transport) {
-	const self = require('../dom/jsdom-bundle.js');
-	const implementation = self.jsdom.JSDOM;
+	const jsdom = require('jsdom');
+	const implementation = jsdom.JSDOM;
 	let node = new implementation('<body></body>');
-	const instance = ProxyConstructor(node.window, transport.transport);
+	const instance = ProxyConstructor(node.window, transport.transport.bind(transport));
 	return {
 		Element: instance.window.Element,
 		document: instance.window.document,
@@ -174,14 +174,14 @@ function initDominoImplementation(transport) {
 }
 
 function initSimpleImplementation(transport) {
-	const implementation = require('../dom/simple-dom-bundle.js');
+	const implementation = require('simple-dom');
 	let doc = new implementation.Document();
 	doc.createElementNS = function(...args) {
 		return doc.createElement.apply(doc, args);
 	};
 	const instance = ProxyConstructor({
 		document: doc
-	}, transport.transport);
+	}, transport.transport.bind(transport));
 	return {
 		Element: instance.window.Element,
 		document: instance.window.document,

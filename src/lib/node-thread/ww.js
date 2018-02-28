@@ -38,10 +38,10 @@ let uids = {
 			window.onblur();
 		}
 	},
-	_visibilitychange: ({ value }) => {
-		console.log('onVisibilityChange');
+	//_visibilitychange: ({ value }) => {
+	//	console.log('onVisibilityChange');
 		// onVisibilityChange(value);
-	},
+	//},
 	_onPerformanceFeedback: (data) => {
 		console.log('adjustSpeed');
 	},

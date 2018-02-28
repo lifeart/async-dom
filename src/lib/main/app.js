@@ -61,12 +61,11 @@ class Thread {
 				thread.send(JSON.stringify(data));
 			};
 			thread.onopen = () => {
-				this.ready();
-				console.log('opened');
 				thread.postMessage(Object.assign({
 					uid: '_configure',
 					appUID: uid
 				}, config));
+				this.ready();
 			};
 
 			thread.onclose = function(event) {
