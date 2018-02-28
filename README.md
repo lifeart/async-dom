@@ -57,3 +57,4 @@ This is a proof of concept of asynchronous DOM modification example with:
 7. Rendering testing -> if snapshots/chunks are same - UI is good
 8. You can run zoo of frameworks/(different versions of framework) on one page in web workers and use all of them, without iframes and side effects
 9. You can use async-dom to create bridge for `react-native` etc -> glimmer working with DOM -> `DOM` modifications converted to `react-native` events using async-dom, you don't need to use custom(platform) dom implementation, all you need - write dom converter, but i'm not sure )
+10. Usage in Quizz/Exam/Education solutions / user can't cheat, because have no access to apis and source code
