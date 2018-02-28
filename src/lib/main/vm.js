@@ -1,5 +1,5 @@
 /* global thread */
-function runVM(self) {
+function runVM(self, thread) {
 
 	// viewportHeight (recalculated on each frame size)
 	var viewportHeight = 0;

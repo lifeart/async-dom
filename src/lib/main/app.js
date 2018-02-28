@@ -86,8 +86,6 @@ class Thread {
 			this._bindThreadActions(thread,uid);
 			this.threads[threadName] = thread;
 			this.threadsList.push(thread);
-
-		
 		} else {
 			thread = new Worker('lib/thread/ww.js?t='+Math.random());
 			this.uids[uid] = thread;
@@ -95,16 +93,17 @@ class Thread {
 			this.threads[threadName] = thread;
 			this.threadsList.push(thread);
 
-			
+			this.ready();
 			thread.postMessage(Object.assign({
 				uid: '_configure',
 				appUID: uid
 			}, config));
-			
-
 		}
 
 		return thread;
+	}
+	ready() {
+		runVM(window, this);
 	}
 	getUID() {
 		return Math.random().toString(36).substr(2, 5);
@@ -130,7 +129,7 @@ Transport.createThread({
 	frameTime: 250
 });
 
-this.debug = true;
+
 
 // Transport.createThread({
 // 	name: 'webWorkerApp2',
@@ -141,11 +140,11 @@ this.debug = true;
 // 	frameTime: 100
 // });
 
-Transport.ready = ()=>{
-	runVM(this);
-};
+// Transport.ready = ()=>{
+// 	runVM(this);
+// };
 
-const thread = Transport;
+// const thread = Transport;
 
 // setTimeout(()=>{
 // 	Transport.ready();
