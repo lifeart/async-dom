@@ -12,14 +12,20 @@ wss.on('connection', function connection(ws) {
 	var worker = fork(path.resolve(__dirname,'lib/node-thread/ww.js'));
 
 	worker.on('message', (event) => {
+		// console.log('<-',event);
 		ws.send(event);
 	});
 
 	ws.on('error', function(){
 		worker.kill('SIGKILL');
 	});
-
+	let mid = 1;
 	ws.on('message', function incoming(message) {
-		worker.send(message);
+		// console.log('->',message);
+		mid++ ;
+		if (mid < 10) {
+			worker.send(message);
+		}
+		
 	});
 });

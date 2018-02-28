@@ -29,8 +29,9 @@ function configureThread(data, transport) {
 
 	self.packSize = data.packSize || self.packSize;
 	self.batchTimeout = data.batchTimeout || self.batchTimeout;
+
+	self.transport = transport;
 	
-	Object.assign(self,result);
 	// window.screen = {
 	// 	width: 1280,
 	// 	height: 720
@@ -41,7 +42,7 @@ function configureThread(data, transport) {
 		createInitialDomStructure(result.document);
 	}
 
-	importApp(data.app, result);
+	importApp(data.app, Object.assign(self, result));
 
 	return self;
 }
@@ -49,6 +50,7 @@ function configureThread(data, transport) {
 
 function WindowContext(jsFile, windowContext) {
 	const self = {};
+	const instance = windowContext.instance;
 
 	var window = windowContext.window;
 	var Element = windowContext.Element;
@@ -58,15 +60,20 @@ function WindowContext(jsFile, windowContext) {
 	self.Element = Element;
 	self.document = document;
 
-	self.animationFrameTime = 100;
-	self.batchTransport = false;
+	self.animationFrameTime = windowContext.animationFrameTime || 100;
+	self.batchTransport = windowContext.batchTransport || false;
+	self.packSize = windowContext.packSize || 2000;
+	self.batchTimeout = windowContext.batchTimeout || 6;
 
-	self.packSize = 2000;
-	self.batchTimeout = 6;
+	windowContext.transport.setConfig({
+		batchTransport: self.batchTransport,
+		packSize: self.packSize,
+		batchTimeout: self.batchTimeout
+	});
 
 	self.lastCallback = ()=>{};
 	self.lastFrame = 0;
-	self.AppUID = null;
+	instance.setAppUid(windowContext.AppUID || null);
 
 	var onVisibilityChange = (result) => {
 		if (result === 'visible') {
@@ -80,7 +87,8 @@ function WindowContext(jsFile, windowContext) {
 		ctx.animationFrameTime = time;
 	};
 
-	var requestAnimationFrame = function(cb) {
+	const requestAnimationFrame = function(cb) {
+		// console.log(' self.animationFrameTime)', self.animationFrameTime);
 		self.lastFrame = setTimeout(cb, self.animationFrameTime);
 		return self.lastFrame;
 	};
@@ -93,8 +101,6 @@ function WindowContext(jsFile, windowContext) {
 	self.cancelAnimationFrame = cancelAnimationFrame;
 
 	self.asyncMessage = () => {};
-
-
 	self.nodeCounter = 0;
 	self.hasAlertMicrotask = false;
 
@@ -114,7 +120,6 @@ function WindowContext(jsFile, windowContext) {
 	};
 	
 	self.alert = alert;
-
 
 	eval(jsFile);
 

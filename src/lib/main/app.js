@@ -121,12 +121,12 @@ Transport.createThread({
 	name: 'webWorkerApp',
 	app: 'glimmer',
 	createInitialDomStructure: true,
-	batchTransport: false,
+	batchTransport: true,
 	implementation: 'domino',
 	type: 'websocket',
 	packSize: 2000,
 	batchTimeout: 5,
-	frameTime: 250
+	frameTime: 20
 });
 
 

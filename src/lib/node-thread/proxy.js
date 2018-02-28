@@ -9,7 +9,9 @@ function ProxyConstructor(implementation, asyncMessage) {
 	const _cache = new WeakMap();
 	const ORIGINAL_KEY = '__ORIGINAL__';
 
-
+	function setAppUid(uid) {
+		self.AppUID = uid;
+	}
 
 	const proxyList = {
 		style: {
@@ -588,7 +590,8 @@ function ProxyConstructor(implementation, asyncMessage) {
 	return {
 		proxyGet,
 		window,
-		proxySet
+		proxySet,
+		setAppUid
 	};
 }
 

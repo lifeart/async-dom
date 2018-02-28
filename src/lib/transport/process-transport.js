@@ -36,6 +36,13 @@ class ProcessTransport {
 		});
 		this.transport.bind(this);
 	}
+	setConfig(config = {}) {
+		if (config.batchTransport) {
+			this.transportName = ['asyncBatch'];
+		} else {
+			this.transportName = ['asyncSendMessage'];
+		}
+	}
 	transport(msg) {
 		return this[this.transportName](msg);
 	}
@@ -79,9 +86,11 @@ class ProcessTransport {
 		process.send(JSON.stringify(data));
 	}
 	onmessage(e) {
+		// console.log('onmessage');
 		let data = JSON.parse(e);
 		let uid = String(data.uid);
 		let cb = this.uidsMap.get(uid);
+		// console.log('cb', cb);
 		cb && cb(data);
 		if (uid.charAt(0) !== '_') {
 			this.uidsMap.delete(uid);
@@ -120,6 +129,7 @@ class ProcessTransport {
 	}
 
 	asyncBatch(action) {
+		// console.log(typeof this.sendBatch);
 		this.actionsList.push(action);
 		if (this.actionsList.length > this.packSize) {
 			this.sendBatch();
@@ -129,7 +139,9 @@ class ProcessTransport {
 			this.sendBatch();
 		}, this.batchTimeout);
 	}
-
+	asyncBatchMessages(messages) {
+		return this.asyncSendMessage(messages);
+	}
 	addUids(uids) {
 		Object.keys(uids).forEach(uidKey => {
 			this.uidsMap.set(uidKey, uids[uidKey]);
@@ -145,9 +157,6 @@ class LegacyProcessTransport extends ProcessTransport {
 			attribute: name,
 			value: value
 		});
-	}
-	asyncBatchMessages(messages) {
-		return this[this.transportName](messages);
 	}
 	asyncBodyAppendChild(id) {
 		return this[this.transportName]({

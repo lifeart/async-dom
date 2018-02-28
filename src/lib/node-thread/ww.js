@@ -42,7 +42,7 @@ let uids = {
 		console.log('onVisibilityChange');
 		// onVisibilityChange(value);
 	},
-	_onPerformanceFeedback: data => {
+	_onPerformanceFeedback: (data) => {
 		console.log('adjustSpeed');
 	},
 	_setScreen: ({ screen }) => {
