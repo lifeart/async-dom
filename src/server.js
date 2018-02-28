@@ -45,7 +45,7 @@ wss.on('connection', function connection(ws) {
 		mid++;
 		// console.log('->', mid);
 		// mid++ ;
-		if (mid < 10) {
+		if (mid < 100) {
 			worker.send(message);
 		}
 		

@@ -2,7 +2,7 @@
 const { ProcessTransport } = require('./../transport/process-transport');
 const configureThread = require('./initializers').configureThread;
 
-const transportInstance = new ProcessTransport();
+const transportInstance = new ProcessTransport({}, process);
 
 // const noop = () => {};
 

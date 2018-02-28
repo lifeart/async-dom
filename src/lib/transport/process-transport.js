@@ -21,11 +21,10 @@ const waitingStates = [
 ];
 
 class ProcessTransport {
-	constructor(config = {}) {
+	constructor(config = {}, process) {
 		this.middlewareActions = [];
 		this.removedNodes = [];
 		this.actionsList = [];
-		this.WAITING_LIST = [];
 		this.updateTimeout = null;
 		this.maxId = 0;
 		this.uidsMap = new Map();
@@ -86,7 +85,7 @@ class ProcessTransport {
 		process.send(JSON.stringify(data));
 	}
 	onmessage(e) {
-		// console.log('onmessage');
+		console.log('onmessage');
 		let data = JSON.parse(e);
 		let uid = String(data.uid);
 		let cb = this.uidsMap.get(uid);
@@ -102,9 +101,6 @@ class ProcessTransport {
 	addMiddleware(action) {
 		this.middlewareActions.push(action);
 	}
-	addRequestToWaitingList(request) {
-		this.WAITING_LIST.push(request);
-	}
 	asyncSendMessage(data) {
 		this.middleware(data);
 		let request = new Promise(resolve => {
@@ -113,13 +109,13 @@ class ProcessTransport {
 			});
 		});
 
-		if (waitingStates.includes(data.action)) {
-			this.addRequestToWaitingList(request);
-		} else {
-			if (data.onload) {
-				this.addRequestToWaitingList(request);
-			}
-		}
+		// if (waitingStates.includes(data.action)) {
+			// this.addRequestToWaitingList(request);
+		// } else {
+			// if (data.onload) {
+			// this.addRequestToWaitingList(request);
+			// }
+		// }
 		return request;
 	}
 
