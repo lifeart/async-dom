@@ -44,3 +44,12 @@ This is a proof of concept of asynchronous DOM modification example with:
 # WebWorker 
 * Business logic
 * All DOM modifications came from WebWorker and applyed to Main thread DOM
+
+
+# RealLife usage?
+
+1. Share NDA UI's (user can't copy js logic) / for UI demos
+2. SmartTV -> execute complicated buisiness logic (math) on backend and stream smooth ui
+3. Marketing - > track user experience (websocket can broadcast ui changes for multiple users)
+4. Parallel editing demo -> catch events from 2+ users and apply to single app (edited)
+5. Internet of things -> execute app and stream result to any device
