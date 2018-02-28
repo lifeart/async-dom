@@ -41,11 +41,28 @@ wss.on('connection', function connection(ws) {
 		worker.kill('SIGKILL');
 	});
 	let mid = 0;
+	let batchTransport = true;
 	ws.on('message', function incoming(message) {
 		mid++;
+		if (mid == 1) {
+			let msg = JSON.parse((message));
+			if (msg.batchTransport === false) {
+				batchTransport = false;
+			}
+			worker.send(message);
+		}
 		// console.log('->', mid);
 		// mid++ ;
-		if (mid < 100) {
+		// if (batchTransport) {
+		// 	worker.send(message);
+		// } else {
+
+		// }
+		// if (!batchTransport && mid < 100) {
+		// 	worker.send(message);
+		// }
+
+		if (!batchTransport && mid < 100) {
 			worker.send(message);
 		}
 		

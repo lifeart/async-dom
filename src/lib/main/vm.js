@@ -243,7 +243,13 @@ function runVM(self, thread) {
 	}
 	// sorting DOM actions to get maximum painting performance
 	function smartBatchSort(actions) {
+		// console.log(actions);
 		return actions;
+		// return actions.sort((a,b)=>{
+		// 	return b.uid - a.uid;
+		// });
+		// debugger;
+		// return actions;
 		const priorityActionsMap = {
 			createNode: 1,
 			setAttribute: 2,

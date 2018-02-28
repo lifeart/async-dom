@@ -69,12 +69,16 @@ class ProcessTransport {
 		//@todo happy handle it
 		if (data.length) {
 			data.forEach(el => {
+				this.maxId++;
+				let localUid = this.maxId;
+				
+				el.uid = localUid;
+
 				if (typeof el.callback === 'function') {
-					this.maxId++;
-					this.uidsMap.set(`_${uid}_${el.name}`, el.callback);
-					el.uid = this.maxId;
+					this.uidsMap.set(`_${localUid}_${el.name}`, el.callback);
 					delete el.callback;
 				}
+
 			});
 		}
 
