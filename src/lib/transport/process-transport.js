@@ -30,10 +30,14 @@ class ProcessTransport {
 		this.maxId = 0;
 		this.uidsMap = new Map();
 		this.packSize = config.packSize || 1000;
-		this.transport = config.batchTransport ? 'asyncBatch' : 'asyncSendMessage';
+		this.transportName = config.batchTransport ? 'asyncBatch' : 'asyncSendMessage';
 		process.on('message', msg => {
 			this.onmessage(msg);
 		});
+		this.transport.bind(this);
+	}
+	transport(msg) {
+		return this[this.transportName](msg);
 	}
 	sendMessage(data, callback) {
 		this.maxId++;
@@ -72,12 +76,13 @@ class ProcessTransport {
 		this.postMessage(data);
 	}
 	postMessage(data) {
-		process.send(data);
+		process.send(JSON.stringify(data));
 	}
 	onmessage(e) {
-		let uid = String(e.data.uid);
+		let data = JSON.parse(e);
+		let uid = String(data.uid);
 		let cb = this.uidsMap.get(uid);
-		cb && cb(e.data);
+		cb && cb(data);
 		if (uid.charAt(0) !== '_') {
 			this.uidsMap.delete(uid);
 		}
@@ -134,7 +139,7 @@ class ProcessTransport {
 
 class LegacyProcessTransport extends ProcessTransport {
 	asyncSetAttribute(id, name, value) {
-		return this[this.transport]({
+		return this[this.transportName]({
 			action: 'setAttribute',
 			id: id,
 			attribute: name,
@@ -142,16 +147,16 @@ class LegacyProcessTransport extends ProcessTransport {
 		});
 	}
 	asyncBatchMessages(messages) {
-		return this[this.transport](messages);
+		return this[this.transportName](messages);
 	}
 	asyncBodyAppendChild(id) {
-		return this[this.transport]({
+		return this[this.transportName]({
 			action: 'bodyAppendChild',
 			id: id
 		});
 	}
 	asyncImageLoad(id, src, onload, onerror) {
-		return this[this.transport]({
+		return this[this.transportName]({
 			action: 'loadImage',
 			id: id,
 			src: src,
@@ -160,13 +165,13 @@ class LegacyProcessTransport extends ProcessTransport {
 		});
 	}
 	asyncHeadAppendChild(id) {
-		return this[this.transport]({
+		return this[this.transportName]({
 			action: 'headAppendChild',
 			id: id
 		});
 	}
 	asyncAddEventListener(id) {
-		return this[this.transport]({
+		return this[this.transportName]({
 			action: 'addEventListener',
 			id: id,
 			name: 'click',
@@ -176,13 +181,13 @@ class LegacyProcessTransport extends ProcessTransport {
 		});
 	}
 	asyncGetElementById(id) {
-		return this[this.transport]({
+		return this[this.transportName]({
 			action: 'getElementById',
 			id: id
 		});
 	}
 	asyncCreateElement(id, tagName) {
-		return this[this.transport]({
+		return this[this.transportName]({
 			action: 'createNode',
 			id: id,
 			tag: tagName

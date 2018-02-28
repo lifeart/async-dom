@@ -32,7 +32,7 @@ class Thread {
 	_bindThreadActions(thread, appUID) {
 		if (thread.type && thread.type === 'ws') {
 			thread.onmessage  = (data) => {
-				console.log('raw',data);
+				// console.log('raw',data);
 				let parsedData = {
 					data: JSON.parse(data.data)
 				};
@@ -61,6 +61,7 @@ class Thread {
 				thread.send(JSON.stringify(data));
 			};
 			thread.onopen = () => {
+				this.ready();
 				console.log('opened');
 				thread.postMessage(Object.assign({
 					uid: '_configure',
@@ -146,7 +147,7 @@ Transport.ready = ()=>{
 
 const thread = Transport;
 
-setTimeout(()=>{
-	Transport.ready();
-},1500);
+// setTimeout(()=>{
+// 	Transport.ready();
+// },1500);
 

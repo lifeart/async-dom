@@ -1,25 +1,25 @@
-const ProxyConstructor = require('./proxy');
+const ProxyConstructor = require('./proxy').ProxyConstructor;
 const APP_NODE_HOOKS = require('./app-hooks');
 const fs = require('fs');
 
-function configureThread(data) {
+function configureThread(data, transport) {
 
 	const self = {};
 	let result = null;
 	if (data.implementation) {
 		if (data.implementation === 'simple') {
-			result = initSimpleImplementation();
+			result = initSimpleImplementation(transport);
 		} else if (data.implementation === 'domino') {
-			result = initDominoImplementation();
+			result = initDominoImplementation(transport);
 		} else if (data.implementation === 'jsdom') {
-			result = initJsDomImplementation();
+			result = initJsDomImplementation(transport);
 		} else if (data.implementation === 'pseudo') {
-			result = initPseudoDomImplementation();
+			result = initPseudoDomImplementation(transport);
 		} else {
-			result = initDominoImplementation();
+			result = initDominoImplementation(transport);
 		}
 	} else {
-		result = initDominoImplementation();
+		result = initDominoImplementation(transport);
 	}
 
 	//instance
@@ -125,7 +125,7 @@ function importApp(appName='glimmer', windowContext) {
 	if (APP_NODE_HOOKS[appName]) {
 		Object.assign(windowContext.proxyGet, APP_NODE_HOOKS[appName]);
 	}
-	let app = fs.readFileSync(`../../apps/${appName}.js`,'utf8');
+	let app = fs.readFileSync(`apps/${appName}.js`,'utf8');
 	WindowContext(app, windowContext);
 }
 
@@ -157,9 +157,9 @@ function initJsDomImplementation(transport) {
 
 
 function initDominoImplementation(transport) {
-	const implementation = require('../dom/domino-async-bundle.js');
+	const implementation = require('domino');
 	const win = implementation.createWindow('', 'http://localhost:8080/');
-	const instance = ProxyConstructor(win, transport.transport);
+	const instance = ProxyConstructor(win, transport.transport.bind(transport));
 	return {
 		Element: instance.window.Element,
 		document: instance.window.document,

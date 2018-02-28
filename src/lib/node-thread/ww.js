@@ -1,6 +1,6 @@
 // const globals = require('./globals');
 const { ProcessTransport } = require('./../transport/process-transport');
-const configureThread = require('./initializers');
+const configureThread = require('./initializers').configureThread;
 
 const transportInstance = new ProcessTransport();
 
@@ -13,7 +13,7 @@ let window = {};
 
 let uids = {
 	_configure: (data) => {
-		configureThread(data);
+		configureThread(data,transportInstance);
 	},
 	_setNavigator: () => {
 		// data

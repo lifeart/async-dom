@@ -1,10 +1,10 @@
 function ProxyConstructor(implementation, asyncMessage) {
 
-	const window = getProxy(implementation, 'window');
-	const document = window.document;
-
+	const self = {};
+	// @todo -> fix this self;
+	
 	const proxyMap = new WeakMap();
-	let nodeCounter = nodeCounter;
+	let nodeCounter = 0;
 
 	const _cache = new WeakMap();
 	const ORIGINAL_KEY = '__ORIGINAL__';
@@ -492,6 +492,9 @@ function ProxyConstructor(implementation, asyncMessage) {
 		},
 		DOM_ATTR_EVENT_HOOKS
 	);
+
+	const window = getProxy(implementation, 'window');
+	const document = window.document;
 
 	function extendedSet(target, prop, value) {
 		// console.log(prop);
