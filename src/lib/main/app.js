@@ -54,7 +54,7 @@ class Thread {
 		let thread = null;
 
 		if (config.type && config.type === 'websocket') {
-			thread = new WebSocket('ws://localhost:8010');
+			thread = new WebSocket('ws://' + window.location.hostname +':8010');
 			thread.type = 'ws';
 			
 			thread.postMessage = function (data) {
@@ -121,11 +121,11 @@ Transport.createThread({
 	app: 'glimmer',
 	createInitialDomStructure: true,
 	batchTransport: true,
-	implementation: 'domino',
+	implementation: 'jsom',
 	type: 'websocket',
 	packSize: 2000,
 	batchTimeout: 5,
-	frameTime: 20
+	frameTime: 16
 });
 
 
