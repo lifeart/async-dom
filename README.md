@@ -55,3 +55,4 @@ This is a proof of concept of asynchronous DOM modification example with:
 5. Internet of things -> execute app and stream result to any device
 6. DOM rendering time-traveling for JS frameworks debugging
 7. Rendering testing -> if snapshots/chunks are same - UI is good
+8. You can run zoo of frameworks/(different versions of framework) on one page in web workers and use all of them, without iframes and side effects
