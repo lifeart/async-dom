@@ -1057,3 +1057,4 @@ class Text {}
 // goFrame();
 
 
+})(typeof exports === 'undefined' ? this['pseudoDom'] = {} : exports);
