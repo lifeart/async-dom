@@ -85,11 +85,9 @@ class ProcessTransport {
 		process.send(JSON.stringify(data));
 	}
 	onmessage(e) {
-		console.log('onmessage');
 		let data = JSON.parse(e);
 		let uid = String(data.uid);
 		let cb = this.uidsMap.get(uid);
-		// console.log('cb', cb);
 		cb && cb(data);
 		if (uid.charAt(0) !== '_') {
 			this.uidsMap.delete(uid);
