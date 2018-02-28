@@ -1,9 +1,9 @@
-const { getProxy, proxyGet } = require('./proxy');
+const ProxyConstructor = require('./proxy');
 const APP_NODE_HOOKS = require('./app-hooks');
 
 function getDOMImplementation(name) {
 	console.log('domImplemented', name);
-	requireJS(`../dom/${name}.js`);
+	return require(`../dom/${name}.js`);
 }
 
 function configureThread(data) {
@@ -46,56 +46,62 @@ function importApp(appName='glimmer') {
 }
 
 
-function initPseudoDomImplementation() {
-	getDOMImplementation('pseudo-dom');
+function initPseudoDomImplementation(transport) {
+	let self = getDOMImplementation('pseudo-dom');
 	const implementation = self.pseudoDom;
-	// console.log('implementation',implementation);
-	// console.log(implementation,window.Element);
-	// let node = new implementation(`<body></body>`);
-	window = getProxy(implementation, 'window');
-	// asyncMessage = transport.sendMessage;
-	
-	Element = window.Element;
-	document = window.document;
-	window.screen = {
-		width: 1280,
-		height: 720
-	};
+	const instance = ProxyConstructor(implementation, transport.transport);
+
+	// window.screen = {
+	// 	width: 1280,
+	// 	height: 720
+	// };
 
 	return {
-		Element: window.Element,
-		document: window.document,
-		window: 
+		Element: instance.window.Element,
+		document: instance.window.document,
+		window: instance.window
 	};
 }
 
-function initJsDomImplementation() {
-	getDOMImplementation('jsdom-bundle');
+function initJsDomImplementation(transport) {
+	const self = getDOMImplementation('jsdom-bundle');
 	const implementation = self.jsdom.JSDOM;
 	let node = new implementation(`<body></body>`);
-	return getProxy(node.window, 'window');;
+	const instance = ProxyConstructor(node.window, transport.transport);
+	return {
+		Element: instance.window.Element,
+		document: instance.window.document,
+		window: instance.window
+	};
 }
 
 
-function initDominoImplementation() {
-	getDOMImplementation('domino-async-bundle');
-	const implementation = self.domino;
-	return getProxy(implementation.createWindow('', 'http://localhost:8080/'),'window');
+function initDominoImplementation(transport) {
+	const implementation = getDOMImplementation('domino-async-bundle');
+	const win = implementation.createWindow('', 'http://localhost:8080/');
+	const instance = ProxyConstructor(win, transport.transport);
+	return {
+		Element: instance.window.Element,
+		document: instance.window.document,
+		window: instance.window
+	};
 }
 
-function initSimpleImplementation() {
-	getDOMImplementation('simple-dom-bundle');
-	const implementation = self.simpleDom;
-	// asyncMessage = transport.sendMessage;
-	// Element = implementation.Element; // etc
+function initSimpleImplementation(transport) {
+	const implementation = getDOMImplementation('simple-dom-bundle');
 	let doc = new implementation.Document();
 	doc.createElementNS = function(...args) {
 		return doc.createElement.apply(doc, args);
 	};
-	window = getProxy({
+	const instance = ProxyConstructor({
 		document: doc
-	}, 'window');
-	return window;
+	}, transport.transport);
+
+	return {
+		Element: instance.window.Element,
+		document: instance.window.document,
+		window: instance.window
+	};
 }
 
 function createInitialDomStructure(document) {
@@ -106,17 +112,7 @@ function createInitialDomStructure(document) {
 	document.body.appendChild(node);
 	//@todo fix simple-dom getE
 	//self.appNode = node;
-
 	document.appNode = node;
-
-	// let secondNode = document.createElement('div');
-	// secondNode.innerHTML = 'foo-bar';
-	// node.insertBefore(secondNode, null);
-
-	// let firdNode = document.createElement('div');
-	// firdNode.innerHTML = 'lool';
-
-	// node.insertBefore(firdNode,secondNode);
 }
 
 module.exports.configureThread = configureThread;
