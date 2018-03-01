@@ -941,7 +941,9 @@ class Proxy {
 	}
 }
 
-var window = {};
+var window = {
+	dispatchEvent: ()=>{}
+};
 
 var document = new Document();
 window.document = document;
@@ -1057,4 +1059,4 @@ class Text {}
 // goFrame();
 
 
-})(typeof exports === 'undefined' ? this['pseudoDom'] = {} : exports);
+})(typeof exports === 'undefined' ? this : exports);
