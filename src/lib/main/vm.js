@@ -203,7 +203,7 @@ function runVM(self, thread) {
 	function shouldSkip(data) {
 		// if (data.action !== 'createNode' && data.id) {
 		// if (!nodesCache[data.id]) {
-		// return true;
+		// return false;
 		// }
 		// }
 		if (data.length || !data.optional) {
@@ -676,6 +676,7 @@ function runVM(self, thread) {
 		// console.log('setStyle',data);
 		var node = getNode(data.id, data);
 		if (!node) {
+			console.log('setStyle',data);
 			return;
 		}
 		if (data.optional && renderConfig.skipNotInVewport) {

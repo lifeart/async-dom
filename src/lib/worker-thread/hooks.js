@@ -18,7 +18,9 @@ self.require = function(name) {
 		},
 		'../dom/pseudo-dom.js': function() {
 			importScripts('../dom/pseudo-dom.js');
-			return self.pseudoDom;
+			return {
+				pseudoDom: self.pseudoDom
+			};
 		},
 		'domino': function() {
 			importScripts('../dom/domino-async-bundle.js');

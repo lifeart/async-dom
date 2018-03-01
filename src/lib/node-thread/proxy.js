@@ -1,13 +1,20 @@
 function ProxyConstructor(implementation, asyncMessage) {
 
-	const self = {};
+	if (typeof self === 'undefined') {
+		self = {};
+	}
+	
 	// @todo -> fix this self;
 	
 	const proxyMap = new WeakMap();
 	let nodeCounter = 0;
 
 	const _cache = new WeakMap();
+	const _cacheId = new Map();
 	const ORIGINAL_KEY = '__ORIGINAL__';
+
+	self._cache = _cache;
+	self._cacheId = _cacheId;
 
 	function setAppUid(uid) {
 		self.AppUID = uid;
@@ -19,13 +26,14 @@ function ProxyConstructor(implementation, asyncMessage) {
 				return target[prop];
 			},
 			set(target, prop, value) {
-				// console.log(target, prop, value);
+				// console.log('target',target);
+				// console.log(nodeId(target._element || target, 'proxyList'));
 				asyncMessage({
 					action: 'setStyle',
-					id: nodeId(target._element || target, 'proxyList'),
+					id: nodeId(this || target._element || target, 'proxyList'),
 					attribute: prop,
 					value: value,
-					optional: true
+					// optional: true
 				});
 				target[prop] = value;
 				return true;
@@ -54,6 +62,9 @@ function ProxyConstructor(implementation, asyncMessage) {
 			get(target, prop) {
 				if (patches[prop]) {
 					return patches[prop].bind(target);
+				}
+				if (prop === 'defaultView') {
+					return window;
 				}
 				if (prop === 'body') {
 					if (!bodyProxy) {
@@ -186,6 +197,9 @@ function ProxyConstructor(implementation, asyncMessage) {
 	};
 
 	const DOM_EVENT_HOOKS = {
+		cloneNode(arg) {
+			return getProxy(this.cloneNode(arg));
+		},
 		removeEventListener(name) {
 			if (!name) {
 				return;
@@ -202,6 +216,9 @@ function ProxyConstructor(implementation, asyncMessage) {
 				//|| name === 'DOMContentLoaded'
 				setTimeout(callback, 100);
 				return getProxy(this);
+			}
+			if (name === 'react-invokeguardedcallback') {
+				return callback();
 			}
 			// console.log('addEventListener',addEventListener, name, callback);
 			asyncMessage({
@@ -294,10 +311,14 @@ function ProxyConstructor(implementation, asyncMessage) {
 	const customDomCache = {};
 
 	const DOCUMENT_HOOKS = {
+		createStyleSheet() {
+			console.log('createStyleSheet', arguments);
+		},
 		documentElement() {
 			// console.log('documentElement');
 			// return getProxy(originalNode(this.documentElement),'document');
 			// return window;
+			return this.documentElement || document;
 		},
 		// document
 		getElementById(id) {
@@ -368,13 +389,30 @@ function ProxyConstructor(implementation, asyncMessage) {
 	);
 
 	let staticGet = {
+		child() {
+			console.log('child', this.child);
+			return this.child;
+		},
+		styleSheet() {
+			let _this = this;
+			console.log('styleSheet',_this,arguments);
+			return {
+				addRule(selector,rule) {
+					asyncMessage({action:'styleSheetAddRule',id:nodeId(_this),selector:selector,rule:rule});
+					console.log('addRule',_this,arguments);
+				}
+			};
+		},
 		children() {
-			// console.log('children', this.children);
+			console.log('children', this.children);
 			return this.children;
 		},
 		attributes() {
 			// console.log('attributes',this.attributes);
 			return this.attributes;
+		},
+		sibling() {
+			return getProxy(this.sibling);
 		},
 		firstChild() {
 			return getProxy(this.firstChild);
@@ -401,7 +439,7 @@ function ProxyConstructor(implementation, asyncMessage) {
 			return getProxy(document, 'document');
 		},
 		style() {
-			return getProxy(this.style, 'style');
+			return getProxy(this.style || {}, 'style', this);
 		}
 	};
 
@@ -551,6 +589,7 @@ function ProxyConstructor(implementation, asyncMessage) {
 			console.log('maybeElement', maybeElement, debug);
 		}
 		let element = maybeElement[ORIGINAL_KEY] || maybeElement;
+		// console.log(element);
 		if (!_cache.has(element)) {
 			nodeCounter++;
 			// console.log('element.tagName',element.tagName);
@@ -562,10 +601,15 @@ function ProxyConstructor(implementation, asyncMessage) {
 					_cache.set(element, 'app');
 				} else {
 					// react fix
-					if ('Uint8Array' in element) {
+					if ('Uint8Array' in element || 'document' in element) {
 						_cache.set(element, 'window');
+					} else if (element.nodeName === '#document') {
+						_cache.set(element, 'document');
 					} else {
+						// console.log(element.nodeName);
 						_cache.set(element, `a-${self.AppUID}-${nodeCounter}`);
+						let str = `a-${self.AppUID}-${nodeCounter}`;
+						_cacheId.set(str, element);
 					}
 				}
 			}
@@ -573,17 +617,31 @@ function ProxyConstructor(implementation, asyncMessage) {
 		return _cache.get(element);
 	}
 
-	function getProxy(obj, proxyName = 'asyncProxy') {
+	function getProxy(obj, proxyName = 'asyncProxy', context = false) {
 		if (!obj) {
 			return obj;
 		}
-		if (!proxyMap.has(obj)) {
-			if (typeof obj === 'string') {
-				return obj;
-			}
-			proxyMap.set(obj, new Proxy(obj, proxyList[proxyName]));
+		let node = originalNode(obj);
+		// console.log('getProxy',node);
+		if (node.nodeName === '#document') {
+			proxyName = 'document';
 		}
-		return proxyMap.get(obj);
+		if (!proxyMap.has(node)) {
+			if (typeof node === 'string') {
+				return node;
+			}
+			if (context) {
+				// console.log('context', proxyName);
+				proxyMap.set(node, new Proxy(node, {
+					get: proxyList[proxyName].get.bind(context),
+					set: proxyList[proxyName].set.bind(context)
+				}));
+			} else {
+				proxyMap.set(node, new Proxy(node, proxyList[proxyName]));
+			}
+			
+		}
+		return proxyMap.get(node);
 	}
 
 	return {
