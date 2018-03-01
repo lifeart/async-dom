@@ -16,7 +16,6 @@ function ProxyConstructor(implementation, asyncMessage) {
 	const proxyList = {
 		style: {
 			get(target, prop) {
-				// console.log(prop);
 				return target[prop];
 			},
 			set(target, prop, value) {
