@@ -86,7 +86,7 @@ class Thread {
 			this.threads[threadName] = thread;
 			this.threadsList.push(thread);
 		} else {
-			thread = new Worker('lib/thread/ww.js?t='+Math.random());
+			thread = new Worker('lib/worker-thread/ww.js?t='+Math.random());
 			this.uids[uid] = thread;
 			this._bindThreadActions(thread,uid);
 			this.threads[threadName] = thread;
@@ -120,9 +120,9 @@ Transport.createThread({
 	name: 'webWorkerApp',
 	app: 'glimmer',
 	createInitialDomStructure: true,
-	batchTransport: true,
-	implementation: 'pseudo',
-	type: 'websocket',
+	batchTransport: false,
+	implementation: 'simple',
+	// type: 'websocket',
 	packSize: 2000,
 	batchTimeout: 10,
 	frameTime: 30

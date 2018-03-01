@@ -27,12 +27,23 @@ class ProcessTransport {
 		this.actionsList = [];
 		this.updateTimeout = null;
 		this.maxId = 0;
+		this.type = config.type || 'node';
 		this.uidsMap = new Map();
 		this.packSize = config.packSize || 1000;
 		this.transportName = config.batchTransport ? 'asyncBatch' : 'asyncSendMessage';
-		process.on('message', msg => {
-			this.onmessage(msg);
-		});
+
+		if (this.type === 'ww') {
+			this.postMessage = this.postMessageWorker;
+			self.onmessage = this.onmessageWorker.bind(this);
+		} else {
+			this.postMessage = this.postMessageNode;
+			this.onmessage = this.onmessageNode;
+			process.on('message', msg => {
+				this.onmessage(msg);
+			});
+		}
+
+	
 		this.transport.bind(this);
 	}
 	setConfig(config = {}) {
@@ -85,17 +96,31 @@ class ProcessTransport {
 		data.cb = callback ? true : false;
 		this.postMessage(data);
 	}
-	postMessage(data) {
+	postMessage() {
+		throw 'postMessage not implemented';
+	}
+	postMessageWorker(data) {
+		self.postMessage(data);
+	}
+	postMessageNode(data) {
 		process.send(JSON.stringify(data));
 	}
-	onmessage(e) {
-		let data = JSON.parse(e);
+	onmessageWorker(e) {
+		this._onmessage(e.data);
+	}
+	onmessageNode(e) {
+		this._onmessage(JSON.parse(e));
+	}
+	_onmessage(data) {
 		let uid = String(data.uid);
 		let cb = this.uidsMap.get(uid);
 		cb && cb(data);
 		if (uid.charAt(0) !== '_') {
 			this.uidsMap.delete(uid);
 		}
+	}
+	onmessage() {
+		throw 'onmessage not implemented';
 	}
 	middleware(data) {
 		this.middlewareActions.forEach(action => action(data));

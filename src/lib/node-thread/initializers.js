@@ -1,10 +1,8 @@
-const ProxyConstructor = require('./proxy').ProxyConstructor;
-const APP_NODE_HOOKS = require('./app-hooks');
+const CreateProxy = require('./proxy').ProxyConstructor;
+const APP_HOOKS = require('./app-hooks');
 const fs = require('fs');
 
-function configureThread(data, transport) {
-
-	const self = {};
+function configureThread(data, transport, executor, context = {}) {
 	let result = null;
 	if (data.implementation) {
 		if (data.implementation === 'simple') {
@@ -23,14 +21,14 @@ function configureThread(data, transport) {
 	}
 
 	//instance
-	self.AppUID = data.appUID;
-	self.animationFrameTime = data.frameTime || self.animationFrameTime;
-	self.batchTransport = data.batchTransport || self.batchTransport;
+	context.AppUID = data.appUID;
+	context.animationFrameTime = data.frameTime || context.animationFrameTime;
+	context.batchTransport = data.batchTransport || context.batchTransport;
 
-	self.packSize = data.packSize || self.packSize;
-	self.batchTimeout = data.batchTimeout || self.batchTimeout;
+	context.packSize = data.packSize || context.packSize;
+	context.batchTimeout = data.batchTimeout || context.batchTimeout;
 
-	self.transport = transport;
+	context.transport = transport;
 	
 	// window.screen = {
 	// 	width: 1280,
@@ -42,44 +40,46 @@ function configureThread(data, transport) {
 		createInitialDomStructure(result.document);
 	}
 
-	importApp(data.app, Object.assign(self, result));
+	importApp(data.app, Object.assign(context, result), executor, context);
 
-	return self;
+	return context;
 }
 
+function executeFile() {
+	return eval;
+}
 
-function WindowContext(jsFile, windowContext) {
-	const self = {};
+function WindowContext(jsFile, windowContext, executor = false, context = {}) {
 	const instance = windowContext.instance;
 
 	var window = windowContext.window;
 	var Element = windowContext.Element;
 	var document = windowContext.document;
 
-	self.window = window;
-	self.Element = Element;
-	self.document = document;
+	context.window = window;
+	context.Element = Element;
+	context.document = document;
 
-	self.animationFrameTime = windowContext.animationFrameTime || 100;
-	self.batchTransport = windowContext.batchTransport || false;
-	self.packSize = windowContext.packSize || 2000;
-	self.batchTimeout = windowContext.batchTimeout || 6;
+	context.animationFrameTime = windowContext.animationFrameTime || 100;
+	context.batchTransport = windowContext.batchTransport || false;
+	context.packSize = windowContext.packSize || 2000;
+	context.batchTimeout = windowContext.batchTimeout || 6;
 
 	windowContext.transport.setConfig({
-		batchTransport: self.batchTransport,
-		packSize: self.packSize,
-		batchTimeout: self.batchTimeout
+		batchTransport: context.batchTransport,
+		packSize: context.packSize,
+		batchTimeout: context.batchTimeout
 	});
 
-	self.lastCallback = ()=>{};
-	self.lastFrame = 0;
+	context.lastCallback = ()=>{};
+	context.lastFrame = 0;
 	instance.setAppUid(windowContext.AppUID || null);
 
 	var onVisibilityChange = (result) => {
 		if (result === 'visible') {
-			setAnimationFrameTime(self, 100);
+			setAnimationFrameTime(context, 100);
 		} else {
-			setAnimationFrameTime(self, 2000);
+			setAnimationFrameTime(context, 2000);
 		}
 	};
 
@@ -89,28 +89,27 @@ function WindowContext(jsFile, windowContext) {
 
 	const requestAnimationFrame = function(cb) {
 		// console.log(' self.animationFrameTime)', self.animationFrameTime);
-		self.lastFrame = setTimeout(cb, self.animationFrameTime);
-		return self.lastFrame;
+		context.lastFrame = setTimeout(cb, context.animationFrameTime);
+		return context.lastFrame;
 	};
 
 	var cancelAnimationFrame = clearTimeout;
 
-	self.requestAnimationFrame = requestAnimationFrame;
-	self.onVisibilityChange = onVisibilityChange;
-	self.requestAnimationFrame  = requestAnimationFrame;
-	self.cancelAnimationFrame = cancelAnimationFrame;
+	context.requestAnimationFrame = requestAnimationFrame;
+	context.onVisibilityChange = onVisibilityChange;
+	context.cancelAnimationFrame = cancelAnimationFrame;
 
-	self.asyncMessage = () => {};
-	self.nodeCounter = 0;
-	self.hasAlertMicrotask = false;
+	context.asyncMessage = () => {};
+	context.nodeCounter = 0;
+	context.hasAlertMicrotask = false;
 
 	var alert = function(text) {
 
-		self.asyncMessage({action: 'alert', text: text},()=>{
-			self.hasAlertMicrotask = false;
+		context.asyncMessage({action: 'alert', text: text},()=>{
+			context.hasAlertMicrotask = false;
 		});
 
-		self.hasAlertMicrotask = true;
+		context.hasAlertMicrotask = true;
 
 		var e = performance.now() + 0.8;
 
@@ -119,26 +118,30 @@ function WindowContext(jsFile, windowContext) {
 		}
 	};
 	
-	self.alert = alert;
+	context.alert = alert;
+	
+	if (!executor) {
+		executeFile()(jsFile);
+	} else {
+		executor()(jsFile);
+	}
 
-	eval(jsFile);
-
-	return self;
+	return context;
 }
 
-function importApp(appName='glimmer', windowContext) {
-	if (APP_NODE_HOOKS[appName]) {
-		Object.assign(windowContext.proxyGet, APP_NODE_HOOKS[appName]);
+function importApp(appName='glimmer', windowContext, executor, context) {
+	if (APP_HOOKS[appName]) {
+		Object.assign(windowContext.proxyGet, APP_HOOKS[appName]);
 	}
 	let app = fs.readFileSync(`src/apps/${appName}.js`,'utf8');
-	WindowContext(app, windowContext);
+	WindowContext(app, windowContext, executor, context);
 }
 
 
 function initPseudoDomImplementation(transport) {
 	let self = require('../dom/pseudo-dom.js');
 	const implementation = self.pseudoDom;
-	const instance = ProxyConstructor(implementation, transport.transport.bind(transport));
+	const instance = CreateProxy(implementation, transport.transport.bind(transport));
 	return {
 		Element: instance.window.Element,
 		document: instance.window.document,
@@ -151,7 +154,7 @@ function initJsDomImplementation(transport) {
 	const jsdom = require('jsdom');
 	const implementation = jsdom.JSDOM;
 	let node = new implementation('<body></body>');
-	const instance = ProxyConstructor(node.window, transport.transport.bind(transport));
+	const instance = CreateProxy(node.window, transport.transport.bind(transport));
 	return {
 		Element: instance.window.Element,
 		document: instance.window.document,
@@ -164,7 +167,7 @@ function initJsDomImplementation(transport) {
 function initDominoImplementation(transport) {
 	const implementation = require('domino');
 	const win = implementation.createWindow('', 'http://localhost:8080/');
-	const instance = ProxyConstructor(win, transport.transport.bind(transport));
+	const instance = CreateProxy(win, transport.transport.bind(transport));
 	return {
 		Element: instance.window.Element,
 		document: instance.window.document,
@@ -179,7 +182,7 @@ function initSimpleImplementation(transport) {
 	doc.createElementNS = function(...args) {
 		return doc.createElement.apply(doc, args);
 	};
-	const instance = ProxyConstructor({
+	const instance = CreateProxy({
 		document: doc
 	}, transport.transport.bind(transport));
 	return {

@@ -725,7 +725,11 @@ function runVM(self, thread) {
 	function customRemoveChild(data) {
 		var node = getNode(data.id);
 		var child = getNode(data.childrenId);
-		node.removeChild(child);
+		if (node && child) {
+			node.removeChild(child);
+		} else {
+			console.log('Unable to remove child');
+		}
 	}
 
 	// DOM action classList.remove
