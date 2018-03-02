@@ -17,10 +17,15 @@ class Thread {
 	}
 	sendMessage(data) {
 		if (data.appUID) {
-			this.uids[data.appUID].postMessage(data);
+			if (this.uids[data.appUID].canSend) {
+				this.uids[data.appUID].postMessage(data);
+			}
+			
 		} else {
 			this.threadsList.forEach((thread) => {
-				thread.postMessage(data);
+				if (thread.canSend) {
+					thread.postMessage(data);
+				}
 			});
 		}
 	}
@@ -60,11 +65,13 @@ class Thread {
 			thread.postMessage = function (data) {
 				thread.send(JSON.stringify(data));
 			};
+
 			thread.onopen = () => {
 				thread.postMessage(Object.assign({
 					uid: '_configure',
 					appUID: uid
 				}, config));
+				thread.canSend = true;
 				this.ready();
 			};
 
@@ -91,6 +98,7 @@ class Thread {
 			this._bindThreadActions(thread,uid);
 			this.threads[threadName] = thread;
 			this.threadsList.push(thread);
+			thread.canSend = true;
 
 			this.ready();
 			thread.postMessage(Object.assign({
@@ -102,7 +110,11 @@ class Thread {
 		return thread;
 	}
 	ready() {
+		if (this._activated) {
+			return;
+		}
 		runVM(window, this);
+		this._activated = true;
 	}
 	getUID() {
 		return Math.random().toString(36).substr(2, 5);
@@ -116,11 +128,36 @@ class Thread {
 
 let Transport = new Thread();
 
+
+Transport.createThread({
+	name: 'webWorkerApp2',
+	app: 'glimmer',
+	implementation: 'simple',
+	createInitialDomStructure: true,
+	type: 'websocket',
+	batchTransport: true,
+	batchTimeout: 10,
+	frameTime: 100
+});
+
 Transport.createThread({
 	name: 'webWorkerApp',
-	app: 'glimmer',
-	createInitialDomStructure: true,
-	batchTransport: false,
+	app: 'demo',
+	createInitialDomStructure: false,
+	batchTransport: true,
+	implementation: 'simple',
+	type: 'websocket',
+	packSize: 2000,
+	batchTimeout: 10,
+	frameTime: 30
+});
+
+
+Transport.createThread({
+	name: 'webWorkerApp',
+	app: 'react',
+	createInitialDomStructure: false,
+	batchTransport: true,
 	implementation: 'simple',
 	// type: 'websocket',
 	packSize: 2000,
@@ -129,15 +166,6 @@ Transport.createThread({
 });
 
 
-
-// Transport.createThread({
-// 	name: 'webWorkerApp2',
-// 	app: 'demo',
-// 	implementation: 'domino',
-// 	createInitialDomStructure: false,
-// 	batchTransport: false,
-// 	frameTime: 100
-// });
 
 // Transport.ready = ()=>{
 // 	runVM(this);
