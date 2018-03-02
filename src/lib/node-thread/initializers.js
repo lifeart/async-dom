@@ -91,6 +91,10 @@ function WindowContext(jsFile, windowContext, executor = false, context = {}) {
 
 	var cancelAnimationFrame = clearTimeout;
 
+	context.Text = window.Text;
+	window.setTimeout = setTimeout;
+	window.requestAnimationFrame = requestAnimationFrame;
+
 	context.requestAnimationFrame = requestAnimationFrame;
 	context.onVisibilityChange = onVisibilityChange;
 	context.cancelAnimationFrame = cancelAnimationFrame;
@@ -106,7 +110,7 @@ function WindowContext(jsFile, windowContext, executor = false, context = {}) {
 		});
 
 		context.hasAlertMicrotask = true;
-		
+
 		if (typeof performance === 'undefined') {
 			performance = Date;
 		}
@@ -131,7 +135,7 @@ function WindowContext(jsFile, windowContext, executor = false, context = {}) {
 
 function importApp(appName='glimmer', windowContext, executor, context) {
 	if (APP_HOOKS[appName]) {
-		Object.assign(windowContext.proxyGet, APP_HOOKS[appName]);
+		Object.assign(windowContext.instance.proxyGet, APP_HOOKS[appName]);
 	}
 	let app = fs.readFileSync(`src/apps/${appName}.js`,'utf8');
 	WindowContext(app, windowContext, executor, context);

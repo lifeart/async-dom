@@ -46,6 +46,9 @@ function ProxyConstructor(implementation, asyncMessage) {
 		body: {
 			get(target, prop) {
 				if (prop === 'ownerDocument') {
+					if (prop in target) {
+						return target[prop];
+					}
 					return document;
 				}
 				if (proxyGet[prop]) {
@@ -282,7 +285,7 @@ function ProxyConstructor(implementation, asyncMessage) {
 		},
 		getAttribute(name) {
 			// console.log('getAttribute',name);
-			return this.getAttribute(name);
+			return this.getAttribute && this.getAttribute(name) || '';
 		},
 		appendChild(element) {
 			let result = this.appendChild.apply(this, [originalNode(element)]);

@@ -601,6 +601,7 @@ function runVM(self, thread) {
 
 			console.log(data);
 			// return;
+		} else {
 		}
 		if (!children) {
 			//@todo react hack
@@ -727,7 +728,18 @@ function runVM(self, thread) {
 		var node = getNode(data.id);
 		var child = getNode(data.childrenId);
 		if (node && child) {
-			node.removeChild(child);
+			if (document.contains(child)) {
+				child.parentNode.removeChild(child);
+				// node.removeChild(child);
+			} else {
+				console.log('unable to find child');
+				try {
+					document.removeChild(child);
+				} catch(e) {
+
+				}
+			}
+			
 		} else {
 			console.log('Unable to remove child');
 		}
@@ -904,10 +916,12 @@ function runVM(self, thread) {
 		// action:'insertBefore',id:this.id,newId: newElement.id, refId: referenceElement.id})
 
 		if (data.id == data.newId) {
+			console.log('equal');
 			return;
 		}
 
 		if (!data.newId) {
+			console.log('newId');
 			return;
 		}
 
@@ -924,6 +938,8 @@ function runVM(self, thread) {
 					root.insertBefore(newEl, null);
 				}
 			}
+		} else {
+			console.log('noroot');
 		}
 	}
 	function setParentNode(data) {
