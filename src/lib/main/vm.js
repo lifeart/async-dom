@@ -676,7 +676,7 @@ function runVM(self, thread) {
 		// console.log('setStyle',data);
 		var node = getNode(data.id, data);
 		if (!node) {
-			console.log('setStyle',data);
+			log('setStyle',data);
 			return;
 		}
 		if (data.optional && renderConfig.skipNotInVewport) {
@@ -862,6 +862,7 @@ function runVM(self, thread) {
 	}
 	// addEventListener implementation
 	function customAddEventListener(data) {
+		
 		var eventCallback = function(domEvent) {
 			var e = eventToObject(domEvent);
 			e.uid = `_${data.uid}_${data.name}`;
@@ -869,7 +870,9 @@ function runVM(self, thread) {
 		};
 		var node = getNode(data.id, data);
 		if (node) {
+			// console.log('addEventListener', node, data);
 			node.addEventListener(data.name, eventCallback.bind(data), false);
+			// node.addEventListener('on'+data.name, eventCallback.bind(data), false);
 		} else {
 			console.log('addEventListener', data);
 		}

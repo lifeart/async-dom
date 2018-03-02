@@ -45,10 +45,6 @@ function configureThread(data, transport, executor, context = {}) {
 	return context;
 }
 
-function executeFile() {
-	return eval;
-}
-
 function WindowContext(jsFile, windowContext, executor = false, context = {}) {
 	const instance = windowContext.instance;
 
@@ -110,6 +106,10 @@ function WindowContext(jsFile, windowContext, executor = false, context = {}) {
 		});
 
 		context.hasAlertMicrotask = true;
+		
+		if (typeof performance === 'undefined') {
+			performance = Date;
+		}
 
 		var e = performance.now() + 0.8;
 
@@ -121,7 +121,7 @@ function WindowContext(jsFile, windowContext, executor = false, context = {}) {
 	context.alert = alert;
 	
 	if (!executor) {
-		executeFile()(jsFile);
+		eval(jsFile);
 	} else {
 		executor()(jsFile);
 	}

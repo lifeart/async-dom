@@ -26,7 +26,7 @@ function ProxyConstructor(implementation, asyncMessage) {
 				return target[prop];
 			},
 			set(target, prop, value) {
-				// console.log('target',target);
+				// console.log(target, prop, value);
 				// console.log(nodeId(target._element || target, 'proxyList'));
 				asyncMessage({
 					action: 'setStyle',
@@ -45,6 +45,9 @@ function ProxyConstructor(implementation, asyncMessage) {
 		},
 		body: {
 			get(target, prop) {
+				if (prop === 'ownerDocument') {
+					return document;
+				}
 				if (proxyGet[prop]) {
 					if (prop === ORIGINAL_KEY) {
 						return proxyGet[prop].bind(target)();
@@ -65,6 +68,16 @@ function ProxyConstructor(implementation, asyncMessage) {
 				}
 				if (prop === 'defaultView') {
 					return window;
+				}
+				if (prop === 'documentElement') {
+					return document;
+				}
+				if (prop === 'style') {
+					if (prop in target) {
+						return target[prop];
+					} else {
+						return {};
+					}
 				}
 				if (prop === 'body') {
 					if (!bodyProxy) {
@@ -318,7 +331,8 @@ function ProxyConstructor(implementation, asyncMessage) {
 			// console.log('documentElement');
 			// return getProxy(originalNode(this.documentElement),'document');
 			// return window;
-			return this.documentElement || document;
+			let item = this.documentElement || document;
+			return item;
 		},
 		// document
 		getElementById(id) {

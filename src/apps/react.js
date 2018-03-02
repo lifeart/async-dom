@@ -201,7 +201,7 @@ var ExampleApplication = function (_React$Component2) {
 
 var start = new Date().getTime();
 function update() {
-  ReactDOM.render(React.createElement(ExampleApplication, { elapsed: new Date().getTime() - start }), document.getElementById('app'));
+  ReactDOM.render(React.createElement(ExampleApplication, { elapsed: new Date().getTime() - start }), document.body);
   requestAnimationFrame(update);
 }
 requestAnimationFrame(update);
