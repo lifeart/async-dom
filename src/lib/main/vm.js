@@ -5,6 +5,8 @@ function runVM(self, thread) {
 	var viewportHeight = 0;
 	// viewportWidth (recalculated on each frame size)
 	var viewportWidth = 0;
+	// simple action looper;
+	var useStupidLoop = true;
 	// render config options
 	var renderConfig = {
 		disableOptional: false,
@@ -203,6 +205,9 @@ function runVM(self, thread) {
 	function shouldSkip(data) {
 		// if (data.action !== 'createNode' && data.id) {
 		// if (!nodesCache[data.id]) {
+		if (useStupidLoop) {
+			return false;
+		}
 		// return false;
 		// }
 		// }
@@ -311,6 +316,7 @@ function runVM(self, thread) {
 			if (!isEvent(action)) {
 				if (action.length) {
 					action.forEach((item)=>{
+						item.appUID = action.appUID;
 						actionsList.push(item);
 					});
 				} else {
@@ -348,7 +354,7 @@ function runVM(self, thread) {
 			return 1;
 		}
 		// if (a.action === 'setStyle' && b.action !== 'setStyle') {
-		//     return -1;
+		// 	return -1;
 		// }
 		return a.uid - b.uid;
 	}
@@ -422,6 +428,7 @@ function runVM(self, thread) {
 	}
 
 	// if action can't fit in 16ms range push it back
+
 	function pushBackAction(action) {
 		actionsList.unshift(action);
 	}
@@ -430,6 +437,32 @@ function runVM(self, thread) {
 		actions.forEach(action => {
 			pushBackAction(action);
 		});
+	}
+
+	function haveTime(start) {
+		if (!actionsList.length) {
+			return false;
+		}
+		let diff = (performance.now() - start);
+		let canGet60fps = diff < fpsMs;
+		// console.log('canGet60fps',diff,canGet60fps);
+		if (canGet60fps) {
+			return true;
+		}
+		return false;
+	}
+	
+	// main render thread
+	function stupidActionLoop(actionLoop) {
+		frameId++;
+		while(haveTime(actionLoop)) {
+			let action = actionsList.shift();
+			performAction(action, result => {
+				skip(action, result);
+			});
+		}
+		// console.log(performance.now()-actionLoop);
+		requestAnimationFrame(stupidActionLoop);
 	}
 
 	// main render thread
@@ -1056,7 +1089,12 @@ function runVM(self, thread) {
 		}
 	}
 	// start the world
-	requestAnimationFrame(actionLoop);
+	if (useStupidLoop) {
+		requestAnimationFrame(stupidActionLoop);
+	} else {
+		requestAnimationFrame(actionLoop);
+	}
+	
 
 	document.addEventListener('visibilitychange', function() {
 		sendMessage({
