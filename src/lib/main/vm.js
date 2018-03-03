@@ -33,11 +33,13 @@ function runVM(self, thread) {
 	// body style node
 	var pointerEventsStyleNode = document.body.style['pointer-events'];
 	// imagine how many milliseconds we can take for each frame
-	var fpsMs = 11;
+	var fpsMs = 16;
 	// here we store actions timings
 	var actionTimes = {};
 	// this is list of async actions
 	var actionsList = [];
+	// pool of actions to be rendered
+	var actionsPool = [];
 	// critical actions list size, if pool rich this size all actions will be applyed
 	var criticalSize = 1500;
 	// max size before we increase number of actions per frame
@@ -317,10 +319,19 @@ function runVM(self, thread) {
 				if (action.length) {
 					action.forEach((item)=>{
 						item.appUID = action.appUID;
-						actionsList.push(item);
+						if (useStupidLoop) {
+							actionsPool.push(item);
+						} else {
+							actionsList.push(item);
+						}
+						
 					});
 				} else {
-					actionsList.push(action);
+					if (useStupidLoop) {
+						actionsPool.push(action);
+					} else {
+						actionsList.push(item);
+					}
 				}
 			} else {
 				performAction(action, handleNonBlickingActionResult);
@@ -363,6 +374,7 @@ function runVM(self, thread) {
 	function getActionsForLoop() {
 		//   var optimalCap = getOptimalActionsCap();
 		var optimalCap = actionsList.length > 25000 ? actionsList.length : 2000;
+		// actionsList = actionsList.concat(actionsPool.sort(prioritySort));
 		actionsList = actionsList.sort(prioritySort);
 		var actions = actionsList.splice(0, optimalCap);
 		return actions;
@@ -449,19 +461,23 @@ function runVM(self, thread) {
 		if (canGet60fps) {
 			return true;
 		}
-		return false;
+		if (actionsList.length < maxSizeBeforeFlush) {
+			return false;
+		} else {
+			return true;
+		}
+	
 	}
 	
 	// main render thread
 	function stupidActionLoop(actionLoop) {
-		frameId++;
+		actionsList = actionsList.concat(actionsPool.splice(0,actionsPool.length).sort(prioritySort));
 		while(haveTime(actionLoop)) {
 			let action = actionsList.shift();
 			performAction(action, result => {
 				skip(action, result);
 			});
 		}
-		// console.log(performance.now()-actionLoop);
 		requestAnimationFrame(stupidActionLoop);
 	}
 
