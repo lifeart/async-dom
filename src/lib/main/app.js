@@ -1,4 +1,4 @@
-/* lobal runVM */
+/* global runVM */
 
 class Thread {
 	constructor() {
