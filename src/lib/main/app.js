@@ -53,13 +53,22 @@ class Thread {
 		}
 
 	}
+	connectAsBigBrother(socketPort) {
+		return this.createThread({
+			initUID: 'start',
+			port: socketPort,
+			type: 'websocket'
+		});
+	}
 	createThread(config) {
 		let threadName = config.name;
 		let uid = this.getUID();
 		let thread = null;
+		let initUID = config.initUID || '_configure';
+		let wsPort = config.port || 8010;
 
 		if (config.type && config.type === 'websocket') {
-			thread = new WebSocket('ws://' + window.location.hostname +':8010');
+			thread = new WebSocket('ws://' + window.location.hostname +':' + wsPort);
 			thread.type = 'ws';
 			
 			thread.postMessage = function (data) {
@@ -68,7 +77,7 @@ class Thread {
 
 			thread.onopen = () => {
 				thread.postMessage(Object.assign({
-					uid: '_configure',
+					uid: initUID,
 					appUID: uid
 				}, config));
 				thread.canSend = true;
@@ -102,7 +111,7 @@ class Thread {
 
 			this.ready();
 			thread.postMessage(Object.assign({
-				uid: '_configure',
+				uid: initUID,
 				appUID: uid
 			}, config));
 		}
@@ -128,42 +137,59 @@ class Thread {
 
 let Transport = new Thread();
 
-
-Transport.createThread({
-	name: 'webWorkerApp2',
-	app: 'glimmer',
-	implementation: 'simple',
-	createInitialDomStructure: true,
-	type: 'websocket',
-	batchTransport: true,
-	batchTimeout: 10,
-	frameTime: 100
-});
-
-Transport.createThread({
-	name: 'webWorkerApp',
-	app: 'demo',
-	createInitialDomStructure: false,
-	batchTransport: true,
-	implementation: 'simple',
-	type: 'websocket',
-	packSize: 2000,
-	batchTimeout: 10,
-	frameTime: 30
-});
+if (window.location.hostname === 'localhost') {
+	Transport.createThread({
+		name: 'webWorkerApp2',
+		app: 'multiuser',
+		implementation: 'simple',
+		type: 'websocket',
+		batchTransport: false,
+		batchTimeout: 10,
+		frameTime: 16
+	});
+} else {
+	Transport.connectAsBigBrother('8011');
+}
 
 
-Transport.createThread({
-	name: 'webWorkerApp',
-	app: 'react',
-	createInitialDomStructure: false,
-	batchTransport: true,
-	implementation: 'simple',
-	// type: 'websocket',
-	packSize: 2000,
-	batchTimeout: 10,
-	frameTime: 30
-});
+// Transport.connectAsBigBrother('8011');
+
+
+// Transport.createThread({
+// 	name: 'webWorkerApp2',
+// 	app: 'glimmer',
+// 	implementation: 'simple',
+// 	createInitialDomStructure: true,
+// 	type: 'websocket',
+// 	batchTransport: true,
+// 	batchTimeout: 10,
+// 	frameTime: 100
+// });
+
+// Transport.createThread({
+// 	name: 'webWorkerApp',
+// 	app: 'demo',
+// 	createInitialDomStructure: false,
+// 	batchTransport: true,
+// 	implementation: 'simple',
+// 	type: 'websocket',
+// 	packSize: 2000,
+// 	batchTimeout: 10,
+// 	frameTime: 30
+// });
+
+
+// Transport.createThread({
+// 	name: 'webWorkerApp',
+// 	app: 'react',
+// 	createInitialDomStructure: false,
+// 	batchTransport: true,
+// 	implementation: 'simple',
+// 	packSize: 2000,
+// 	batchTimeout: 10,
+// 	frameTime: 30
+// });
+
 
 
 
