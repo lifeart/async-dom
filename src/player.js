@@ -1,7 +1,18 @@
 class Timeline {
-	constructor() {
+	constructor(logicThread) {
 		this.frames = [];
+		this.clients = [];
 		this.lastFrame = 0;
+		this.logicThread = logicThread;
+	}
+	sendMessage(message) {
+		this.logicThread.send(message);
+	}
+	registerClient(client) {
+		this.clients.push(client);
+	}
+	unregisterClient(client) {
+		this.clients = this.clients.filter(el=>el!==client);
 	}
 	push(action) {
 		this.frames.push([this.lastFrame, action]);
@@ -12,10 +23,25 @@ class Timeline {
 		return this.frames.length;
 	}
 	vacuum() {
-		//to implement
+		let lastIndex = this.lastFrame;
+		this.clients.forEach((client)=>{
+			if (client.frameId < lastIndex ) {
+				lastIndex = client.frameId;
+			}
+		});
+		this.frames = this.frames.slice(lastIndex, this.frames.length-1);
 	}
-	broadcastFrame() {
-
+	broadcastFrame(action) {
+		this.clients.forEach((client)=>{
+			client.broadcast(action);
+		});
+	}
+	destroy() {
+		this.frames = [];
+		this.clients.forEach((client)=>{
+			client.destroy();
+		});
+		this.clients = [];
 	}
 	playFromFrame(fromFrameId = 0, limit = 0) {
 		var lastFrame = fromFrameId;
@@ -72,6 +98,15 @@ class TimelineClient {
 		this.timeline = timeline;
 		this.setupClient();
 	}
+	destroy() {
+
+	}
+	broadcast(msg) {
+		this.connection.sendMessage(msg);
+	}
+	timelineFeedback(msg) {
+		this.timeline.sendMessage(msg);
+	}
 	sendMessage(messageName, [newLastFrameId, itemsList]) {
 		this.connection.sendMessage({
 			_name: messageName,
@@ -83,6 +118,7 @@ class TimelineClient {
 		return this.timeline.playFromFrame(this.frameId);
 	}
 	setupClient() {
+		this.timeline.registerClient(this);
 		this.sendMessage('ready', this.frameId, this.timeline.framesCount());
 		this.on('start', ({lastFrame}) => {
 			this.frameId = lastFrame;
