@@ -7,7 +7,7 @@ Async Dom
 
 2 apps separately running in web-workers, using async dom https://lifeart.github.io/async-dom/
 
-# Supported WebWorker dom implementations
+# Supported WebWorker/NodeJs websockets DOM implementations
 * Pseudo Dom
 * JSDom
 * Simple Dom
