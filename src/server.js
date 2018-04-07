@@ -3,6 +3,10 @@
 const path = require('path');
 const WebSocket = require('uws');
 const { fork } = require('child_process');
+
+const USE_TIMELINE = true;
+const {Timeline, TimelineClient, TimelineConnection} = require('./player');
+
 const wss = new WebSocket.Server({
 	port: 8010 ,
 	// perMessageDeflate: {
@@ -26,22 +30,34 @@ const wss = new WebSocket.Server({
 	// }
 });
 
+function getThread() {
+	return fork(path.resolve(__dirname,'lib/node-thread/ww.js'));
+}
 
 wss.on('error', () => console.log('errored'));
+
 wss.on('connection', function connection(ws) {
 
-	var worker = fork(path.resolve(__dirname,'lib/node-thread/ww.js'));
+	var worker = getThread();
+	// var timeline = new Timeline();
+	// var timelineConnection = new TimelineConnection(ws);
+	// var timelineClient = new TimelineClient(timelineConnection, timeline);
 
 	worker.on('message', (event) => {
-		// console.log('<-',event);
+		// if (USE_TIMELINE) {
+		// timeline.push(event);
+		// } else {
 		ws.send(event);
+		// }
 	});
 
 	ws.on('error', function(){
 		worker.kill('SIGKILL');
 	});
+
 	let mid = 0;
 	let batchTransport = true;
+
 	ws.on('message', function incoming(message) {
 		mid++;
 		if (mid == 1) {
