@@ -63,9 +63,10 @@ class Thread {
 		let thread = new WebSocket(wsUrl);
 		thread.type = 'ws';
 		thread.postMessage = function (data) {
-			if (data.cb) {
-				thread.send(JSON.stringify(data));
-			}
+			// console.log(data);
+			// if (data.cb) {
+			thread.send(JSON.stringify(data));
+			// }
 		};
 		thread.onclose = this.wsThreadOnClose.bind(this);
 		thread.onerror = this.wsThreadOnError.bind(this);
