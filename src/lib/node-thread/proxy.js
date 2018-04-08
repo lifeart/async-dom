@@ -198,6 +198,12 @@ function ProxyConstructor(implementation, asyncMessage) {
 		onkeyup(callback) {
 			return DOM_EVENT_HOOKS.addEventListener.apply(this, ['keyup', callback]);
 		},
+		onchange(callback) {
+			return DOM_EVENT_HOOKS.addEventListener.apply(this, [
+				'change',
+				callback
+			]);
+		},
 		onkeypress(callback) {
 			return DOM_EVENT_HOOKS.addEventListener.apply(this, [
 				'keypress',
@@ -532,6 +538,28 @@ function ProxyConstructor(implementation, asyncMessage) {
 				html: value
 			});
 			return result;
+		},
+		
+		//for-input
+		checked(value) {
+			let result = (this.checked = value);
+			asyncMessage({
+				action: 'setProperty',
+				id: nodeId(this, 'checked'),
+				property: 'checked',
+				value: value
+			});
+			return result;
+		},
+		type(value) {
+			let result = (this.type = value);
+			asyncMessage({
+				action: 'setProperty',
+				id: nodeId(this, 'type'),
+				property: 'type',
+				value: value
+			});
+			return result;
 		}
 	});
 
@@ -588,11 +616,11 @@ function ProxyConstructor(implementation, asyncMessage) {
 	}
 
 	function EventTransformer(callback, e) {
-		e.currentTarget = document.getElementById(e.currentTarget);
-		e.srcElement = document.getElementById(e.srcElement);
-		e.target = document.getElementById(e.target) || e.currentTarget || null;
-		e.toElement = document.getElementById(e.toElement);
-		e.eventPhase = document.getElementById(e.eventPhase);
+		e.currentTarget = getProxy(_cacheId.get(e.currentTarget));
+		e.srcElement = getProxy(_cacheId.get(e.srcElement));
+		e.target = getProxy(_cacheId.get(e.target || e.currentTarget || null));
+		e.toElement = getProxy(_cacheId.get(e.toElement));
+		e.eventPhase = getProxy(_cacheId.get(e.eventPhase));
 		e.preventDefault = () => {};
 		callback(e);
 	}

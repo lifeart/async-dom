@@ -152,11 +152,12 @@ let Transport = new Thread();
 
 let multiuserAppConfig = {
 	name: 'webWorkerApp2',
-	app: 'multiuser',
+	// app: 'multiuser',
+	app: 'multicheckboxes',
 	implementation: 'simple',
 	type: 'websocket',
 	callbacks: false,
-	batchTransport: false,
+	batchTransport: true,
 	batchTimeout: 10,
 	frameTime: 16
 };
