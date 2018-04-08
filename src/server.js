@@ -7,6 +7,12 @@ const { fork } = require('child_process');
 const USE_TIMELINE = true;
 const { Timeline, TimelineClient, TimelineConnection } = require('./player');
 
+function noop() {}
+
+function heartbeat() {
+	this.isAlive = true;
+}
+
 const masterSocket = new WebSocket.Server({
 	port: 8010
 });
@@ -41,10 +47,18 @@ function log(msg) {
 	console.log(msg);
 }
 
-masterSocket.on('error', () => log('errored'));
+masterSocket.on('error', () => {
+	log('errored');
+	timeline = null;
+	timelineClients = [];
+});
 slaveSocket.on('error', () => log('errored'));
 
 slaveSocket.on('connection', function connection(ws) {
+
+	ws.isAlive = true;
+	ws.on('pong', heartbeat);
+
 	requestTimeline(function(timeline){
 		var timelineClient = new TimelineClient(new TimelineConnection(ws), timeline);
 		timelineClient.sync();
@@ -76,6 +90,18 @@ slaveSocket.on('connection', function connection(ws) {
 		});
 	});
 });
+
+const interval = setInterval(function ping() {
+	slaveSocket.clients.forEach(function each(ws) {
+		if (ws.isAlive === false) {
+			return ws.terminate();
+		}
+		ws.isAlive = false;
+		ws.ping(noop);
+	});
+}, 30000);
+
+console.log('interval',interval);
 
 masterSocket.on('connection', function connection(ws) {
 

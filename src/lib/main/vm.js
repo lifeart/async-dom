@@ -1077,7 +1077,12 @@ function runVM(self, thread) {
 		};
 
 		if (data.action) {
-			callback({ uid: data.uid, cb: true, result: actions[data.action](data) });
+			if (data.cb) {
+				callback({ uid: data.uid, cb: true, result: actions[data.action](data) });
+			} else {
+				callback({ uid: data.uid, cb: false, result: actions[data.action](data) });
+			}
+			
 			if (data.action === 'alert') {
 				sendMessage(data);
 			}

@@ -59,6 +59,42 @@ class Thread {
 			type: 'websocket'
 		}));
 	}
+	getWsThread(wsUrl, threadConfig) {
+		let thread = new WebSocket(wsUrl);
+		thread.type = 'ws';
+		thread.postMessage = function (data) {
+			if (data.cb) {
+				thread.send(JSON.stringify(data));
+			}
+		};
+		thread.onclose = this.wsThreadOnClose.bind(this);
+		thread.onerror = this.wsThreadOnError.bind(this);
+		thread.onopen = () => {
+			thread.postMessage(threadConfig);
+			thread.canSend = true;
+			this.ready();
+		};
+		return thread;
+	}
+	wsThreadOnClose(event) {
+
+		if (event.wasClean) {
+			console.log('Соединение закрыто чисто');
+		} else {
+			console.log('Обрыв соединения'); // например, "убит" процесс сервера
+		}
+		console.log('Код: ' + event.code + ' причина: ' + event.reason);
+		
+	}
+	wsThreadOnError(error) {
+		console.log('Ошибка ' + error.message);
+	}
+	addThread(thread, threadName, uid) {
+		this.uids[uid] = thread;
+		this._bindThreadActions(thread,uid);
+		this.threads[threadName] = thread;
+		this.threadsList.push(thread);
+	}
 	createThread(config) {
 		let threadName = config.name;
 		let uid = this.getUID();
@@ -72,45 +108,17 @@ class Thread {
 				wsType = 'wss';
 			}
 			let wsUrl = config.url ||  wsType + '://' + window.location.hostname +':' + wsPort;
-			thread = new WebSocket(wsUrl);
-			thread.type = 'ws';
-			
-			thread.postMessage = function (data) {
-				thread.send(JSON.stringify(data));
-			};
 
-			thread.onopen = () => {
-				thread.postMessage(Object.assign({
-					uid: initUID,
-					appUID: uid
-				}, config));
-				thread.canSend = true;
-				this.ready();
-			};
+			let threadConfig = Object.assign({
+				uid: initUID,
+				appUID: uid
+			}, config);
 
-			thread.onclose = function(event) {
-				if (event.wasClean) {
-					console.log('Соединение закрыто чисто');
-				} else {
-					console.log('Обрыв соединения'); // например, "убит" процесс сервера
-				}
-				console.log('Код: ' + event.code + ' причина: ' + event.reason);
-			};
-
-			thread.onerror = function(error) {
-				console.log('Ошибка ' + error.message);
-			};
-
-			this.uids[uid] = thread;
-			this._bindThreadActions(thread,uid);
-			this.threads[threadName] = thread;
-			this.threadsList.push(thread);
+			thread = this.getWsThread(wsUrl, threadConfig);
+			this.addThread(thread, threadName, uid);
 		} else {
 			thread = new Worker('lib/worker-thread/ww.js?t='+Math.random());
-			this.uids[uid] = thread;
-			this._bindThreadActions(thread,uid);
-			this.threads[threadName] = thread;
-			this.threadsList.push(thread);
+			this.addThread(thread, threadName, uid);
 			thread.canSend = true;
 
 			this.ready();
@@ -146,6 +154,7 @@ let multiuserAppConfig = {
 	app: 'multiuser',
 	implementation: 'simple',
 	type: 'websocket',
+	callbacks: false,
 	batchTransport: false,
 	batchTimeout: 10,
 	frameTime: 16
@@ -155,6 +164,8 @@ let demoHostname = 'async.cool';
 
 if (window.location.hostname === 'localhost') {
 	Transport.createThread(multiuserAppConfig);
+	console.log('createThread');
+
 } else {
 	// window.location.search
 	if (window.location.hostname === demoHostname) {
@@ -168,6 +179,7 @@ if (window.location.hostname === 'localhost') {
 			});
 		}
 	} else {
+		console.log('connectAsBigBrother');
 		Transport.connectAsBigBrother({
 			port: 8011
 		});

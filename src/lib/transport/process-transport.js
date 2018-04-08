@@ -31,6 +31,7 @@ class ProcessTransport {
 		this.uidsMap = new Map();
 		this.packSize = config.packSize || 1000;
 		this.transportName = config.batchTransport ? 'asyncBatch' : 'asyncSendMessage';
+		this.useCallbacks = true;
 
 		if (this.type === 'ww') {
 			this.postMessage = this.postMessageWorker;
@@ -43,7 +44,6 @@ class ProcessTransport {
 			});
 		}
 
-	
 		this.transport.bind(this);
 	}
 	setConfig(config = {}) {
@@ -51,6 +51,11 @@ class ProcessTransport {
 			this.transportName = ['asyncBatch'];
 		} else {
 			this.transportName = ['asyncSendMessage'];
+		}
+		if (typeof config.callbacks === 'boolean') {
+			this.useCallbacks = config.callbacks;
+		} else {
+			this.useCallbacks = true;
 		}
 	}
 	transport(msg) {
@@ -61,9 +66,10 @@ class ProcessTransport {
 		let uid = `${this.maxId}`;
 		data.uid = parseInt(uid);
 
-		if (callback) {
+		if (callback && this.useCallbacks) {
 			this.uidsMap.set(uid, callback);
 		}
+
 		if (typeof data.callback === 'function') {
 			this.uidsMap.set(`_${uid}_${data.name}`, data.callback);
 			delete data.callback;
@@ -93,7 +99,7 @@ class ProcessTransport {
 			});
 		}
 
-		data.cb = callback ? true : false;
+		data.cb = (this.useCallbacks && callback) ? true : false;
 		this.postMessage(data);
 	}
 	postMessage() {

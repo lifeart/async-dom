@@ -24,12 +24,13 @@ function configureThread(data, transport, executor, context = {}) {
 	context.AppUID = data.appUID;
 	context.animationFrameTime = data.frameTime || context.animationFrameTime;
 	context.batchTransport = data.batchTransport || context.batchTransport;
+	context.callbacks = data.callbacks;
 
 	context.packSize = data.packSize || context.packSize;
 	context.batchTimeout = data.batchTimeout || context.batchTimeout;
 
 	context.transport = transport;
-	
+	//callbacks
 	// window.screen = {
 	// 	width: 1280,
 	// 	height: 720
@@ -62,6 +63,7 @@ function WindowContext(jsFile, windowContext, executor = false, context = {}) {
 	context.batchTimeout = windowContext.batchTimeout || 6;
 
 	windowContext.transport.setConfig({
+		callbacks: context.callbacks,
 		batchTransport: context.batchTransport,
 		packSize: context.packSize,
 		batchTimeout: context.batchTimeout
