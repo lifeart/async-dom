@@ -53,12 +53,11 @@ class Thread {
 		}
 
 	}
-	connectAsBigBrother(socketPort) {
-		return this.createThread({
+	connectAsBigBrother(config) {
+		return this.createThread(Object.assign({}, config, {
 			initUID: 'start',
-			port: socketPort,
 			type: 'websocket'
-		});
+		}));
 	}
 	createThread(config) {
 		let threadName = config.name;
@@ -72,7 +71,8 @@ class Thread {
 			if (window.location.protocol === 'https:') {
 				wsType = 'wss';
 			}
-			thread = new WebSocket(wsType + '://' + window.location.hostname +':' + wsPort);
+			let wsUrl = config.url ||  wsType + '://' + window.location.hostname +':' + wsPort;
+			thread = new WebSocket(wsUrl);
 			thread.type = 'ws';
 			
 			thread.postMessage = function (data) {
@@ -141,18 +141,37 @@ class Thread {
 
 let Transport = new Thread();
 
+let multiuserAppConfig = {
+	name: 'webWorkerApp2',
+	app: 'multiuser',
+	implementation: 'simple',
+	type: 'websocket',
+	batchTransport: false,
+	batchTimeout: 10,
+	frameTime: 16
+};
+
+let demoHostname = 'async.cool';
+
 if (window.location.hostname === 'localhost') {
-	Transport.createThread({
-		name: 'webWorkerApp2',
-		app: 'multiuser',
-		implementation: 'simple',
-		type: 'websocket',
-		batchTransport: false,
-		batchTimeout: 10,
-		frameTime: 16
-	});
+	Transport.createThread(multiuserAppConfig);
 } else {
-	Transport.connectAsBigBrother('8011');
+	// window.location.search
+	if (window.location.hostname === demoHostname) {
+		if (window.location.search.includes('admin')) {
+			Transport.createThread(Object.assign({},multiuserAppConfig,{
+				url: 'wss://'+demoHostname+'/ws-admin'
+			}));
+		} else {
+			Transport.connectAsBigBrother({
+				url: 'wss://'+demoHostname+'/ws'
+			});
+		}
+	} else {
+		Transport.connectAsBigBrother({
+			port: 8011
+		});
+	}
 }
 
 
