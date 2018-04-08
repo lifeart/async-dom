@@ -68,7 +68,11 @@ class Thread {
 		let wsPort = config.port || 8010;
 
 		if (config.type && config.type === 'websocket') {
-			thread = new WebSocket('ws://' + window.location.hostname +':' + wsPort);
+			let wsType = 'ws';
+			if (window.location.protocol === 'https:') {
+				wsType = 'wss';
+			}
+			thread = new WebSocket(wsType + '://' + window.location.hostname +':' + wsPort);
 			thread.type = 'ws';
 			
 			thread.postMessage = function (data) {
