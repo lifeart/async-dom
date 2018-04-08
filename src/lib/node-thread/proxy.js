@@ -616,11 +616,11 @@ function ProxyConstructor(implementation, asyncMessage) {
 	}
 
 	function EventTransformer(callback, e) {
-		e.currentTarget = getProxy(_cacheId.get(e.currentTarget));
-		e.srcElement = getProxy(_cacheId.get(e.srcElement));
-		e.target = getProxy(_cacheId.get(e.target || e.currentTarget || null));
-		e.toElement = getProxy(_cacheId.get(e.toElement));
-		e.eventPhase = getProxy(_cacheId.get(e.eventPhase));
+		e.currentTarget = getProxy(_cacheId.get(e.currentTarget)) || document.getElementById(e.currentTarget);
+		e.srcElement = getProxy(_cacheId.get(e.srcElement))  || document.getElementById(e.srcElement);
+		e.target = getProxy(_cacheId.get(e.target || e.currentTarget || null))  || document.getElementById(e.target || e.currentTarget || null);
+		e.toElement = getProxy(_cacheId.get(e.toElement))  || document.getElementById(e.toElement);
+		e.eventPhase = getProxy(_cacheId.get(e.eventPhase))  || document.getElementById(e.eventPhase);
 		e.preventDefault = () => {};
 		callback(e);
 	}
