@@ -49,14 +49,6 @@ var container = create({
 	id: 'app-container'
 });
   
-
-var total = create({
-	tagName: 'div',
-	id: 'total-clicks',
-	textContent: '0'
-});
-
-
 var checks = (new Array(1000)).fill(null).reduce((result, item, index)=>{
 	let stateKey = 'input_' + index;
 	let node = create({
@@ -78,20 +70,4 @@ var checks = (new Array(1000)).fill(null).reduce((result, item, index)=>{
 },[]);
   
 setLayout(container, checks);
-setLayout(document.body, [container, total]);
-  
-bindViewProp('total', total, 'textContent', 0);
-// bindViewProp('counter', counter, 'textContent', 0, [
-// 	function() {
-// 		view.total++;
-// 	}
-// ]);
-
-
-const styles = ``;
-
-
-setLayout(document.body, [create({
-	tagName: 'style',
-	textContent: styles
-})]);
+setLayout(document.body, [container]);
