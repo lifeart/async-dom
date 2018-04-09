@@ -615,12 +615,16 @@ function ProxyConstructor(implementation, asyncMessage) {
 		return node[ORIGINAL_KEY] || node;
 	}
 
+	function getNodeFromEventAttr(attr) {
+		return getProxy(_cacheId.get(attr)) || document.getElementById(attr);
+	}
+
 	function EventTransformer(callback, e) {
-		e.currentTarget = getProxy(_cacheId.get(e.currentTarget)) || document.getElementById(e.currentTarget);
-		e.srcElement = getProxy(_cacheId.get(e.srcElement))  || document.getElementById(e.srcElement);
-		e.target = getProxy(_cacheId.get(e.target || e.currentTarget || null))  || document.getElementById(e.target || e.currentTarget || null);
-		e.toElement = getProxy(_cacheId.get(e.toElement))  || document.getElementById(e.toElement);
-		e.eventPhase = getProxy(_cacheId.get(e.eventPhase))  || document.getElementById(e.eventPhase);
+		e.currentTarget = getNodeFromEventAttr(e.currentTarget);
+		e.srcElement = getNodeFromEventAttr(e.srcElement);
+		e.target = getNodeFromEventAttr(e.target || e.currentTarget || null);
+		e.toElement = getNodeFromEventAttr(e.toElement);
+		e.eventPhase = getNodeFromEventAttr(e.eventPhase);
 		e.preventDefault = () => {};
 		callback(e);
 	}

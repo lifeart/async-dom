@@ -157,7 +157,7 @@ let multiuserAppConfig = {
 	implementation: 'simple',
 	type: 'websocket',
 	callbacks: false,
-	batchTransport: true,
+	batchTransport: false,
 	batchTimeout: 10,
 	frameTime: 16
 };

@@ -692,7 +692,11 @@ function runVM(self, thread) {
 
 	// DOM action setTextContent
 	function setTextContent(data) {
-		return (getNode(data.id).textContent = data.textContent);
+		let node = getNode(data.id);
+		if (!node) {
+			console.error('undable to set textContent', data);
+		}
+		return (node.textContent = data.textContent);
 	}
 
 	function createNodeAlias(id, newId) {
