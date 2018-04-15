@@ -133,10 +133,11 @@ body {
   #total-clicks {
 	background-color: #8bc34a;
 	display: block;
-	width: 20%;
+	min-width: 20%;
 	border-radius: 10px;
 	height: 1rem;
 	float: right;
+	margin-top: 2rem;
 	padding: 1rem;
 	font-family: monospace;
 	font-size: 2rem;
@@ -146,7 +147,8 @@ body {
 	margin-right: 1rem;
   }
   #total-clicks::before {
-    content: "total clicks:";
+	content: "total clicks:";
+	font-size: 1.5rem;
     display: block;
     float: left;
   } 
