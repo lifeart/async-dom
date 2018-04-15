@@ -85,7 +85,7 @@ bindViewProp('counter', counter, 'textContent', 0, [
 const styles = `
 
 body {
-	background-color: blue;
+	background-color: black;
 	margin: 0;
 	padding: 0;
 	user-select: none;
@@ -110,15 +110,14 @@ body {
   }
   
   #left-button, #right-button {
+  margin-top: 3px;
+  margin-bottom: 3px;
 	height: 6rem;
 	width: 100%;
-	background-color: black;
-	color: white;
-	border: 0;
+	color: black;
 	font-weight: bold;
 	font-size: 4rem;
 	text-align: center;
-	display: block;
 	float: left;
   }
   
@@ -132,11 +131,12 @@ body {
   }
   
   #total-clicks {
-	background-color: red;
+	background-color: #8bc34a;
 	display: block;
-	width: calc(100% - 4rem);
+	width: 20%;
+	border-radius: 10px;
 	height: 1rem;
-	float: left;
+	float: right;
 	padding: 1rem;
 	font-family: monospace;
 	font-size: 2rem;
@@ -145,9 +145,13 @@ body {
 	margin-left: 1rem;
 	margin-right: 1rem;
   }
+  #total-clicks::before {
+    content: "total clicks:";
+    display: block;
+    float: left;
+  } 
 
 `;
-
 
 setLayout(document.body, [create({
 	tagName: 'style',
