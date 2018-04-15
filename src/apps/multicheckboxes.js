@@ -49,7 +49,7 @@ var container = create({
 	id: 'app-container'
 });
   
-var checks = (new Array(1000)).fill(null).reduce((result, item, index)=>{
+var checks = (new Array(300)).fill(null).reduce((result, item, index)=>{
 	let stateKey = 'input_' + index;
 	let node = create({
 		tagName: 'input',
@@ -69,5 +69,26 @@ var checks = (new Array(1000)).fill(null).reduce((result, item, index)=>{
 	return result;
 },[]);
   
-setLayout(container, checks);
+setLayout(container, [].concat(create({
+	tagName: 'h1',
+	textContent: 'Checkboxes: Multiuser'
+}),checks));
 setLayout(document.body, [container]);
+
+
+setLayout(document.body, [create({
+	tagName: 'style',
+	textContent: `
+		body {
+			background-color: #cecece;
+			padding: 5px;
+			text-align: center;
+		}
+		input[type="checkbox"] {
+			width: 24px;
+			height: 24px;
+			padding: 1px;
+			margin: 1px;
+		}
+	`
+})]);
