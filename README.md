@@ -13,6 +13,14 @@ Async Dom
 * Simple Dom
 * Domino
 
+# Features
+
+* Support multiple DOM implementations
+* Ability to batch WW messages
+* Ability to skip some DOM changes
+* Ability to stream DOM updates from nodejs server
+* Render VM on main thread with custom rendering control (frames batching, ordering, etc)
+
 
 # How to run glimmer streaming from websockets?
 
