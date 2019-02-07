@@ -15,6 +15,7 @@ Async Dom
 
 # Features
 
+* Scoped DOM (support multiple workers and applications rendering in single DOCUMENT at one time)
 * Support multiple DOM implementations
 * Ability to batch WW messages
 * Ability to skip some DOM changes
