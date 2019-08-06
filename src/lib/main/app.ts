@@ -1,4 +1,4 @@
-/* global Thread */
+import Thread from './thread';
 
 let Transport = new Thread();
 
@@ -55,17 +55,17 @@ if (window.location.hostname === 'localhost') {
 // 	frameTime: 100
 // });
 
-// Transport.createThread({
-// 	name: 'webWorkerApp',
-// 	app: 'demo',
-// 	createInitialDomStructure: false,
-// 	batchTransport: true,
-// 	implementation: 'simple',
-// 	type: 'websocket',
-// 	packSize: 2000,
-// 	batchTimeout: 10,
-// 	frameTime: 30
-// });
+Transport.createThread({
+	name: 'webWorkerApp',
+	app: 'demo',
+	createInitialDomStructure: true,
+	batchTransport: true,
+	implementation: 'simple',
+	// type: 'websocket',
+	packSize: 2000,
+	batchTimeout: 10,
+	frameTime: 30
+});
 
 
 // Transport.createThread({
@@ -92,3 +92,6 @@ if (window.location.hostname === 'localhost') {
 // 	Transport.ready();
 // },1500);
 
+
+
+export default Transport;

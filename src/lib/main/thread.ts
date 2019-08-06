@@ -1,14 +1,21 @@
-/* global runVM */
+import runVM from './vm';
 
-class Thread {
-	constructor() {
-		this.threads = {};
-		this.callbacks = {
-			'onmessage': []
-		};
-		this.uids = {};
-		this.threadsList = [];
+class ThreadSocket extends WebSocket {
+	type = 'ws';
+	canSend = false;
+	postMessage(data) {
+		this.send(JSON.stringify(data))
 	}
+}
+
+export default class Thread {
+	_activated = false;
+	threads = {};
+	uids = {};
+	callbacks = {
+		'onmessage': []
+	}
+	threadsList = [];
 	on(actionName, fn) {
 		this.callbacks[actionName].push(fn);
 	}
@@ -60,14 +67,7 @@ class Thread {
 		}));
 	}
 	getWsThread(wsUrl, threadConfig) {
-		let thread = new WebSocket(wsUrl);
-		thread.type = 'ws';
-		thread.postMessage = function (data) {
-			// console.log(data);
-			// if (data.cb) {
-			thread.send(JSON.stringify(data));
-			// }
-		};
+		let thread = new ThreadSocket(wsUrl);
 		thread.onclose = this.wsThreadOnClose.bind(this);
 		thread.onerror = this.wsThreadOnError.bind(this);
 		thread.onopen = () => {

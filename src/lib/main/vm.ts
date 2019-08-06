@@ -1,5 +1,5 @@
 /* global thread */
-function runVM(self, thread) {
+export default function runVM(self, thread) {
 
 	// viewportHeight (recalculated on each frame size)
 	var viewportHeight = 0;
@@ -664,7 +664,7 @@ function runVM(self, thread) {
 	// DOM action el.innerHTML
 	function setHTML(data) {
 		log('setHTML', data);
-		var node = getNode(data.id);
+		var node = getNode(data.id, data);
 		if (node) {
 			node.innerHTML = data.html;
 		}
@@ -692,7 +692,7 @@ function runVM(self, thread) {
 
 	// DOM action setTextContent
 	function setTextContent(data) {
-		let node = getNode(data.id);
+		let node = getNode(data.id, data);
 		if (!node) {
 			console.error('undable to set textContent', data);
 		}
@@ -744,7 +744,7 @@ function runVM(self, thread) {
 		node.style[data.attribute] = data.value;
 	}
 	function setProperty(data) {
-		var node = getNode(data.id);
+		var node = getNode(data.id, data);
 		if (!node) {
 			return;
 		}
@@ -752,18 +752,18 @@ function runVM(self, thread) {
 	}
 	// DOM action appendChild to head node
 	function headAppendChild(data) {
-		var node = getNode(data.id);
+		var node = getNode(data.id, data);
 		node && document.head.appendChild(node);
 	}
 	// DOM action appendChild to body node
 	function bodyAppendChild(data) {
-		var node = getNode(data.id);
+		var node = getNode(data.id, data);
 		node && document.body.appendChild(node);
 	}
 	// DOM action removeChild
 	function removeNode(data) {
 		removeEventListeners(data);
-		var node = getNode(data.id);
+		var node = getNode(data.id, data);
 		if (!node) {
 			log('removeNode', data);
 			return;
