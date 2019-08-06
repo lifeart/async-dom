@@ -5,7 +5,7 @@ var cjsTree = typescript('src', {
   tsconfig: {
     compilerOptions: {
       module: "es6",
-      target: "es5",
+      target: "es2018",
       moduleResolution: "classic",
       newLine: "LF",
       rootDir: "src",
