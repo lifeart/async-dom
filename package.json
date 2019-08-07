@@ -10,7 +10,9 @@
     "compile-jsdom": "browserify ./src/lib/dom/jsdom.js -o ./src/lib/dom/jsdom-bundle.js",
     "s": "http-server ./src -p 8080",
     "ws": "node ./src/server.js",
-    "serve": "concurrently \"npm run s\" \"npm run ws\""
+    "serve-ws": "concurrently \"npm run s\" \"npm run ws\"",
+    "build": "broccoli build",
+    "serve": "broccoli serve"
   },
   "repository": {
     "type": "git",
@@ -27,6 +29,10 @@
   },
   "homepage": "https://github.com/lifeart/async-dom#readme",
   "devDependencies": {
+    "broccoli": "^3.1.2",
+    "broccoli-cli": "^1.0.0",
+    "broccoli-rollup": "^4.1.1",
+    "broccoli-typescript-compiler": "^4.1.0",
     "browserify": "^16.1.0",
     "concurrently": "^3.5.1",
     "domino": "^2.0.1",
