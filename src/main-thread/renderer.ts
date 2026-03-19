@@ -1,11 +1,26 @@
 import { NodeCache } from "../core/node-cache.ts";
+import type { MutationLogEntry, WarningLogEntry } from "../core/debug.ts";
+import { WarningCode } from "../core/debug.ts";
+import { sanitizeHTML } from "../core/html-sanitizer.ts";
 import type { DomMutation, InsertPosition, NodeId } from "../core/protocol.ts";
+
+const DANGEROUS_ATTR_NAMES = new Set(["srcdoc", "formaction"]);
+const DANGEROUS_URI_ATTR_NAMES = new Set(["href", "src", "data", "action", "xlink:href"]);
+
+function isDangerousURI(value: string): boolean {
+	const trimmed = value.trim().toLowerCase();
+	return /^\s*javascript\s*:/i.test(trimmed) ||
+		/^\s*vbscript\s*:/i.test(trimmed) ||
+		/^\s*data\s*:\s*text\/html/i.test(trimmed);
+}
 
 export interface RendererPermissions {
 	allowHeadAppend: boolean;
 	allowBodyAppend: boolean;
 	allowNavigation: boolean;
 	allowScroll: boolean;
+	allowUnsafeHTML: boolean;
+	additionalAllowedProperties?: string[];
 }
 
 const DEFAULT_PERMISSIONS: RendererPermissions = {
@@ -13,7 +28,25 @@ const DEFAULT_PERMISSIONS: RendererPermissions = {
 	allowBodyAppend: false,
 	allowNavigation: true,
 	allowScroll: true,
+	allowUnsafeHTML: false,
 };
+
+const ALLOWED_PROPERTIES = new Set([
+	// Input
+	"value", "checked", "disabled", "selectedIndex", "indeterminate",
+	"readOnly", "required", "placeholder", "type", "name",
+	// Scroll
+	"scrollTop", "scrollLeft",
+	// Text
+	"textContent", "nodeValue",
+	// Media
+	"src", "currentTime", "volume", "muted", "controls",
+	"loop", "poster", "autoplay",
+	// Misc safe
+	"tabIndex", "title", "lang", "dir", "hidden", "draggable",
+	"contentEditable", "htmlFor", "open", "selected", "multiple",
+	"width", "height", "colSpan", "rowSpan",
+]);
 
 const SVG_TAGS = new Set([
 	"svg",
@@ -60,7 +93,15 @@ export class DomRenderer {
 	private nodeCache: NodeCache;
 	private permissions: RendererPermissions;
 	private root: RendererRoot;
+	private _additionalAllowedProperties: Set<string>;
 	onNodeRemoved: ((id: NodeId) => void) | null = null;
+	private _onWarning: ((entry: WarningLogEntry) => void) | null = null;
+	private _onMutation: ((entry: MutationLogEntry) => void) | null = null;
+
+	setDebugHooks(hooks: { onWarning?: ((e: WarningLogEntry) => void) | null; onMutation?: ((e: MutationLogEntry) => void) | null }): void {
+		this._onWarning = hooks.onWarning ?? null;
+		this._onMutation = hooks.onMutation ?? null;
+	}
 
 	constructor(
 		nodeCache?: NodeCache,
@@ -69,6 +110,7 @@ export class DomRenderer {
 	) {
 		this.nodeCache = nodeCache ?? new NodeCache();
 		this.permissions = { ...DEFAULT_PERMISSIONS, ...permissions };
+		this._additionalAllowedProperties = new Set(this.permissions.additionalAllowedProperties ?? []);
 		this.root = root ?? {
 			body: document.body,
 			head: document.head,
@@ -77,6 +119,9 @@ export class DomRenderer {
 	}
 
 	apply(mutation: DomMutation): void {
+		if (this._onMutation) {
+			this._onMutation({ side: "main", action: mutation.action, mutation, timestamp: performance.now() });
+		}
 		switch (mutation.action) {
 			case "createNode":
 				this.createNode(mutation.id, mutation.tag, mutation.textContent);
@@ -216,13 +261,19 @@ export class DomRenderer {
 	private appendChild(parentId: NodeId, childId: NodeId): void {
 		const parent = this.nodeCache.get(parentId);
 		const child = this.nodeCache.get(childId);
-		if (!parent || !child) return;
+		if (!parent || !child) {
+			this._onWarning?.({ code: WarningCode.MISSING_NODE, message: `appendChild: ${!parent ? "parent" : "child"} not found`, context: { parentId, childId }, timestamp: performance.now() });
+			return;
+		}
 		(parent as Element).appendChild(child);
 	}
 
 	private removeNode(id: NodeId): void {
 		const node = this.nodeCache.get(id);
-		if (!node) return;
+		if (!node) {
+			this._onWarning?.({ code: WarningCode.MISSING_NODE, message: "removeNode: node not found", context: { id }, timestamp: performance.now() });
+			return;
+		}
 		this.onNodeRemoved?.(id);
 		this.nodeCache.delete(id);
 		if (node.parentNode) {
@@ -246,7 +297,10 @@ export class DomRenderer {
 		if (parentId === newId) return;
 		const parent = this.nodeCache.get(parentId);
 		const newEl = this.nodeCache.get(newId);
-		if (!parent || !newEl) return;
+		if (!parent || !newEl) {
+			this._onWarning?.({ code: WarningCode.MISSING_NODE, message: `insertBefore: ${!parent ? "parent" : "newNode"} not found`, context: { parentId, newId, refId }, timestamp: performance.now() });
+			return;
+		}
 
 		const refEl = refId ? this.nodeCache.get(refId) : null;
 		(parent as Element).insertBefore(newEl, refEl ?? null);
@@ -254,7 +308,16 @@ export class DomRenderer {
 
 	private setAttribute(id: NodeId, name: string, value: string): void {
 		const node = this.nodeCache.get(id) as Element | null;
-		if (!node || !("setAttribute" in node)) return;
+		if (!node || !("setAttribute" in node)) {
+			this._onWarning?.({ code: WarningCode.MISSING_NODE, message: "setAttribute: node not found", context: { id, name, value }, timestamp: performance.now() });
+			return;
+		}
+
+		// Block dangerous attributes (on* event handlers, javascript: URIs)
+		const lowerName = name.toLowerCase();
+		if (/^on/i.test(lowerName)) return;
+		if (DANGEROUS_ATTR_NAMES.has(lowerName)) return;
+		if (DANGEROUS_URI_ATTR_NAMES.has(lowerName) && isDangerousURI(value)) return;
 
 		if (name === "id") {
 			// Create alias in cache for new id
@@ -271,13 +334,27 @@ export class DomRenderer {
 
 	private setStyle(id: NodeId, property: string, value: string): void {
 		const node = this.nodeCache.get(id) as HTMLElement | null;
-		if (!node?.style) return;
+		if (!node?.style) {
+			this._onWarning?.({ code: WarningCode.MISSING_NODE, message: "setStyle: node not found", context: { id, property, value }, timestamp: performance.now() });
+			return;
+		}
 		node.style.setProperty(property, value);
 	}
 
 	private setProperty(id: NodeId, property: string, value: unknown): void {
 		const node = this.nodeCache.get(id);
 		if (!node) return;
+
+		if (!ALLOWED_PROPERTIES.has(property) && !this._additionalAllowedProperties.has(property)) {
+			this._onWarning?.({
+				code: WarningCode.BLOCKED_PROPERTY,
+				message: `setProperty: property "${property}" is not in the allowed list`,
+				context: { id, property },
+				timestamp: performance.now(),
+			});
+			return;
+		}
+
 		(node as unknown as Record<string, unknown>)[property] = value;
 	}
 
@@ -296,13 +373,13 @@ export class DomRenderer {
 	private setHTML(id: NodeId, html: string): void {
 		const node = this.nodeCache.get(id) as Element | null;
 		if (!node) return;
-		node.innerHTML = html;
+		node.innerHTML = this.permissions.allowUnsafeHTML ? html : sanitizeHTML(html);
 	}
 
 	private insertAdjacentHTML(id: NodeId, position: InsertPosition, html: string): void {
 		const node = this.nodeCache.get(id) as Element | null;
 		if (!node || !("insertAdjacentHTML" in node)) return;
-		node.insertAdjacentHTML(position, html);
+		node.insertAdjacentHTML(position, this.permissions.allowUnsafeHTML ? html : sanitizeHTML(html));
 	}
 
 	private headAppendChild(id: NodeId): void {

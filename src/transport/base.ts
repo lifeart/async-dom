@@ -7,4 +7,6 @@ export interface Transport {
 	onMessage(handler: (message: Message) => void): void;
 	close(): void;
 	readonly readyState: TransportReadyState;
+	onError?: (error: Error) => void;
+	onClose?: () => void;
 }

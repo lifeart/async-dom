@@ -1,3 +1,5 @@
+import type { DebugOptions } from "../core/debug.ts";
+import { resolveDebugHooks } from "../core/debug.ts";
 import type { AppId, EventMessage, SerializedLocation } from "../core/protocol.ts";
 import { createAppId, isEventMessage, isSystemMessage } from "../core/protocol.ts";
 import { QueryType, SyncChannel } from "../core/sync-channel.ts";
@@ -9,6 +11,7 @@ import { VirtualMutationObserver, VirtualResizeObserver, VirtualIntersectionObse
 export interface WorkerDomConfig {
 	appId?: AppId;
 	transport?: Transport;
+	debug?: DebugOptions;
 }
 
 export interface WorkerDomResult {
@@ -100,6 +103,42 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 			doc.dispatchEvent(eventMsg.listenerId, eventMsg.event);
 		}
 	});
+
+	// Install global error handlers to forward crashes to main thread
+	const workerScope = self as unknown as {
+		onerror: ((event: ErrorEvent | string, source?: string, lineno?: number, colno?: number, error?: Error) => void) | null;
+		onunhandledrejection: ((event: PromiseRejectionEvent) => void) | null;
+	};
+
+	workerScope.onerror = (
+		event: ErrorEvent | string,
+		source?: string,
+		lineno?: number,
+		colno?: number,
+		error?: Error,
+	) => {
+		const message = typeof event === "string" ? event : (event as ErrorEvent).message ?? "Unknown worker error";
+		const serializedError: import("../core/protocol.ts").SerializedError = {
+			message,
+			stack: error?.stack,
+			name: error?.name,
+			filename: source ?? (typeof event !== "string" ? (event as ErrorEvent).filename : undefined),
+			lineno: lineno ?? (typeof event !== "string" ? (event as ErrorEvent).lineno : undefined),
+			colno: colno ?? (typeof event !== "string" ? (event as ErrorEvent).colno : undefined),
+		};
+		transport.send({ type: "error", appId, error: serializedError });
+	};
+
+	workerScope.onunhandledrejection = (event: PromiseRejectionEvent) => {
+		const reason = event.reason;
+		const serializedError: import("../core/protocol.ts").SerializedError = {
+			message: reason instanceof Error ? reason.message : String(reason),
+			stack: reason instanceof Error ? reason.stack : undefined,
+			name: reason instanceof Error ? reason.name : "UnhandledRejection",
+			isUnhandledRejection: true,
+		};
+		transport.send({ type: "error", appId, error: serializedError });
+	};
 
 	// Send ready message after setup
 	transport.send({ type: "ready", appId });
@@ -221,6 +260,19 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 	});
 
 	doc._defaultView = win;
+
+	if (config?.debug?.exposeDevtools) {
+		(globalThis as Record<string, unknown>).__ASYNC_DOM_DEVTOOLS__ = {
+			document: doc,
+			tree: () => doc.toJSON(),
+			findNode: (id: string) => doc.getElementById(id),
+			stats: () => doc.collector.getStats(),
+		};
+	}
+
+	if (config?.debug?.logMutations) {
+		resolveDebugHooks(config.debug);
+	}
 
 	return { document: doc, window: win };
 }

@@ -107,3 +107,132 @@ describe("MutationCollector", () => {
 		expect(collector.pendingCount).toBe(0);
 	});
 });
+
+describe("MutationCollector coalescing", () => {
+	it("deduplicates repeated setStyle on same (id, property)", () => {
+		const transport = createMockTransport();
+		const collector = new MutationCollector(createAppId("test"));
+		collector.setTransport(transport);
+
+		const id = createNodeId("n1");
+		collector.add({ action: "setStyle", id, property: "color", value: "red" });
+		collector.add({ action: "setStyle", id, property: "color", value: "blue" });
+		collector.add({ action: "setStyle", id, property: "color", value: "green" });
+		collector.flushSync();
+
+		const mutations = (transport.sent[0] as { mutations: unknown[] }).mutations;
+		expect(mutations).toHaveLength(1);
+		expect((mutations[0] as { value: string }).value).toBe("green");
+	});
+
+	it("deduplicates repeated setAttribute on same (id, name)", () => {
+		const transport = createMockTransport();
+		const collector = new MutationCollector(createAppId("test"));
+		collector.setTransport(transport);
+
+		const id = createNodeId("n1");
+		collector.add({ action: "setAttribute", id, name: "class", value: "a" });
+		collector.add({ action: "setAttribute", id, name: "class", value: "b" });
+		collector.flushSync();
+
+		const mutations = (transport.sent[0] as { mutations: unknown[] }).mutations;
+		expect(mutations).toHaveLength(1);
+		expect((mutations[0] as { value: string }).value).toBe("b");
+	});
+
+	it("preserves order of non-deduplicated mutations", () => {
+		const transport = createMockTransport();
+		const collector = new MutationCollector(createAppId("test"));
+		collector.setTransport(transport);
+
+		const id1 = createNodeId("n1");
+		const id2 = createNodeId("n2");
+		collector.add({ action: "createNode", id: id1, tag: "div" });
+		collector.add({ action: "setStyle", id: id1, property: "color", value: "red" });
+		collector.add({ action: "createNode", id: id2, tag: "span" });
+		collector.add({ action: "setStyle", id: id1, property: "color", value: "blue" });
+		collector.flushSync();
+
+		const mutations = (transport.sent[0] as { mutations: { action: string }[] }).mutations;
+		expect(mutations).toHaveLength(3);
+		expect(mutations[0].action).toBe("createNode");
+		expect(mutations[1].action).toBe("createNode");
+		expect(mutations[2].action).toBe("setStyle");
+	});
+
+	it("eliminates createNode + removeNode pair when node was never attached", () => {
+		const transport = createMockTransport();
+		const collector = new MutationCollector(createAppId("test"));
+		collector.setTransport(transport);
+
+		const id = createNodeId("temp");
+		collector.add({ action: "createNode", id, tag: "div" });
+		collector.add({ action: "setAttribute", id, name: "class", value: "foo" });
+		collector.add({ action: "removeNode", id });
+		collector.flushSync();
+
+		// All three should be eliminated (create + orphan setAttribute + remove)
+		expect(transport.sent).toHaveLength(0);
+	});
+
+	it("keeps createNode + removeNode when node was attached in between", () => {
+		const transport = createMockTransport();
+		const collector = new MutationCollector(createAppId("test"));
+		collector.setTransport(transport);
+
+		const parentId = createNodeId("parent");
+		const childId = createNodeId("child");
+		collector.add({ action: "createNode", id: childId, tag: "div" });
+		collector.add({ action: "appendChild", id: parentId, childId });
+		collector.add({ action: "removeNode", id: childId });
+		collector.flushSync();
+
+		const mutations = (transport.sent[0] as { mutations: unknown[] }).mutations;
+		expect(mutations).toHaveLength(3);
+	});
+
+	it("does not deduplicate structural mutations", () => {
+		const transport = createMockTransport();
+		const collector = new MutationCollector(createAppId("test"));
+		collector.setTransport(transport);
+
+		const parentId = createNodeId("parent");
+		const childId = createNodeId("child");
+		collector.add({ action: "appendChild", id: parentId, childId });
+		collector.add({ action: "removeChild", id: parentId, childId });
+		collector.add({ action: "appendChild", id: parentId, childId });
+		collector.flushSync();
+
+		const mutations = (transport.sent[0] as { mutations: unknown[] }).mutations;
+		expect(mutations).toHaveLength(3);
+	});
+
+	it("enableCoalescing(false) disables deduplication", () => {
+		const transport = createMockTransport();
+		const collector = new MutationCollector(createAppId("test"));
+		collector.setTransport(transport);
+		collector.enableCoalescing(false);
+
+		const id = createNodeId("n1");
+		collector.add({ action: "setStyle", id, property: "color", value: "red" });
+		collector.add({ action: "setStyle", id, property: "color", value: "blue" });
+		collector.flushSync();
+
+		const mutations = (transport.sent[0] as { mutations: unknown[] }).mutations;
+		expect(mutations).toHaveLength(2);
+	});
+
+	it("different properties on same node are not deduplicated", () => {
+		const transport = createMockTransport();
+		const collector = new MutationCollector(createAppId("test"));
+		collector.setTransport(transport);
+
+		const id = createNodeId("n1");
+		collector.add({ action: "setStyle", id, property: "color", value: "red" });
+		collector.add({ action: "setStyle", id, property: "font-size", value: "12px" });
+		collector.flushSync();
+
+		const mutations = (transport.sent[0] as { mutations: unknown[] }).mutations;
+		expect(mutations).toHaveLength(2);
+	});
+});

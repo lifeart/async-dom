@@ -13,4 +13,5 @@ export default defineConfig({
 	treeshake: true,
 	target: "es2022",
 	outDir: "dist",
+	hash: false,
 });

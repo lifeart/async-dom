@@ -14,8 +14,10 @@ export interface WebSocketTransportOptions {
  */
 export class WebSocketTransport implements Transport {
 	private ws: WebSocket | null = null;
-	private handler: ((message: Message) => void) | null = null;
+	private handlers: Array<(message: Message) => void> = [];
 	private _readyState: TransportReadyState = "connecting";
+	onError?: (error: Error) => void;
+	onClose?: () => void;
 	private attempt = 0;
 	private messageQueue: Message[] = [];
 	private closed = false;
@@ -50,7 +52,9 @@ export class WebSocketTransport implements Transport {
 		this.ws.onmessage = (e: MessageEvent) => {
 			try {
 				const data = JSON.parse(e.data as string) as Message;
-				this.handler?.(data);
+				for (const h of this.handlers) {
+					try { h(data); } catch (err) { console.error("[async-dom] Handler error:", err); }
+				}
 			} catch {
 				console.error("[async-dom] Failed to parse WebSocket message");
 			}
@@ -106,7 +110,7 @@ export class WebSocketTransport implements Transport {
 	}
 
 	onMessage(handler: (message: Message) => void): void {
-		this.handler = handler;
+		this.handlers.push(handler);
 	}
 
 	close(): void {

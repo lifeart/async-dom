@@ -6,6 +6,7 @@ import { WebSocketTransport, type WebSocketTransportOptions } from "../transport
 
 export interface WorkerConfig {
 	worker: Worker;
+	transport?: Transport;
 }
 
 export interface WebSocketConfig {
@@ -28,7 +29,7 @@ export class ThreadManager {
 
 	createWorkerThread(config: WorkerConfig): AppId {
 		const appId = generateAppId();
-		const transport = new WorkerTransport(config.worker);
+		const transport = config.transport ?? new WorkerTransport(config.worker);
 
 		transport.onMessage((message) => {
 			this.notifyHandlers(appId, message);

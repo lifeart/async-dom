@@ -246,6 +246,129 @@ describe("DomRenderer", () => {
 		expect(node).toBe(renderer.getNode(id));
 	});
 
+	describe("property allowlist (B3)", () => {
+		it("blocks innerHTML property", () => {
+			const id = createNodeId("prop-block-1");
+			renderer.apply({ action: "createNode", id, tag: "div" });
+			renderer.apply({ action: "bodyAppendChild", id });
+			renderer.apply({ action: "setProperty", id, property: "innerHTML", value: "<script>alert(1)</script>" });
+
+			const node = renderer.getNode(id) as HTMLElement;
+			expect(node.innerHTML).toBe("");
+		});
+
+		it("blocks __proto__ property", () => {
+			const id = createNodeId("prop-block-2");
+			renderer.apply({ action: "createNode", id, tag: "div" });
+			renderer.apply({ action: "setProperty", id, property: "__proto__", value: {} });
+			// Should not throw, just be silently blocked
+		});
+
+		it("blocks constructor property", () => {
+			const id = createNodeId("prop-block-3");
+			renderer.apply({ action: "createNode", id, tag: "div" });
+			renderer.apply({ action: "setProperty", id, property: "constructor", value: null });
+		});
+
+		it("allows value property on input", () => {
+			const id = createNodeId("prop-allow-1");
+			renderer.apply({ action: "createNode", id, tag: "input" });
+			renderer.apply({ action: "bodyAppendChild", id });
+			renderer.apply({ action: "setProperty", id, property: "value", value: "hello" });
+
+			const node = renderer.getNode(id) as HTMLInputElement;
+			expect(node.value).toBe("hello");
+		});
+
+		it("allows checked property on input", () => {
+			const id = createNodeId("prop-allow-2");
+			renderer.apply({ action: "createNode", id, tag: "input" });
+			renderer.apply({ action: "bodyAppendChild", id });
+			renderer.apply({ action: "setProperty", id, property: "checked", value: true });
+
+			const node = renderer.getNode(id) as HTMLInputElement;
+			expect(node.checked).toBe(true);
+		});
+
+		it("allows textContent property", () => {
+			const id = createNodeId("prop-allow-3");
+			renderer.apply({ action: "createNode", id, tag: "div" });
+			renderer.apply({ action: "bodyAppendChild", id });
+			renderer.apply({ action: "setProperty", id, property: "textContent", value: "hello" });
+
+			const node = renderer.getNode(id) as HTMLElement;
+			expect(node.textContent).toBe("hello");
+		});
+
+		it("allows additional properties via permissions", () => {
+			const customRenderer = new DomRenderer(undefined, {
+				allowHeadAppend: true,
+				allowBodyAppend: true,
+				additionalAllowedProperties: ["customProp"],
+			});
+			const id = createNodeId("prop-custom-1");
+			customRenderer.apply({ action: "createNode", id, tag: "div" });
+			customRenderer.apply({ action: "bodyAppendChild", id });
+			customRenderer.apply({ action: "setProperty", id, property: "customProp", value: "test" });
+
+			const node = customRenderer.getNode(id) as HTMLElement;
+			expect((node as unknown as Record<string, unknown>).customProp).toBe("test");
+		});
+	});
+
+	describe("HTML sanitization (B2)", () => {
+		it("strips script tags from setHTML", () => {
+			const id = createNodeId("sanitize-1");
+			renderer.apply({ action: "createNode", id, tag: "div" });
+			renderer.apply({ action: "bodyAppendChild", id });
+			renderer.apply({ action: "setHTML", id, html: '<b>bold</b><script>alert(1)</script>' });
+
+			const node = renderer.getNode(id) as HTMLElement;
+			expect(node.innerHTML).toBe("<b>bold</b>");
+		});
+
+		it("strips onclick from setHTML", () => {
+			const id = createNodeId("sanitize-2");
+			renderer.apply({ action: "createNode", id, tag: "div" });
+			renderer.apply({ action: "bodyAppendChild", id });
+			renderer.apply({ action: "setHTML", id, html: '<div onclick="alert(1)">text</div>' });
+
+			const node = renderer.getNode(id) as HTMLElement;
+			expect(node.innerHTML).not.toContain("onclick");
+			expect(node.innerHTML).toContain("text");
+		});
+
+		it("allows unsafe HTML when allowUnsafeHTML is true", () => {
+			const unsafeRenderer = new DomRenderer(undefined, {
+				allowHeadAppend: true,
+				allowBodyAppend: true,
+				allowUnsafeHTML: true,
+			});
+			const id = createNodeId("unsafe-1");
+			unsafeRenderer.apply({ action: "createNode", id, tag: "div" });
+			unsafeRenderer.apply({ action: "bodyAppendChild", id });
+			unsafeRenderer.apply({ action: "setHTML", id, html: '<b onclick="x">bold</b>' });
+
+			const node = unsafeRenderer.getNode(id) as HTMLElement;
+			expect(node.innerHTML).toContain("onclick");
+		});
+
+		it("sanitizes insertAdjacentHTML", () => {
+			const id = createNodeId("sanitize-adj-1");
+			renderer.apply({ action: "createNode", id, tag: "div" });
+			renderer.apply({ action: "bodyAppendChild", id });
+			renderer.apply({
+				action: "insertAdjacentHTML",
+				id,
+				position: "beforeend",
+				html: '<p>safe</p><script>alert(1)</script>',
+			});
+
+			const node = renderer.getNode(id) as HTMLElement;
+			expect(node.innerHTML).toBe("<p>safe</p>");
+		});
+	});
+
 	it("mutations on non-existent nodes do not throw", () => {
 		const fakeId = createNodeId("does-not-exist");
 		expect(() => {

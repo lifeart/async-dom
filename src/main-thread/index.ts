@@ -1,5 +1,7 @@
+import type { DebugOptions } from "../core/debug.ts";
+import { resolveDebugHooks } from "../core/debug.ts";
 import { NodeCache } from "../core/node-cache.ts";
-import type { AppId, DomMutation, Message } from "../core/protocol.ts";
+import type { AppId, DomMutation, Message, NodeId } from "../core/protocol.ts";
 import { createNodeId, isMutationMessage, isSystemMessage } from "../core/protocol.ts";
 import { FrameScheduler, type SchedulerConfig } from "../core/scheduler.ts";
 import { QueryType, SyncChannelHost } from "../core/sync-channel.ts";
@@ -11,12 +13,15 @@ export interface AsyncDomConfig {
 	target: Element;
 	worker?: Worker;
 	scheduler?: SchedulerConfig;
+	debug?: DebugOptions;
 }
 
 export interface AppConfig {
 	worker: Worker;
 	mountPoint?: string | Element;
 	shadow?: boolean | ShadowRootInit;
+	transport?: import("../transport/base.ts").Transport;
+	onError?: (error: import("../core/protocol.ts").SerializedError, appId: AppId) => void;
 }
 
 export interface AsyncDomInstance {
@@ -41,6 +46,7 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 	const threadManager = new ThreadManager();
 	const eventBridges = new Map<AppId, EventBridge>();
 	const syncHosts = new Map<AppId, SyncChannelHost>();
+	const debugHooks = resolveDebugHooks(config.debug);
 
 	// Per-app DomRenderer map (each has its own NodeCache)
 	const renderers = new Map<AppId, DomRenderer>();
@@ -160,8 +166,8 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		addAppInternal(config.worker);
 	}
 
-	function addAppInternal(worker: Worker, mountPoint?: string | Element, shadow?: boolean | ShadowRootInit): AppId {
-		const appId = threadManager.createWorkerThread({ worker });
+	function addAppInternal(worker: Worker, mountPoint?: string | Element, shadow?: boolean | ShadowRootInit, customTransport?: import("../transport/base.ts").Transport, onError?: (error: import("../core/protocol.ts").SerializedError, appId: AppId) => void): AppId {
+		const appId = threadManager.createWorkerThread({ worker, transport: customTransport });
 
 		// Per-app NodeCache and DomRenderer for isolation
 		const appNodeCache = new NodeCache();
@@ -196,6 +202,10 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 
 		const appRenderer = new DomRenderer(appNodeCache, undefined, rendererRoot);
 
+		if (debugHooks.onWarning || debugHooks.onMutation) {
+			appRenderer.setDebugHooks({ onWarning: debugHooks.onWarning, onMutation: debugHooks.onMutation });
+		}
+
 		// Seed structural nodes
 		if (rendererRoot) {
 			appNodeCache.set(createNodeId("body-node"), rendererRoot.body as unknown as Node);
@@ -214,9 +224,43 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		renderers.set(appId, appRenderer);
 
 		const bridge = new EventBridge(appId, appNodeCache);
-		const transport = threadManager.getTransport(appId);
-		if (transport) {
-			bridge.setTransport(transport);
+		const appTransport = threadManager.getTransport(appId);
+		if (appTransport) {
+			bridge.setTransport(appTransport);
+
+			// Wire transport error/close handlers for crash recovery (B4)
+			const cleanupDeadApp = () => {
+				bridge.detachAll();
+				eventBridges.delete(appId);
+				appRenderer.clear();
+				renderers.delete(appId);
+				if (lastAppId === appId) {
+					lastRenderer = null;
+					lastAppId = null;
+				}
+				const host = syncHosts.get(appId);
+				if (host) {
+					host.stopPolling();
+					syncHosts.delete(appId);
+				}
+				scheduler.setAppCount(renderers.size);
+			};
+
+			appTransport.onError = (error: Error) => {
+				onError?.({ message: error.message, stack: error.stack, name: error.name }, appId);
+			};
+
+			appTransport.onClose = () => {
+				cleanupDeadApp();
+			};
+
+			// Also handle error system messages from the worker
+			appTransport.onMessage((message: Message) => {
+				if (isSystemMessage(message) && message.type === "error" && "error" in message) {
+					const errMsg = message as { type: "error"; appId: AppId; error: import("../core/protocol.ts").SerializedError };
+					onError?.(errMsg.error, appId);
+				}
+			});
 		}
 		eventBridges.set(appId, bridge);
 		scheduler.setAppCount(renderers.size);
@@ -236,8 +280,8 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		}
 
 		// Handle async query messages from the worker
-		if (transport) {
-			transport.onMessage((message: Message) => {
+		if (appTransport) {
+			appTransport.onMessage((message: Message) => {
 				if (isSystemMessage(message) && message.type === "query") {
 					const queryMsg = message as { type: "query"; uid: number; nodeId: string; query: string; property?: string };
 					const queryTypeMap: Record<string, QueryType> = {
@@ -251,7 +295,7 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 						queryType,
 						data: JSON.stringify({ nodeId: queryMsg.nodeId, property: queryMsg.property }),
 					});
-					transport.send({ type: "queryResult", uid: queryMsg.uid, result });
+					appTransport.send({ type: "queryResult", uid: queryMsg.uid, result });
 				}
 			});
 		}
@@ -276,6 +320,22 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		});
 
 		return appId;
+	}
+
+	if (config.debug?.exposeDevtools) {
+		(globalThis as Record<string, unknown>).__ASYNC_DOM_DEVTOOLS__ = {
+			scheduler: {
+				pending: () => scheduler.pendingCount,
+			},
+			findRealNode: (nodeId: string) => {
+				for (const r of renderers.values()) {
+					const node = r.getNode(nodeId as NodeId);
+					if (node) return node;
+				}
+				return null;
+			},
+			apps: () => [...renderers.keys()],
+		};
 	}
 
 	// Visibility change forwarding
@@ -315,7 +375,7 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		},
 
 		addApp(appConfig: AppConfig): AppId {
-			return addAppInternal(appConfig.worker, appConfig.mountPoint, appConfig.shadow);
+			return addAppInternal(appConfig.worker, appConfig.mountPoint, appConfig.shadow, appConfig.transport, appConfig.onError);
 		},
 
 		removeApp(appId: AppId): void {

@@ -154,6 +154,12 @@ export interface SerializedLocation {
 export interface SerializedError {
 	message: string;
 	stack?: string;
+	name?: string;
+	cause?: SerializedError;
+	filename?: string;
+	lineno?: number;
+	colno?: number;
+	isUnhandledRejection?: boolean;
 }
 
 // System messages

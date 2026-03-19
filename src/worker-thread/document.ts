@@ -1,7 +1,7 @@
 import type { AppId, DomMutation, NodeId } from "../core/protocol.ts";
 import { createNodeId } from "../core/protocol.ts";
 import type { SyncChannel } from "../core/sync-channel.ts";
-import { VirtualCommentNode, VirtualElement, VirtualTextNode } from "./element.ts";
+import { type VirtualNode, VirtualCommentNode, VirtualElement, VirtualTextNode } from "./element.ts";
 import { VirtualEvent } from "./events.ts";
 import { MutationCollector } from "./mutation-collector.ts";
 import { querySelectorAll as selectorQueryAll, querySelector as selectorQuery } from "./selector-engine.ts";
@@ -255,5 +255,33 @@ export class VirtualDocument {
 
 	get ownerDocument(): VirtualDocument {
 		return this;
+	}
+
+	toJSON(): unknown {
+		return this._serializeNode(this.documentElement);
+	}
+
+	private _serializeNode(node: VirtualNode): unknown {
+		if (node.nodeType === 3) {
+			return { type: "text", id: node.id, text: (node as VirtualTextNode).nodeValue };
+		}
+		if (node.nodeType === 8) {
+			return { type: "comment", id: node.id, text: (node as VirtualCommentNode).nodeValue };
+		}
+		const el = node as VirtualElement;
+		const attrs: Record<string, string> = {};
+		const a = el.attributes;
+		for (let i = 0; i < a.length; i++) {
+			const attr = a.item(i);
+			if (attr) attrs[attr.name] = attr.value;
+		}
+		return {
+			type: "element",
+			id: el.id,
+			tag: el.tagName,
+			...(Object.keys(attrs).length > 0 ? { attributes: attrs } : {}),
+			...(el.className ? { className: el.className } : {}),
+			children: el.children.map((c) => this._serializeNode(c)),
+		};
 	}
 }
