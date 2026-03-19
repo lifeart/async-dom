@@ -243,12 +243,13 @@ Returns `{ document: VirtualDocument, window: WorkerWindow }`.
 
 ### Transports
 
-| Class                   | Import                | Use case                               |
-|-------------------------|-----------------------|----------------------------------------|
-| `WorkerTransport`       | `async-dom/transport` | Main thread side of a Worker connection|
-| `WorkerSelfTransport`   | `async-dom/transport` | Worker side (`self.postMessage`)       |
-| `WebSocketTransport`    | `async-dom/transport` | WebSocket client with auto-reconnect   |
-| `createComlinkEndpoint` | `async-dom/transport` | Comlink RPC adapter (optional peer dep)|
+| Class                    | Import                | Use case                                |
+|--------------------------|-----------------------|-----------------------------------------|
+| `WorkerTransport`        | `async-dom/transport` | Main thread side of a Worker connection |
+| `BinaryWorkerTransport`  | `async-dom/transport` | Binary-encoded transport (zero-copy)    |
+| `WorkerSelfTransport`    | `async-dom/transport` | Worker side (`self.postMessage`)        |
+| `WebSocketTransport`     | `async-dom/transport` | WebSocket client with auto-reconnect    |
+| `createComlinkEndpoint`  | `async-dom/transport` | Comlink RPC adapter (optional peer dep) |
 
 ## Browser Requirements
 
@@ -260,10 +261,28 @@ Returns `{ document: VirtualDocument, window: WorkerWindow }`.
   Without these headers, sync reads fall back to returning default values (0 / `{}`).
 - **Web Workers** with `type: "module"` support (all modern browsers).
 
+## Wire Format
+
+async-dom uses techniques inspired by [worker-dom](https://github.com/nicejob/nicejob) (AMP's worker-dom) to minimize serialization overhead:
+
+- **Binary mutation encoding** -- mutations are encoded with `DataView` into a compact binary format: uint8 opcodes, uint32 node IDs, uint16 string indices. This avoids the cost of JSON serialization and structured cloning of large object trees.
+- **String deduplication store** -- strings (tag names, attribute names/values, etc.) are sent once and assigned a monotonic uint16 index. Subsequent references transmit only the 2-byte index, dramatically reducing payload size for repetitive DOM operations.
+- **Numeric Node IDs** -- nodes are identified by a branded `number` type (`NodeId`) instead of string UUIDs, enabling fast `Map` lookups and compact binary encoding (4 bytes per ID).
+- **Expando-based node lookup** -- each real DOM element carries an `__asyncDomId` expando property for O(1) reverse lookups during event handling and subtree cleanup.
+
+### Configurable Transport
+
+| Transport                | Import                | Encoding            | Use case                                    |
+|--------------------------|-----------------------|---------------------|---------------------------------------------|
+| `WorkerTransport`        | `async-dom/transport` | Structured clone    | Default; good baseline, zero-config         |
+| `BinaryWorkerTransport`  | `async-dom/transport` | DataView binary     | Zero-copy binary transfer for high-throughput apps |
+| `WebSocketTransport`     | `async-dom/transport` | JSON                | Remote rendering over WebSocket             |
+
 ## Performance
 
-- ~8.7KB gzipped (worker bundle)
-- ~6.8KB gzipped (main thread bundle)
+- ~10.9KB gzipped (worker bundle)
+- ~9.9KB gzipped (main thread bundle)
+- ~5.6KB gzipped (binary transport add-on)
 - Frame-budgeted rendering (16ms target, adaptive batch sizing)
 - Single-app isolation overhead: 0ns per mutation (fast-path avoids Map lookup)
 - Priority system: high / normal / low with optional mutation skipping under pressure
