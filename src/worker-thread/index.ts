@@ -1,0 +1,231 @@
+import type { AppId, EventMessage, SerializedLocation } from "../core/protocol.ts";
+import { createAppId, isEventMessage, isSystemMessage } from "../core/protocol.ts";
+import { QueryType, SyncChannel } from "../core/sync-channel.ts";
+import type { Transport } from "../transport/base.ts";
+import { WorkerSelfTransport } from "../transport/worker-transport.ts";
+import { VirtualDocument } from "./document.ts";
+import { VirtualMutationObserver, VirtualResizeObserver, VirtualIntersectionObserver } from "./observers.ts";
+
+export interface WorkerDomConfig {
+	appId?: AppId;
+	transport?: Transport;
+}
+
+export interface WorkerDomResult {
+	document: VirtualDocument;
+	window: WorkerWindow;
+}
+
+export interface WorkerWindow {
+	document: VirtualDocument;
+	location: WorkerLocation;
+	history: WorkerHistory;
+	screen: { width: number; height: number };
+	innerWidth: number;
+	innerHeight: number;
+	localStorage: WorkerLocalStorage;
+	addEventListener(name: string, callback: (e: unknown) => void): void;
+	removeEventListener(name: string, callback: (e: unknown) => void): void;
+	scrollTo(x: number, y: number): void;
+	getComputedStyle(el: unknown): Record<string, string>;
+	requestAnimationFrame(cb: (time: number) => void): number;
+	cancelAnimationFrame(id: number): void;
+	MutationObserver: typeof VirtualMutationObserver;
+	ResizeObserver: typeof VirtualResizeObserver;
+	IntersectionObserver: typeof VirtualIntersectionObserver;
+}
+
+interface WorkerLocation {
+	hash: string;
+	href: string;
+	port: string;
+	host: string;
+	origin: string;
+	hostname: string;
+	pathname: string;
+	protocol: string;
+	search: string;
+}
+
+interface WorkerHistory {
+	state: unknown;
+	pushState(state: unknown, title: string, url: string): void;
+	replaceState(state: unknown, title: string, url: string): void;
+}
+
+interface WorkerLocalStorage {
+	setItem(key: string, value: string): void;
+	getItem(key: string): string | null;
+	removeItem(key: string): void;
+}
+
+/**
+ * Creates a virtual DOM environment inside a Web Worker.
+ *
+ * Returns a `document` and `window` that can be used by frameworks
+ * or vanilla JS. All DOM mutations are automatically collected and
+ * sent to the main thread for rendering.
+ */
+export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
+	const appId = config?.appId ?? createAppId("worker");
+	const transport = config?.transport ?? new WorkerSelfTransport();
+
+	const doc = new VirtualDocument(appId);
+	doc.collector.setTransport(transport);
+
+	// Route incoming events from main thread to virtual DOM
+	transport.onMessage((message) => {
+		// Handle init messages with location data
+		if (isSystemMessage(message) && message.type === "init" && "location" in message) {
+			const initMsg = message as { location: SerializedLocation; sharedBuffer?: SharedArrayBuffer };
+			const initLoc = initMsg.location;
+			if (initLoc) {
+				location.href = initLoc.href;
+				location.protocol = initLoc.protocol;
+				location.hostname = initLoc.hostname;
+				location.port = initLoc.port;
+				location.pathname = initLoc.pathname;
+				location.search = initLoc.search;
+				location.hash = initLoc.hash;
+			}
+			// Initialize sync channel if SharedArrayBuffer was provided
+			if (initMsg.sharedBuffer) {
+				doc._syncChannel = SyncChannel.fromBuffer(initMsg.sharedBuffer);
+			}
+			return;
+		}
+
+		if (isEventMessage(message)) {
+			const eventMsg = message as EventMessage;
+			doc.dispatchEvent(eventMsg.listenerId, eventMsg.event);
+		}
+	});
+
+	// Send ready message after setup
+	transport.send({ type: "ready", appId });
+
+	// localStorage polyfill
+	const storage = new Map<string, string>();
+	const localStorage: WorkerLocalStorage = {
+		setItem(key: string, value: string) {
+			storage.set(key, value);
+		},
+		getItem(key: string): string | null {
+			return storage.get(key) ?? null;
+		},
+		removeItem(key: string) {
+			storage.delete(key);
+		},
+	};
+
+	const location: WorkerLocation = {
+		hash: "",
+		href: "http://localhost/",
+		port: "",
+		host: "localhost",
+		origin: "http://localhost",
+		hostname: "localhost",
+		pathname: "/",
+		protocol: "http:",
+		search: "",
+	};
+
+	const history: WorkerHistory = {
+		state: null,
+		pushState(state: unknown, title: string, url: string) {
+			doc.collector.add({
+				action: "pushState",
+				state,
+				title,
+				url,
+			});
+		},
+		replaceState(state: unknown, title: string, url: string) {
+			doc.collector.add({
+				action: "replaceState",
+				state,
+				title,
+				url,
+			});
+		},
+	};
+
+	const win: WorkerWindow = {
+		document: doc,
+		location,
+		history,
+		screen: { width: 1280, height: 720 },
+		innerWidth: 1280,
+		innerHeight: 720,
+		localStorage,
+		addEventListener(name: string, callback: (e: unknown) => void) {
+			doc.addEventListener(name, callback);
+		},
+		removeEventListener(name: string, callback: (e: unknown) => void) {
+			doc.removeEventListener(name, callback);
+		},
+		scrollTo(x: number, y: number) {
+			doc.collector.add({ action: "scrollTo", x, y });
+		},
+		getComputedStyle(el: unknown) {
+			if (doc._syncChannel && el && typeof el === "object" && "id" in el) {
+				const result = doc._syncChannel.request(
+					QueryType.ComputedStyle,
+					JSON.stringify({ nodeId: (el as { id: string }).id }),
+				);
+				if (result && typeof result === "object") {
+					return result as Record<string, string>;
+				}
+			}
+			return {};
+		},
+		requestAnimationFrame(cb: (time: number) => void): number {
+			return setTimeout(() => cb(performance.now()), 16) as unknown as number;
+		},
+		cancelAnimationFrame(id: number): void {
+			clearTimeout(id);
+		},
+		MutationObserver: VirtualMutationObserver,
+		ResizeObserver: VirtualResizeObserver,
+		IntersectionObserver: VirtualIntersectionObserver,
+	};
+
+	// Override innerWidth/innerHeight with sync-channel-aware getters
+	Object.defineProperties(win, {
+		innerWidth: {
+			get() {
+				if (doc._syncChannel) {
+					const result = doc._syncChannel.request(
+						QueryType.WindowProperty,
+						JSON.stringify({ property: "innerWidth" }),
+					);
+					if (typeof result === "number") return result;
+				}
+				return 1280;
+			},
+			configurable: true,
+		},
+		innerHeight: {
+			get() {
+				if (doc._syncChannel) {
+					const result = doc._syncChannel.request(
+						QueryType.WindowProperty,
+						JSON.stringify({ property: "innerHeight" }),
+					);
+					if (typeof result === "number") return result;
+				}
+				return 720;
+			},
+			configurable: true,
+		},
+	});
+
+	doc._defaultView = win;
+
+	return { document: doc, window: win };
+}
+
+export { VirtualDocument } from "./document.ts";
+export type { VirtualNode } from "./element.ts";
+export { VirtualCommentNode, VirtualElement, VirtualTextNode } from "./element.ts";
+export { MutationCollector } from "./mutation-collector.ts";

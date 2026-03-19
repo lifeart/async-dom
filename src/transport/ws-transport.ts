@@ -1,0 +1,125 @@
+import { WS_BASE_DELAY_MS, WS_MAX_DELAY_MS, WS_MAX_RETRIES } from "../core/constants.ts";
+import type { Message } from "../core/protocol.ts";
+import type { Transport, TransportReadyState } from "./base.ts";
+
+export interface WebSocketTransportOptions {
+	maxRetries?: number;
+	baseDelay?: number;
+	maxDelay?: number;
+}
+
+/**
+ * Transport implementation using WebSocket with automatic reconnection.
+ * Messages are queued while disconnected and flushed on reconnect.
+ */
+export class WebSocketTransport implements Transport {
+	private ws: WebSocket | null = null;
+	private handler: ((message: Message) => void) | null = null;
+	private _readyState: TransportReadyState = "connecting";
+	private attempt = 0;
+	private messageQueue: Message[] = [];
+	private closed = false;
+	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+	private readonly maxRetries: number;
+	private readonly baseDelay: number;
+	private readonly maxDelay: number;
+
+	constructor(
+		private url: string,
+		options?: WebSocketTransportOptions,
+	) {
+		this.maxRetries = options?.maxRetries ?? WS_MAX_RETRIES;
+		this.baseDelay = options?.baseDelay ?? WS_BASE_DELAY_MS;
+		this.maxDelay = options?.maxDelay ?? WS_MAX_DELAY_MS;
+		this.connect();
+	}
+
+	private connect(): void {
+		if (this.closed) return;
+
+		this._readyState = "connecting";
+		this.ws = new WebSocket(this.url);
+
+		this.ws.onopen = () => {
+			this._readyState = "open";
+			this.attempt = 0;
+			this.flushQueue();
+		};
+
+		this.ws.onmessage = (e: MessageEvent) => {
+			try {
+				const data = JSON.parse(e.data as string) as Message;
+				this.handler?.(data);
+			} catch {
+				console.error("[async-dom] Failed to parse WebSocket message");
+			}
+		};
+
+		this.ws.onclose = () => {
+			if (!this.closed) {
+				this.scheduleReconnect();
+			}
+		};
+
+		this.ws.onerror = () => {
+			this.ws?.close();
+		};
+	}
+
+	private scheduleReconnect(): void {
+		if (this.attempt >= this.maxRetries) {
+			this._readyState = "closed";
+			console.error(`[async-dom] WebSocket reconnection failed after ${this.maxRetries} attempts`);
+			return;
+		}
+
+		// Exponential backoff with jitter
+		const delay = Math.min(
+			this.baseDelay * 2 ** this.attempt + Math.random() * 1000,
+			this.maxDelay,
+		);
+		this.attempt++;
+
+		this.reconnectTimer = setTimeout(() => {
+			this.connect();
+		}, delay);
+	}
+
+	private flushQueue(): void {
+		while (this.messageQueue.length > 0) {
+			const msg = this.messageQueue.shift()!;
+			this.sendRaw(msg);
+		}
+	}
+
+	private sendRaw(message: Message): void {
+		this.ws?.send(JSON.stringify(message));
+	}
+
+	send(message: Message): void {
+		if (this._readyState === "open" && this.ws?.readyState === WebSocket.OPEN) {
+			this.sendRaw(message);
+		} else if (this._readyState !== "closed") {
+			this.messageQueue.push(message);
+		}
+	}
+
+	onMessage(handler: (message: Message) => void): void {
+		this.handler = handler;
+	}
+
+	close(): void {
+		this.closed = true;
+		this._readyState = "closed";
+		if (this.reconnectTimer !== null) {
+			clearTimeout(this.reconnectTimer);
+		}
+		this.ws?.close();
+		this.messageQueue.length = 0;
+	}
+
+	get readyState(): TransportReadyState {
+		return this._readyState;
+	}
+}

@@ -1,16 +1,43 @@
 {
   "name": "async-dom",
-  "version": "1.0.0",
-  "description": "Async Dom libs",
-  "main": "index.js",
+  "version": "2.0.0-alpha.1",
+  "description": "Asynchronous DOM rendering — offload UI to Web Workers with frame-budgeted scheduling",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js",
+      "require": "./dist/worker.cjs"
+    },
+    "./transport": {
+      "types": "./dist/transport.d.ts",
+      "import": "./dist/transport.js",
+      "require": "./dist/transport.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "compile-domino": "browserify ./src/lib/dom/domino-async.js -o ./src/lib/dom/domino-async-bundle.js",
-    "compile-simple-dom": "browserify ./src/lib/dom/simple-dom.js -o ./src/lib/dom/simple-dom-bundle.js",
-    "compile-jsdom": "browserify ./src/lib/dom/jsdom.js -o ./src/lib/dom/jsdom-bundle.js",
-    "s": "http-server ./src -p 8080",
-    "ws": "node ./src/server.js",
-    "serve": "concurrently \"npm run s\" \"npm run ws\""
+    "build": "tsdown",
+    "dev": "vite",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "typecheck:worker": "tsc --noEmit -p tsconfig.worker.json",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "repository": {
     "type": "git",
@@ -18,7 +45,11 @@
   },
   "keywords": [
     "DOM",
-    "Async"
+    "async",
+    "web-worker",
+    "virtual-dom",
+    "frame-budget",
+    "off-main-thread"
   ],
   "author": "Aleksandr Kanunnikov <lifeart92@gmail.com>",
   "license": "MIT",
@@ -27,19 +58,20 @@
   },
   "homepage": "https://github.com/lifeart/async-dom#readme",
   "devDependencies": {
-    "browserify": "^16.1.0",
-    "concurrently": "^3.5.1",
-    "domino": "^2.0.1",
-    "http-server": "^0.11.1",
-    "jsdom": "^11.6.2",
-    "promise": "^8.0.1",
-    "simple-dom": "^1.4.0-alpha.82914663",
-    "uws": "^9.14.0"
+    "@biomejs/biome": "^2.0.0",
+    "@vitest/web-worker": "^4.0.0",
+    "jsdom": "^29.0.0",
+    "tsdown": "^0.12.0",
+    "typescript": "^5.8.0",
+    "vite": "^6.0.0",
+    "vitest": "^4.0.0"
   },
-  "dependencies": {
-    "eslint": "^4.18.1",
-    "webworker-threads": "^0.7.13",
-    "workbox-sw": "^2.1.2",
-    "ws": "^4.1.0"
+  "peerDependencies": {
+    "comlink": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "comlink": {
+      "optional": true
+    }
   }
 }
