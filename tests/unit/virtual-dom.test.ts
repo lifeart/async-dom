@@ -137,6 +137,24 @@ describe("VirtualElement", () => {
 			expect(parent.children[0]).toBe(a);
 			expect(parent.children[1]).toBe(b);
 		});
+
+		it("children returns only element nodes, childNodes returns all", () => {
+			const parent = doc.createElement("div");
+			const child1 = doc.createElement("span");
+			const text = doc.createTextNode("hello");
+			const child2 = doc.createElement("em");
+			parent.appendChild(child1);
+			parent.appendChild(text);
+			parent.appendChild(child2);
+
+			expect(parent.childNodes).toHaveLength(3);
+			expect(parent.children).toHaveLength(2);
+			expect(parent.children[0]).toBe(child1);
+			expect(parent.children[1]).toBe(child2);
+			expect(parent.childElementCount).toBe(2);
+			expect(parent.firstElementChild).toBe(child1);
+			expect(parent.lastElementChild).toBe(child2);
+		});
 	});
 
 	describe("navigation", () => {
@@ -398,6 +416,16 @@ describe("VirtualElement edge cases", () => {
 		const result = el.classList.toggle("active", false);
 		expect(result).toBe(false);
 		expect(el.classList.contains("active")).toBe(false);
+	});
+
+	it("element.id returns HTML id attribute, not internal _nodeId", () => {
+		const el = doc.createElement("div");
+		expect(el.id).toBe(""); // No id attribute set
+		el.setAttribute("id", "my-element");
+		expect(el.id).toBe("my-element");
+		expect(el._nodeId).not.toBe("my-element"); // _nodeId is a number
+		el.id = "new-id";
+		expect(el.getAttribute("id")).toBe("new-id");
 	});
 
 	it("setAttribute('style', 'color: red; font-size: 12px') parses correctly", () => {

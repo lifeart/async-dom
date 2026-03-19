@@ -198,6 +198,33 @@ describe("Event Bubbling", () => {
 		expect(currentTargets[1]).toBe(parent);
 	});
 
+	it("addEventListener with { once: true } removes after first call", () => {
+		const el = doc.createElement("div");
+		doc.body.appendChild(el);
+
+		const calls: number[] = [];
+		el.addEventListener("click", () => calls.push(1), { once: true });
+
+		const listenerId = Array.from(
+			(el as unknown as { _eventListeners: Map<string, unknown> })._eventListeners.keys(),
+		)[0];
+
+		// First dispatch
+		doc.dispatchEvent(listenerId, {
+			type: "click",
+			target: el._nodeId,
+			currentTarget: el._nodeId,
+			bubbles: true,
+		});
+		expect(calls).toEqual([1]);
+
+		// Second dispatch — listener should be gone, so calls stays at [1]
+		// The listener was removed, so we need to check it's gone
+		expect((el as unknown as { _eventListeners: Map<string, unknown> })._eventListeners.size).toBe(
+			0,
+		);
+	});
+
 	it("non-bubbling events do not bubble", () => {
 		const parent = doc.createElement("div");
 		const child = doc.createElement("span");

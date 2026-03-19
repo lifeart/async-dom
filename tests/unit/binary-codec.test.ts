@@ -319,6 +319,17 @@ describe("BinaryMutationEncoder / BinaryMutationDecoder", () => {
 		expect(result2).toEqual([{ action: "createNode", id: nid(12), tag: "span" }]);
 	});
 
+	it("throws descriptive error on truncated buffer", () => {
+		// Create a buffer with just an opcode byte but no payload
+		const buffer = new ArrayBuffer(1);
+		new DataView(buffer).setUint8(0, 0); // MutOp.CreateNode opcode
+
+		const strings = new StringStore();
+		const decoder = new BinaryMutationDecoder(strings);
+
+		expect(() => decoder.decode(buffer)).toThrow("unexpected end of buffer");
+	});
+
 	it("throws on unknown opcode", () => {
 		const strings = new StringStore();
 		const decoder = new BinaryMutationDecoder(strings);

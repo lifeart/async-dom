@@ -45,4 +45,48 @@ describe("createStyleProxy", () => {
 
 		expect(style.color).toBe("");
 	});
+
+	it("getPropertyValue returns set property", () => {
+		const collector = new MutationCollector(createAppId("test"));
+		const id = createNodeId();
+		const style = createStyleProxy({ _nodeId: id }, collector, { color: "red" });
+
+		expect(style.getPropertyValue("color")).toBe("red");
+	});
+
+	it("removeProperty removes and emits mutation", () => {
+		const collector = new MutationCollector(createAppId("test"));
+		const id = createNodeId();
+		const style = createStyleProxy({ _nodeId: id }, collector, { color: "red" });
+		collector.flushSync();
+
+		const old = style.removeProperty("color");
+		expect(old).toBe("red");
+		expect(style.color).toBe("");
+		expect(collector.pendingCount).toBeGreaterThan(0);
+	});
+
+	it("setProperty sets value and emits mutation", () => {
+		const collector = new MutationCollector(createAppId("test"));
+		const id = createNodeId();
+		const style = createStyleProxy({ _nodeId: id }, collector);
+		collector.flushSync();
+
+		style.setProperty("background-color", "blue");
+		expect(style["background-color"]).toBe("blue");
+		expect(collector.pendingCount).toBeGreaterThan(0);
+	});
+
+	it("cssText getter reconstructs style string", () => {
+		const collector = new MutationCollector(createAppId("test"));
+		const id = createNodeId();
+		const style = createStyleProxy({ _nodeId: id }, collector, {
+			color: "red",
+			"font-size": "12px",
+		});
+
+		const cssText = style.cssText;
+		expect(cssText).toContain("color: red");
+		expect(cssText).toContain("font-size: 12px");
+	});
 });

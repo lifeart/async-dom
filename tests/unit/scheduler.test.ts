@@ -123,6 +123,22 @@ describe("FrameScheduler", () => {
 		rafSpy.mockRestore();
 	});
 
+	it("processes large queue correctly without data loss", () => {
+		const largeApplied: string[] = [];
+		scheduler.setApplier((mutation) => {
+			if ("id" in mutation) largeApplied.push(String((mutation as { id: unknown }).id));
+		});
+
+		const mutations = [];
+		for (let i = 0; i < 500; i++) {
+			mutations.push({ action: "createNode" as const, id: createNodeId(), tag: "div" });
+		}
+		scheduler.enqueue(mutations, A);
+		scheduler.flush();
+
+		expect(largeApplied).toHaveLength(500);
+	});
+
 	it("multiple enqueue/flush cycles preserve ordering", () => {
 		const a1 = createNodeId();
 		const a2 = createNodeId();
