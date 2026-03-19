@@ -31,14 +31,6 @@ jobs:
       - name: Build demo
         run: npx vite build
 
-      - name: Add COOP/COEP headers for SharedArrayBuffer
-        run: |
-          cat > demo-dist/_headers <<'HEADERS'
-          /*
-            Cross-Origin-Opener-Policy: same-origin
-            Cross-Origin-Embedder-Policy: require-corp
-          HEADERS
-
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
