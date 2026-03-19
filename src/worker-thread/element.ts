@@ -29,10 +29,17 @@ function generateNodeId(prefix: string): NodeId {
  * instead of touching real DOM.
  */
 export class VirtualElement {
+	static readonly ELEMENT_NODE = 1;
+	static readonly TEXT_NODE = 3;
+	static readonly COMMENT_NODE = 8;
+	static readonly DOCUMENT_NODE = 9;
+	static readonly DOCUMENT_FRAGMENT_NODE = 11;
+
 	readonly id: NodeId;
 	readonly nodeName: string;
 	readonly tagName: string;
 	readonly nodeType = 1;
+	readonly namespaceURI: string;
 
 	parentNode: VirtualElement | null = null;
 	_ownerDocument: VirtualDocument | null = null;
@@ -131,8 +138,13 @@ export class VirtualElement {
 		this.nodeName = tag.toUpperCase();
 		this.tagName = this.nodeName;
 		this.id = id ?? generateNodeId("a");
+		this.namespaceURI = "http://www.w3.org/1999/xhtml";
 		this.style = createStyleProxy(this, collector);
 		this.classList = new VirtualClassList(this);
+	}
+
+	_setNamespaceURI(ns: string): void {
+		(this as { namespaceURI: string }).namespaceURI = ns;
 	}
 
 	// --- Attributes ---
@@ -194,6 +206,18 @@ export class VirtualElement {
 			name,
 		};
 		this.collector.add(mutation);
+	}
+
+	getAttributeNS(_ns: string | null, name: string): string | null {
+		return this.getAttribute(name);
+	}
+
+	setAttributeNS(_ns: string | null, name: string, value: string): void {
+		this.setAttribute(name, value);
+	}
+
+	removeAttributeNS(_ns: string | null, name: string): void {
+		this.removeAttribute(name);
 	}
 
 	get attributes(): {
@@ -540,6 +564,9 @@ export class VirtualElement {
 		for (const child of this.children) {
 			if (child instanceof VirtualElement) {
 				child._cleanupFromDocument();
+			} else if (this._ownerDocument) {
+				// Clean up text/comment node IDs from _ids map
+				this._ownerDocument.unregisterElement(child.id);
 			}
 		}
 	}
@@ -617,6 +644,22 @@ export class VirtualElement {
 		this._setOnHandler("contextmenu", cb);
 	}
 
+	set oninput(cb: ((e: unknown) => void) | null) {
+		this._setOnHandler("input", cb);
+	}
+
+	set onfocus(cb: ((e: unknown) => void) | null) {
+		this._setOnHandler("focus", cb);
+	}
+
+	set onblur(cb: ((e: unknown) => void) | null) {
+		this._setOnHandler("blur", cb);
+	}
+
+	set onsubmit(cb: ((e: unknown) => void) | null) {
+		this._setOnHandler("submit", cb);
+	}
+
 	// --- Navigation ---
 
 	get firstChild(): VirtualNode | null {
@@ -649,6 +692,65 @@ export class VirtualElement {
 
 	get ownerDocument(): VirtualDocument | null {
 		return this._ownerDocument;
+	}
+
+	get isConnected(): boolean {
+		let current: VirtualElement | null = this;
+		while (current) {
+			if (current._ownerDocument && current === current._ownerDocument.documentElement) return true;
+			current = current.parentNode;
+		}
+		return false;
+	}
+
+	getRootNode(): VirtualNode {
+		let current: VirtualNode = this;
+		while (current.parentNode) current = current.parentNode;
+		return current;
+	}
+
+	get nextElementSibling(): VirtualElement | null {
+		if (!this.parentNode) return null;
+		const siblings = this.parentNode.children;
+		const idx = siblings.indexOf(this);
+		for (let i = idx + 1; i < siblings.length; i++) {
+			if (siblings[i].nodeType === 1) return siblings[i] as VirtualElement;
+		}
+		return null;
+	}
+
+	get previousElementSibling(): VirtualElement | null {
+		if (!this.parentNode) return null;
+		const siblings = this.parentNode.children;
+		const idx = siblings.indexOf(this);
+		for (let i = idx - 1; i >= 0; i--) {
+			if (siblings[i].nodeType === 1) return siblings[i] as VirtualElement;
+		}
+		return null;
+	}
+
+	hasChildNodes(): boolean {
+		return this.children.length > 0;
+	}
+
+	replaceChild(newChild: VirtualNode, oldChild: VirtualNode): VirtualNode {
+		const idx = this.children.indexOf(oldChild);
+		if (idx === -1) return oldChild;
+		this.insertBefore(newChild, oldChild);
+		this.removeChild(oldChild);
+		return oldChild;
+	}
+
+	normalize(): void {
+		// Stub — text node merging not needed for framework compatibility
+	}
+
+	dispatchEvent(event: unknown): boolean {
+		const evt = event as { type: string; immediatePropagationStopped?: boolean };
+		if (evt.type) {
+			this._dispatchBubbledEvent(evt);
+		}
+		return true;
 	}
 
 	// --- Clone ---
@@ -840,6 +942,12 @@ export class VirtualElement {
  * Virtual text node.
  */
 export class VirtualTextNode {
+	static readonly ELEMENT_NODE = 1;
+	static readonly TEXT_NODE = 3;
+	static readonly COMMENT_NODE = 8;
+	static readonly DOCUMENT_NODE = 9;
+	static readonly DOCUMENT_FRAGMENT_NODE = 11;
+
 	readonly nodeType = 3;
 	readonly nodeName = "#text";
 	parentNode: VirtualElement | null = null;
@@ -902,6 +1010,12 @@ export class VirtualTextNode {
  * Virtual comment node.
  */
 export class VirtualCommentNode {
+	static readonly ELEMENT_NODE = 1;
+	static readonly TEXT_NODE = 3;
+	static readonly COMMENT_NODE = 8;
+	static readonly DOCUMENT_NODE = 9;
+	static readonly DOCUMENT_FRAGMENT_NODE = 11;
+
 	readonly nodeType = 8;
 	readonly nodeName = "#comment";
 	parentNode: VirtualElement | null = null;

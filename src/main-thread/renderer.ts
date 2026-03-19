@@ -323,7 +323,8 @@ export class DomRenderer {
 			});
 			return;
 		}
-		this.onNodeRemoved?.(id);
+		// Detach listeners on this node and all descendants
+		this._cleanupSubtreeListeners(node, id);
 		this.nodeCache.delete(id);
 		if (node.parentNode) {
 			node.parentNode.removeChild(node);
@@ -456,5 +457,24 @@ export class DomRenderer {
 		if (!this.permissions.allowBodyAppend) return;
 		const node = this.nodeCache.get(id);
 		if (node) (this.root.body as unknown as Node).appendChild(node);
+	}
+
+	/**
+	 * Notify onNodeRemoved for a node and all its descendants.
+	 * This ensures EventBridge detaches listeners on the entire subtree.
+	 */
+	private _cleanupSubtreeListeners(node: Node, id: NodeId): void {
+		this.onNodeRemoved?.(id);
+		if ("children" in node) {
+			const el = node as Element;
+			for (let i = 0; i < el.children.length; i++) {
+				const child = el.children[i];
+				const childId = (child as unknown as Record<string, string>).__asyncDomId as NodeId | undefined;
+				if (childId) {
+					this._cleanupSubtreeListeners(child, childId);
+					this.nodeCache.delete(childId);
+				}
+			}
+		}
 	}
 }

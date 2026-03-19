@@ -76,8 +76,10 @@ export class VirtualDocument {
 		return element;
 	}
 
-	createElementNS(_ns: string, tag: string): VirtualElement {
-		return this.createElement(tag);
+	createElementNS(ns: string, tag: string): VirtualElement {
+		const el = this.createElement(tag);
+		el._setNamespaceURI(ns);
+		return el;
 	}
 
 	createTextNode(text: string): VirtualTextNode {
@@ -250,6 +252,70 @@ export class VirtualDocument {
 	 */
 	unregisterListener(listenerId: string): void {
 		this._listenerToElement.delete(listenerId);
+	}
+
+	createEvent(_type: string): Record<string, unknown> {
+		return {
+			type: "",
+			initEvent(type: string, bubbles?: boolean, cancelable?: boolean) {
+				this.type = type;
+				this.bubbles = bubbles ?? false;
+				this.cancelable = cancelable ?? false;
+			},
+			bubbles: false,
+			cancelable: false,
+			preventDefault() {},
+			stopPropagation() {},
+			stopImmediatePropagation() {},
+		};
+	}
+
+	get activeElement(): VirtualElement {
+		return this.body;
+	}
+
+	createRange(): unknown {
+		const doc = this;
+		return {
+			createContextualFragment(_html: string) {
+				return doc.createDocumentFragment();
+			},
+			setStart() {},
+			setEnd() {},
+			collapse() {},
+			selectNodeContents() {},
+			cloneRange() {
+				return doc.createRange();
+			},
+		};
+	}
+
+	createTreeWalker(
+		root: VirtualElement,
+		_whatToShow?: number,
+	): { currentNode: VirtualNode; nextNode(): VirtualNode | null } {
+		const nodes: VirtualNode[] = [];
+		function collect(node: VirtualNode) {
+			nodes.push(node);
+			if ("children" in node) {
+				for (const child of (node as VirtualElement).children) {
+					collect(child);
+				}
+			}
+		}
+		collect(root);
+		let idx = 0;
+		return {
+			currentNode: root,
+			nextNode() {
+				idx++;
+				if (idx < nodes.length) {
+					this.currentNode = nodes[idx];
+					return nodes[idx];
+				}
+				return null;
+			},
+		};
 	}
 
 	querySelector(selector: string): VirtualElement | null {
