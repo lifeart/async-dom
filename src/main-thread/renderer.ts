@@ -282,9 +282,10 @@ export class DomRenderer {
 			node = document.createElement(tag);
 		}
 
-		node.id = id;
-		node.setAttribute("data-async-dom-id", id);
-		(node as unknown as Record<string, string>).__asyncDomId = id;
+		const idStr = String(id);
+		node.id = idStr;
+		node.setAttribute("data-async-dom-id", idStr);
+		(node as unknown as Record<string, unknown>).__asyncDomId = id;
 		if (textContent) {
 			node.textContent = textContent;
 		}
@@ -380,8 +381,9 @@ export class DomRenderer {
 		if (DANGEROUS_URI_ATTR_NAMES.has(lowerName) && isDangerousURI(value)) return;
 
 		if (name === "id") {
-			// Create alias in cache for new id
-			this.nodeCache.set(value as NodeId, node);
+			// Create alias in cache for new id — user-facing IDs are strings,
+			// but we store them as NodeId for lookup compatibility
+			this.nodeCache.set(value as unknown as NodeId, node);
 		}
 		node.setAttribute(name, value);
 	}
@@ -469,7 +471,9 @@ export class DomRenderer {
 			const el = node as Element;
 			for (let i = 0; i < el.children.length; i++) {
 				const child = el.children[i];
-				const childId = (child as unknown as Record<string, string>).__asyncDomId as NodeId | undefined;
+				const childId = (child as unknown as Record<string, unknown>).__asyncDomId as
+					| NodeId
+					| undefined;
 				if (childId) {
 					this._cleanupSubtreeListeners(child, childId);
 					this.nodeCache.delete(childId);

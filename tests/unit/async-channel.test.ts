@@ -25,12 +25,12 @@ describe("AsyncChannel", () => {
 		const channel = new AsyncChannel(createAppId("test"));
 		channel.setTransport(transport);
 
-		channel.request(createNodeId("node-1"), "boundingRect");
+		channel.request(createNodeId(), "boundingRect");
 
 		expect(transport.sent).toHaveLength(1);
 		const msg = transport.sent[0] as Record<string, unknown>;
 		expect(msg.type).toBe("query");
-		expect(msg.nodeId).toBe("node-1");
+		expect(typeof msg.nodeId).toBe("number");
 		expect(msg.query).toBe("boundingRect");
 	});
 
@@ -39,7 +39,7 @@ describe("AsyncChannel", () => {
 		const channel = new AsyncChannel(createAppId("test"));
 		channel.setTransport(transport);
 
-		const promise = channel.request(createNodeId("node-1"), "boundingRect");
+		const promise = channel.request(createNodeId(), "boundingRect");
 
 		// Extract uid from sent message
 		const msg = transport.sent[0] as Record<string, unknown>;
@@ -57,7 +57,7 @@ describe("AsyncChannel", () => {
 		const transport = createMockTransport();
 		channel.setTransport(transport);
 
-		const result = await channel.request(createNodeId("node-1"), "boundingRect");
+		const result = await channel.request(createNodeId(), "boundingRect");
 		expect(result).toBeNull();
 	});
 
@@ -66,8 +66,8 @@ describe("AsyncChannel", () => {
 		const channel = new AsyncChannel(createAppId("test"));
 		channel.setTransport(transport);
 
-		const p1 = channel.request(createNodeId("node-1"), "boundingRect");
-		const p2 = channel.request(createNodeId("node-2"), "computedStyle");
+		const p1 = channel.request(createNodeId(), "boundingRect");
+		const p2 = channel.request(createNodeId(), "computedStyle");
 
 		expect(transport.sent).toHaveLength(2);
 
@@ -86,8 +86,8 @@ describe("AsyncChannel", () => {
 		const channel = new AsyncChannel(createAppId("test"));
 		channel.setTransport(transport);
 
-		const p1 = channel.request(createNodeId("node-1"), "boundingRect");
-		const p2 = channel.request(createNodeId("node-2"), "computedStyle");
+		const p1 = channel.request(createNodeId(), "boundingRect");
+		const p2 = channel.request(createNodeId(), "computedStyle");
 
 		channel.destroy();
 
@@ -100,7 +100,7 @@ describe("AsyncChannel", () => {
 		const channel = new AsyncChannel(createAppId("test"));
 		channel.setTransport(transport);
 
-		channel.request(createNodeId("node-1"), "nodeProperty", "offsetWidth");
+		channel.request(createNodeId(), "nodeProperty", "offsetWidth");
 
 		const msg = transport.sent[0] as Record<string, unknown>;
 		expect(msg.property).toBe("offsetWidth");

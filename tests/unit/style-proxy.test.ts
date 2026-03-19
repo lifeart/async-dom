@@ -21,7 +21,7 @@ describe("toKebabCase", () => {
 describe("createStyleProxy", () => {
 	it("emits setStyle mutations on property set", () => {
 		const collector = new MutationCollector(createAppId("test"));
-		const id = createNodeId("el-1");
+		const id = createNodeId();
 		const style = createStyleProxy({ id }, collector);
 
 		style.backgroundColor = "red";
@@ -31,7 +31,7 @@ describe("createStyleProxy", () => {
 
 	it("reads properties in kebab-case", () => {
 		const collector = new MutationCollector(createAppId("test"));
-		const id = createNodeId("el-1");
+		const id = createNodeId();
 		const style = createStyleProxy({ id }, collector, { "background-color": "blue" });
 
 		expect(style.backgroundColor).toBe("blue");
@@ -40,7 +40,7 @@ describe("createStyleProxy", () => {
 
 	it("returns empty string for unset properties", () => {
 		const collector = new MutationCollector(createAppId("test"));
-		const id = createNodeId("el-1");
+		const id = createNodeId();
 		const style = createStyleProxy({ id }, collector);
 
 		expect(style.color).toBe("");

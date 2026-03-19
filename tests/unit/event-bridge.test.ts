@@ -43,13 +43,12 @@ describe("EventBridge", () => {
 	});
 
 	it("setTransport stores transport", () => {
-		// If transport was not stored, sending an event would not work
 		const div = document.createElement("div");
-		div.id = "transport-test";
 		document.body.appendChild(div);
-		nodeCache.set(createNodeId("transport-test"), div);
+		const id = createNodeId();
+		nodeCache.set(id, div);
 
-		bridge.attach(createNodeId("transport-test"), "click", "listener-1");
+		bridge.attach(id, "click", "listener-1");
 		div.click();
 
 		expect(transport.sent).toHaveLength(1);
@@ -57,11 +56,11 @@ describe("EventBridge", () => {
 
 	it("attach() adds event listener to node", () => {
 		const div = document.createElement("div");
-		div.id = "attach-test";
 		document.body.appendChild(div);
-		nodeCache.set(createNodeId("attach-test"), div);
+		const id = createNodeId();
+		nodeCache.set(id, div);
 
-		bridge.attach(createNodeId("attach-test"), "click", "listener-attach");
+		bridge.attach(id, "click", "listener-attach");
 		div.click();
 
 		expect(transport.sent).toHaveLength(1);
@@ -69,18 +68,17 @@ describe("EventBridge", () => {
 	});
 
 	it("attach() with non-existent node is a no-op", () => {
-		// Should not throw
-		bridge.attach(createNodeId("nonexistent"), "click", "listener-noop");
+		bridge.attach(createNodeId(), "click", "listener-noop");
 		expect(transport.sent).toHaveLength(0);
 	});
 
 	it("detach() aborts the listener via AbortController", () => {
 		const div = document.createElement("div");
-		div.id = "detach-test";
 		document.body.appendChild(div);
-		nodeCache.set(createNodeId("detach-test"), div);
+		const id = createNodeId();
+		nodeCache.set(id, div);
 
-		bridge.attach(createNodeId("detach-test"), "click", "listener-detach");
+		bridge.attach(id, "click", "listener-detach");
 		bridge.detach("listener-detach");
 
 		div.click();
@@ -89,17 +87,17 @@ describe("EventBridge", () => {
 
 	it("detachAll() aborts all listeners", () => {
 		const div1 = document.createElement("div");
-		div1.id = "detach-all-1";
 		document.body.appendChild(div1);
-		nodeCache.set(createNodeId("detach-all-1"), div1);
+		const id1 = createNodeId();
+		nodeCache.set(id1, div1);
 
 		const div2 = document.createElement("div");
-		div2.id = "detach-all-2";
 		document.body.appendChild(div2);
-		nodeCache.set(createNodeId("detach-all-2"), div2);
+		const id2 = createNodeId();
+		nodeCache.set(id2, div2);
 
-		bridge.attach(createNodeId("detach-all-1"), "click", "listener-a");
-		bridge.attach(createNodeId("detach-all-2"), "click", "listener-b");
+		bridge.attach(id1, "click", "listener-a");
+		bridge.attach(id2, "click", "listener-b");
 		bridge.detachAll();
 
 		div1.click();
@@ -109,11 +107,11 @@ describe("EventBridge", () => {
 
 	it("serialized event includes correct properties for click events", () => {
 		const div = document.createElement("div");
-		div.id = "click-props";
 		document.body.appendChild(div);
-		nodeCache.set(createNodeId("click-props"), div);
+		const id = createNodeId();
+		nodeCache.set(id, div);
 
-		bridge.attach(createNodeId("click-props"), "click", "listener-click-props");
+		bridge.attach(id, "click", "listener-click-props");
 		div.click();
 
 		expect(transport.sent).toHaveLength(1);
@@ -123,7 +121,6 @@ describe("EventBridge", () => {
 			expect(msg.event.type).toBe("click");
 			expect(msg.event).toHaveProperty("bubbles");
 			expect(msg.event).toHaveProperty("cancelable");
-			// Mouse event properties
 			expect(msg.event).toHaveProperty("clientX");
 			expect(msg.event).toHaveProperty("clientY");
 			expect(msg.event).toHaveProperty("button");
@@ -132,11 +129,11 @@ describe("EventBridge", () => {
 
 	it("serialized event includes keyboard properties for keydown", () => {
 		const div = document.createElement("div");
-		div.id = "kbd-test";
 		document.body.appendChild(div);
-		nodeCache.set(createNodeId("kbd-test"), div);
+		const id = createNodeId();
+		nodeCache.set(id, div);
 
-		bridge.attach(createNodeId("kbd-test"), "keydown", "listener-kbd");
+		bridge.attach(id, "keydown", "listener-kbd");
 		const event = new KeyboardEvent("keydown", {
 			key: "Enter",
 			code: "Enter",
@@ -153,19 +150,14 @@ describe("EventBridge", () => {
 	});
 
 	it("passive events are marked correctly (scroll, touchstart)", () => {
-		// We can't directly verify the passive flag, but we can verify that
-		// attaching scroll/touchstart listeners does not throw.
-		// The implementation uses isPassiveEvent to set passive: true.
 		const div = document.createElement("div");
-		div.id = "passive-test";
 		document.body.appendChild(div);
-		nodeCache.set(createNodeId("passive-test"), div);
+		const id = createNodeId();
+		nodeCache.set(id, div);
 
-		// These should not throw
-		bridge.attach(createNodeId("passive-test"), "scroll", "listener-scroll");
-		bridge.attach(createNodeId("passive-test"), "touchstart", "listener-touch");
+		bridge.attach(id, "scroll", "listener-scroll");
+		bridge.attach(id, "touchstart", "listener-touch");
 
-		// Dispatch scroll event
 		const scrollEvent = new Event("scroll", { bubbles: true });
 		div.dispatchEvent(scrollEvent);
 
@@ -174,14 +166,13 @@ describe("EventBridge", () => {
 	});
 
 	it("preventDefault only called on anchor click events, not other event types", () => {
-		// Test with an anchor element
 		const anchor = document.createElement("a");
-		anchor.id = "anchor-test";
 		anchor.href = "https://example.com";
 		document.body.appendChild(anchor);
-		nodeCache.set(createNodeId("anchor-test"), anchor);
+		const anchorId = createNodeId();
+		nodeCache.set(anchorId, anchor);
 
-		bridge.attach(createNodeId("anchor-test"), "click", "listener-anchor");
+		bridge.attach(anchorId, "click", "listener-anchor");
 
 		const clickEvent = new MouseEvent("click", { bubbles: true, cancelable: true });
 		const preventSpy = vi.spyOn(clickEvent, "preventDefault");
@@ -189,13 +180,12 @@ describe("EventBridge", () => {
 
 		expect(preventSpy).toHaveBeenCalled();
 
-		// Now test with a non-anchor element
 		const div = document.createElement("div");
-		div.id = "non-anchor-test";
 		document.body.appendChild(div);
-		nodeCache.set(createNodeId("non-anchor-test"), div);
+		const divId = createNodeId();
+		nodeCache.set(divId, div);
 
-		bridge.attach(createNodeId("non-anchor-test"), "click", "listener-non-anchor");
+		bridge.attach(divId, "click", "listener-non-anchor");
 
 		const divClickEvent = new MouseEvent("click", { bubbles: true, cancelable: true });
 		const preventSpy2 = vi.spyOn(divClickEvent, "preventDefault");

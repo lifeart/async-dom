@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createNodeId } from "../../src/core/protocol.ts";
+import { createNodeId, type NodeId } from "../../src/core/protocol.ts";
 import { DomRenderer } from "../../src/main-thread/renderer.ts";
 
 describe("DomRenderer", () => {
@@ -14,14 +14,14 @@ describe("DomRenderer", () => {
 	});
 
 	it("creates an element and adds it to node cache", () => {
-		const id = createNodeId("test-1");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 		const node = renderer.getNode(id);
 		expect(node).toBeInstanceOf(HTMLDivElement);
 	});
 
 	it("creates a text node", () => {
-		const id = createNodeId("text-1");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "#text", textContent: "hello" });
 		const node = renderer.getNode(id);
 		expect(node).toBeInstanceOf(Text);
@@ -29,7 +29,7 @@ describe("DomRenderer", () => {
 	});
 
 	it("creates a comment node", () => {
-		const id = createNodeId("comment-1");
+		const id = createNodeId();
 		renderer.apply({ action: "createComment", id, textContent: "a comment" });
 		const node = renderer.getNode(id);
 		expect(node).toBeInstanceOf(Comment);
@@ -37,8 +37,8 @@ describe("DomRenderer", () => {
 	});
 
 	it("appends child to parent", () => {
-		const parentId = createNodeId("parent");
-		const childId = createNodeId("child");
+		const parentId = createNodeId();
+		const childId = createNodeId();
 
 		renderer.apply({ action: "createNode", id: parentId, tag: "div" });
 		renderer.apply({ action: "createNode", id: childId, tag: "span" });
@@ -51,7 +51,7 @@ describe("DomRenderer", () => {
 	});
 
 	it("sets attributes", () => {
-		const id = createNodeId("attr-test");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 		renderer.apply({ action: "bodyAppendChild", id });
 		renderer.apply({ action: "setAttribute", id, name: "data-test", value: "hello" });
@@ -61,7 +61,7 @@ describe("DomRenderer", () => {
 	});
 
 	it("removes attributes", () => {
-		const id = createNodeId("remove-attr");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 		renderer.apply({ action: "bodyAppendChild", id });
 		renderer.apply({ action: "setAttribute", id, name: "data-x", value: "y" });
@@ -72,7 +72,7 @@ describe("DomRenderer", () => {
 	});
 
 	it("sets style properties", () => {
-		const id = createNodeId("style-test");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 		renderer.apply({ action: "bodyAppendChild", id });
 		renderer.apply({ action: "setStyle", id, property: "color", value: "red" });
@@ -82,7 +82,7 @@ describe("DomRenderer", () => {
 	});
 
 	it("sets text content", () => {
-		const id = createNodeId("text-content");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 		renderer.apply({ action: "bodyAppendChild", id });
 		renderer.apply({ action: "setTextContent", id, textContent: "hello world" });
@@ -92,7 +92,7 @@ describe("DomRenderer", () => {
 	});
 
 	it("sets className", () => {
-		const id = createNodeId("class-test");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 		renderer.apply({ action: "bodyAppendChild", id });
 		renderer.apply({ action: "setClassName", id, name: "foo bar" });
@@ -102,7 +102,7 @@ describe("DomRenderer", () => {
 	});
 
 	it("sets innerHTML", () => {
-		const id = createNodeId("html-test");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 		renderer.apply({ action: "bodyAppendChild", id });
 		renderer.apply({ action: "setHTML", id, html: "<b>bold</b>" });
@@ -112,7 +112,7 @@ describe("DomRenderer", () => {
 	});
 
 	it("removes a node", () => {
-		const id = createNodeId("remove-test");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 		renderer.apply({ action: "bodyAppendChild", id });
 
@@ -122,10 +122,10 @@ describe("DomRenderer", () => {
 	});
 
 	it("inserts before a reference node", () => {
-		const parentId = createNodeId("ib-parent");
-		const aId = createNodeId("ib-a");
-		const bId = createNodeId("ib-b");
-		const cId = createNodeId("ib-c");
+		const parentId = createNodeId();
+		const aId = createNodeId();
+		const bId = createNodeId();
+		const cId = createNodeId();
 
 		renderer.apply({ action: "createNode", id: parentId, tag: "div" });
 		renderer.apply({ action: "createNode", id: aId, tag: "span" });
@@ -139,11 +139,11 @@ describe("DomRenderer", () => {
 
 		const parent = renderer.getNode(parentId) as HTMLElement;
 		expect(parent.children).toHaveLength(3);
-		expect(parent.children[1].id).toBe("ib-b");
+		expect(parent.children[1].id).toBe(String(bId));
 	});
 
 	it("sets properties", () => {
-		const id = createNodeId("prop-test");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "input" });
 		renderer.apply({ action: "bodyAppendChild", id });
 		renderer.apply({ action: "setProperty", id, property: "checked", value: true });
@@ -153,7 +153,7 @@ describe("DomRenderer", () => {
 	});
 
 	it("does not duplicate nodes on repeated createNode", () => {
-		const id = createNodeId("dup-test");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 		renderer.apply({ action: "createNode", id, tag: "div" }); // duplicate
 		// Should not throw, second call is a no-op
@@ -162,7 +162,7 @@ describe("DomRenderer", () => {
 	});
 
 	it("clears cache on clear()", () => {
-		const id = createNodeId("clear-test");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 		expect(renderer.getNode(id)).toBeTruthy();
 		renderer.clear();
@@ -171,14 +171,14 @@ describe("DomRenderer", () => {
 	});
 
 	it("maps BODY tag to document.body", () => {
-		const id = createNodeId("body-test");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "BODY" });
 		expect(renderer.getNode(id)).toBe(document.body);
 	});
 
 	it("removeChild action removes child from parent", () => {
-		const parentId = createNodeId("rc-parent");
-		const childId = createNodeId("rc-child");
+		const parentId = createNodeId();
+		const childId = createNodeId();
 
 		renderer.apply({ action: "createNode", id: parentId, tag: "div" });
 		renderer.apply({ action: "createNode", id: childId, tag: "span" });
@@ -193,7 +193,7 @@ describe("DomRenderer", () => {
 	});
 
 	it("SVG element creation uses createElementNS", () => {
-		const id = createNodeId("svg-test");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "svg" });
 		const node = renderer.getNode(id) as Element;
 		expect(node).toBeTruthy();
@@ -223,7 +223,7 @@ describe("DomRenderer", () => {
 	});
 
 	it("headAppendChild action appends to document.head", () => {
-		const id = createNodeId("head-child");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "style" });
 		renderer.apply({ action: "headAppendChild", id });
 
@@ -235,20 +235,20 @@ describe("DomRenderer", () => {
 	});
 
 	it("setAttribute with name 'id' creates cache alias", () => {
-		const id = createNodeId("id-alias-test");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 		renderer.apply({ action: "bodyAppendChild", id });
 		renderer.apply({ action: "setAttribute", id, name: "id", value: "new-id-alias" });
 
 		// The node should now be accessible via the new id alias
-		const node = renderer.getNode(createNodeId("new-id-alias"));
+		const node = renderer.getNode("new-id-alias" as unknown as NodeId);
 		expect(node).toBeTruthy();
 		expect(node).toBe(renderer.getNode(id));
 	});
 
 	describe("property allowlist (B3)", () => {
 		it("blocks innerHTML property", () => {
-			const id = createNodeId("prop-block-1");
+			const id = createNodeId();
 			renderer.apply({ action: "createNode", id, tag: "div" });
 			renderer.apply({ action: "bodyAppendChild", id });
 			renderer.apply({
@@ -263,20 +263,20 @@ describe("DomRenderer", () => {
 		});
 
 		it("blocks __proto__ property", () => {
-			const id = createNodeId("prop-block-2");
+			const id = createNodeId();
 			renderer.apply({ action: "createNode", id, tag: "div" });
 			renderer.apply({ action: "setProperty", id, property: "__proto__", value: {} });
 			// Should not throw, just be silently blocked
 		});
 
 		it("blocks constructor property", () => {
-			const id = createNodeId("prop-block-3");
+			const id = createNodeId();
 			renderer.apply({ action: "createNode", id, tag: "div" });
 			renderer.apply({ action: "setProperty", id, property: "constructor", value: null });
 		});
 
 		it("allows value property on input", () => {
-			const id = createNodeId("prop-allow-1");
+			const id = createNodeId();
 			renderer.apply({ action: "createNode", id, tag: "input" });
 			renderer.apply({ action: "bodyAppendChild", id });
 			renderer.apply({ action: "setProperty", id, property: "value", value: "hello" });
@@ -286,7 +286,7 @@ describe("DomRenderer", () => {
 		});
 
 		it("allows checked property on input", () => {
-			const id = createNodeId("prop-allow-2");
+			const id = createNodeId();
 			renderer.apply({ action: "createNode", id, tag: "input" });
 			renderer.apply({ action: "bodyAppendChild", id });
 			renderer.apply({ action: "setProperty", id, property: "checked", value: true });
@@ -296,7 +296,7 @@ describe("DomRenderer", () => {
 		});
 
 		it("allows textContent property", () => {
-			const id = createNodeId("prop-allow-3");
+			const id = createNodeId();
 			renderer.apply({ action: "createNode", id, tag: "div" });
 			renderer.apply({ action: "bodyAppendChild", id });
 			renderer.apply({ action: "setProperty", id, property: "textContent", value: "hello" });
@@ -311,7 +311,7 @@ describe("DomRenderer", () => {
 				allowBodyAppend: true,
 				additionalAllowedProperties: ["customProp"],
 			});
-			const id = createNodeId("prop-custom-1");
+			const id = createNodeId();
 			customRenderer.apply({ action: "createNode", id, tag: "div" });
 			customRenderer.apply({ action: "bodyAppendChild", id });
 			customRenderer.apply({ action: "setProperty", id, property: "customProp", value: "test" });
@@ -323,7 +323,7 @@ describe("DomRenderer", () => {
 
 	describe("HTML sanitization (B2)", () => {
 		it("strips script tags from setHTML", () => {
-			const id = createNodeId("sanitize-1");
+			const id = createNodeId();
 			renderer.apply({ action: "createNode", id, tag: "div" });
 			renderer.apply({ action: "bodyAppendChild", id });
 			renderer.apply({ action: "setHTML", id, html: "<b>bold</b><script>alert(1)</script>" });
@@ -333,7 +333,7 @@ describe("DomRenderer", () => {
 		});
 
 		it("strips onclick from setHTML", () => {
-			const id = createNodeId("sanitize-2");
+			const id = createNodeId();
 			renderer.apply({ action: "createNode", id, tag: "div" });
 			renderer.apply({ action: "bodyAppendChild", id });
 			renderer.apply({ action: "setHTML", id, html: '<div onclick="alert(1)">text</div>' });
@@ -349,7 +349,7 @@ describe("DomRenderer", () => {
 				allowBodyAppend: true,
 				allowUnsafeHTML: true,
 			});
-			const id = createNodeId("unsafe-1");
+			const id = createNodeId();
 			unsafeRenderer.apply({ action: "createNode", id, tag: "div" });
 			unsafeRenderer.apply({ action: "bodyAppendChild", id });
 			unsafeRenderer.apply({ action: "setHTML", id, html: '<b onclick="x">bold</b>' });
@@ -359,7 +359,7 @@ describe("DomRenderer", () => {
 		});
 
 		it("sanitizes insertAdjacentHTML", () => {
-			const id = createNodeId("sanitize-adj-1");
+			const id = createNodeId();
 			renderer.apply({ action: "createNode", id, tag: "div" });
 			renderer.apply({ action: "bodyAppendChild", id });
 			renderer.apply({
@@ -375,11 +375,11 @@ describe("DomRenderer", () => {
 	});
 
 	it("mutations on non-existent nodes do not throw", () => {
-		const fakeId = createNodeId("does-not-exist");
+		const fakeId = createNodeId();
 		expect(() => {
-			renderer.apply({ action: "appendChild", id: fakeId, childId: createNodeId("also-missing") });
+			renderer.apply({ action: "appendChild", id: fakeId, childId: createNodeId() });
 			renderer.apply({ action: "removeNode", id: fakeId });
-			renderer.apply({ action: "removeChild", id: fakeId, childId: createNodeId("nope") });
+			renderer.apply({ action: "removeChild", id: fakeId, childId: createNodeId() });
 			renderer.apply({ action: "setAttribute", id: fakeId, name: "x", value: "y" });
 			renderer.apply({ action: "removeAttribute", id: fakeId, name: "x" });
 			renderer.apply({ action: "setStyle", id: fakeId, property: "color", value: "red" });
@@ -392,7 +392,7 @@ describe("DomRenderer", () => {
 			renderer.apply({
 				action: "insertBefore",
 				id: fakeId,
-				newId: createNodeId("missing-new"),
+				newId: createNodeId(),
 				refId: null,
 			});
 		}).not.toThrow();

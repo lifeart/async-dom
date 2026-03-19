@@ -25,7 +25,7 @@ describe("Shadow DOM Support", () => {
 				},
 			);
 
-			const bodyId = createNodeId("body-node");
+			const bodyId = createNodeId();
 			renderer.apply({ action: "createNode", id: bodyId, tag: "BODY" });
 
 			// BODY should map to shadow root, not document.body
@@ -48,7 +48,7 @@ describe("Shadow DOM Support", () => {
 				},
 			);
 
-			const htmlId = createNodeId("html-node");
+			const htmlId = createNodeId();
 			renderer.apply({ action: "createNode", id: htmlId, tag: "HTML" });
 			expect(cache.get(htmlId)).toBe(host);
 		});
@@ -69,7 +69,7 @@ describe("Shadow DOM Support", () => {
 				},
 			);
 
-			const headId = createNodeId("head-node");
+			const headId = createNodeId();
 			renderer.apply({ action: "createNode", id: headId, tag: "HEAD" });
 			expect(cache.get(headId)).toBe(shadow);
 		});
@@ -91,11 +91,11 @@ describe("Shadow DOM Support", () => {
 			);
 
 			// Seed body
-			const bodyId = createNodeId("body-node");
+			const bodyId = createNodeId();
 			renderer.apply({ action: "createNode", id: bodyId, tag: "BODY" });
 
 			// Create and append a child
-			const childId = createNodeId("shadow-child");
+			const childId = createNodeId();
 			renderer.apply({ action: "createNode", id: childId, tag: "div" });
 			renderer.apply({ action: "appendChild", id: bodyId, childId });
 
@@ -120,7 +120,7 @@ describe("Shadow DOM Support", () => {
 				},
 			);
 
-			const styleId = createNodeId("shadow-style");
+			const styleId = createNodeId();
 			renderer.apply({ action: "createNode", id: styleId, tag: "style" });
 			renderer.apply({ action: "headAppendChild", id: styleId });
 
@@ -148,7 +148,7 @@ describe("Shadow DOM Support", () => {
 				},
 			);
 
-			const divId = createNodeId("shadow-body-child");
+			const divId = createNodeId();
 			renderer.apply({ action: "createNode", id: divId, tag: "div" });
 			renderer.apply({ action: "bodyAppendChild", id: divId });
 
@@ -179,7 +179,7 @@ describe("Shadow DOM Support", () => {
 			);
 
 			// App 1 adds a style
-			const styleId = createNodeId("style-1");
+			const styleId = createNodeId();
 			renderer1.apply({ action: "createNode", id: styleId, tag: "style" });
 			renderer1.apply({ action: "headAppendChild", id: styleId });
 
@@ -194,7 +194,7 @@ describe("Shadow DOM Support", () => {
 			const cache = new NodeCache();
 			const renderer = new DomRenderer(cache, { allowBodyAppend: true });
 
-			const bodyId = createNodeId("default-body");
+			const bodyId = createNodeId();
 			renderer.apply({ action: "createNode", id: bodyId, tag: "BODY" });
 			expect(cache.get(bodyId)).toBe(document.body);
 		});
@@ -217,10 +217,10 @@ describe("Shadow DOM Support", () => {
 				},
 			);
 
-			const bodyId = createNodeId("mount-body");
+			const bodyId = createNodeId();
 			renderer.apply({ action: "createNode", id: bodyId, tag: "BODY" });
 
-			const childId = createNodeId("mount-child");
+			const childId = createNodeId();
 			renderer.apply({ action: "createNode", id: childId, tag: "span" });
 			renderer.apply({ action: "appendChild", id: bodyId, childId });
 

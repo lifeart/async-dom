@@ -20,10 +20,10 @@ describe("encodeBinaryMessage / decodeBinaryMessage", () => {
 			appId: createAppId("app1"),
 			uid: 42,
 			mutations: [
-				{ action: "createNode", id: createNodeId("n1"), tag: "div" },
+				{ action: "createNode", id: createNodeId(), tag: "div" },
 				{
 					action: "setAttribute",
-					id: createNodeId("n1"),
+					id: createNodeId(),
 					name: "class",
 					value: "hello",
 				},
@@ -76,7 +76,7 @@ describe("encodeBinaryMessage / decodeBinaryMessage", () => {
 			mutations: [
 				{
 					action: "setTextContent",
-					id: createNodeId("n1"),
+					id: createNodeId(),
 					textContent: "Hello \u{1F600} \u4F60\u597D \u00FC\u00F6\u00E4",
 				},
 			],
@@ -119,7 +119,7 @@ describe("BinaryWorkerTransport", () => {
 			type: "mutation",
 			appId: createAppId("a"),
 			uid: 1,
-			mutations: [{ action: "createNode", id: createNodeId("n1"), tag: "div" }],
+			mutations: [{ action: "createNode", id: createNodeId(), tag: "div" }],
 		};
 
 		transport.send(msg);
@@ -169,7 +169,7 @@ describe("BinaryWorkerTransport", () => {
 			type: "mutation",
 			appId: createAppId("a"),
 			uid: 1,
-			mutations: [{ action: "createNode", id: createNodeId("n1"), tag: "div" }],
+			mutations: [{ action: "createNode", id: createNodeId(), tag: "div" }],
 		};
 
 		const buffer = encodeBinaryMessage(original);
@@ -245,7 +245,7 @@ describe("BinaryWorkerSelfTransport", () => {
 			type: "mutation",
 			appId: createAppId("a"),
 			uid: 1,
-			mutations: [{ action: "createNode", id: createNodeId("n1"), tag: "div" }],
+			mutations: [{ action: "createNode", id: createNodeId(), tag: "div" }],
 		};
 
 		transport.send(msg);
@@ -280,7 +280,7 @@ describe("BinaryWorkerSelfTransport", () => {
 			type: "mutation",
 			appId: createAppId("a"),
 			uid: 1,
-			mutations: [{ action: "createNode", id: createNodeId("n1"), tag: "span" }],
+			mutations: [{ action: "createNode", id: createNodeId(), tag: "span" }],
 		};
 
 		const buffer = encodeBinaryMessage(original);

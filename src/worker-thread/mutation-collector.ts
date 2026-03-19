@@ -1,4 +1,4 @@
-import type { AppId, DomMutation, MutationMessage } from "../core/protocol.ts";
+import type { AppId, DomMutation, MutationMessage, NodeId } from "../core/protocol.ts";
 import type { Transport } from "../transport/base.ts";
 
 /**
@@ -44,9 +44,9 @@ export class MutationCollector {
 		const toRemove = new Set<number>();
 
 		// Track created nodes and their attachment status for create+remove elimination
-		const createdAt = new Map<string, number>();
-		const attachedIds = new Set<string>();
-		const eliminatedIds = new Set<string>();
+		const createdAt = new Map<NodeId, number>();
+		const attachedIds = new Set<NodeId>();
+		const eliminatedIds = new Set<NodeId>();
 
 		for (let i = 0; i < mutations.length; i++) {
 			const m = mutations[i];
@@ -84,7 +84,8 @@ export class MutationCollector {
 					// If this node was created in this batch and never attached,
 					// drop both and mark for orphan cleanup
 					if (createdAt.has(m.id) && !attachedIds.has(m.id)) {
-						toRemove.add(createdAt.get(m.id)!);
+						const createdIdx = createdAt.get(m.id);
+						if (createdIdx !== undefined) toRemove.add(createdIdx);
 						toRemove.add(i);
 						createdAt.delete(m.id);
 						eliminatedIds.add(m.id);
@@ -107,7 +108,7 @@ export class MutationCollector {
 			for (let j = 0; j < mutations.length; j++) {
 				if (toRemove.has(j)) continue;
 				const mut = mutations[j];
-				if ("id" in mut && eliminatedIds.has((mut as { id: string }).id)) {
+				if ("id" in mut && eliminatedIds.has((mut as { id: NodeId }).id)) {
 					toRemove.add(j);
 				}
 			}

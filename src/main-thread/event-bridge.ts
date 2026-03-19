@@ -123,12 +123,9 @@ function isPassiveEvent(name: string): boolean {
 
 function getNodeId(el: Element | null): string | null {
 	if (!el) return null;
-	return (
-		(el as unknown as Record<string, string>).__asyncDomId ??
-		el.getAttribute("data-async-dom-id") ??
-		el.id ??
-		null
-	);
+	const asyncId = (el as unknown as Record<string, unknown>).__asyncDomId;
+	if (asyncId != null) return String(asyncId);
+	return el.getAttribute("data-async-dom-id") ?? el.id ?? null;
 }
 
 /**

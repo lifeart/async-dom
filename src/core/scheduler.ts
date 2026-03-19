@@ -114,7 +114,8 @@ export class FrameScheduler {
 		if (!applier) return;
 		this.queue.sort(prioritySort);
 		while (this.queue.length > 0) {
-			const item = this.queue.shift()!;
+			const item = this.queue.shift();
+			if (!item) break;
 			applier(item.mutation, item.appId);
 		}
 	}
@@ -156,7 +157,8 @@ export class FrameScheduler {
 				break;
 			}
 
-			const item = this.queue.shift()!;
+			const item = this.queue.shift();
+			if (!item) break;
 
 			if (this.shouldSkip(item)) {
 				continue;

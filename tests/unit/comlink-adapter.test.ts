@@ -41,7 +41,7 @@ describe("createComlinkEndpoint", () => {
 			type: "mutation",
 			appId: createAppId("a"),
 			uid: 1,
-			mutations: [{ action: "createNode", id: createNodeId("n1"), tag: "div" }],
+			mutations: [{ action: "createNode", id: createNodeId(), tag: "div" }],
 		};
 
 		endpoint.postMessage(msg);

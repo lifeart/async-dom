@@ -24,8 +24,8 @@ describe("MutationCollector", () => {
 		const collector = new MutationCollector(createAppId("test"));
 		collector.setTransport(transport);
 
-		collector.add({ action: "createNode", id: createNodeId("n1"), tag: "div" });
-		collector.add({ action: "createNode", id: createNodeId("n2"), tag: "span" });
+		collector.add({ action: "createNode", id: createNodeId(), tag: "div" });
+		collector.add({ action: "createNode", id: createNodeId(), tag: "span" });
 
 		expect(collector.pendingCount).toBe(2);
 		expect(transport.sent).toHaveLength(0);
@@ -46,7 +46,7 @@ describe("MutationCollector", () => {
 		const collector = new MutationCollector(createAppId("test"));
 		collector.setTransport(transport);
 
-		collector.add({ action: "createNode", id: createNodeId("n1"), tag: "div" });
+		collector.add({ action: "createNode", id: createNodeId(), tag: "div" });
 		collector.flushSync();
 
 		expect(transport.sent).toHaveLength(1);
@@ -67,10 +67,10 @@ describe("MutationCollector", () => {
 		const collector = new MutationCollector(createAppId("test"));
 		collector.setTransport(transport);
 
-		collector.add({ action: "createNode", id: createNodeId("n1"), tag: "div" });
+		collector.add({ action: "createNode", id: createNodeId(), tag: "div" });
 		await Promise.resolve();
 
-		collector.add({ action: "createNode", id: createNodeId("n2"), tag: "span" });
+		collector.add({ action: "createNode", id: createNodeId(), tag: "span" });
 		await Promise.resolve();
 
 		expect(transport.sent).toHaveLength(2);
@@ -84,7 +84,7 @@ describe("MutationCollector", () => {
 		const collector = new MutationCollector(createAppId("test"));
 		collector.setTransport(transport);
 
-		collector.add({ action: "createNode", id: createNodeId("n1"), tag: "div" });
+		collector.add({ action: "createNode", id: createNodeId(), tag: "div" });
 		collector.flushSync();
 
 		// The microtask scheduled by add() should find an empty queue
@@ -99,8 +99,8 @@ describe("MutationCollector", () => {
 		const collector = new MutationCollector(createAppId("test"));
 		collector.setTransport(transport);
 
-		collector.add({ action: "createNode", id: createNodeId("n1"), tag: "div" });
-		collector.add({ action: "createNode", id: createNodeId("n2"), tag: "span" });
+		collector.add({ action: "createNode", id: createNodeId(), tag: "div" });
+		collector.add({ action: "createNode", id: createNodeId(), tag: "span" });
 		expect(collector.pendingCount).toBe(2);
 
 		collector.flushSync();
@@ -114,7 +114,7 @@ describe("MutationCollector coalescing", () => {
 		const collector = new MutationCollector(createAppId("test"));
 		collector.setTransport(transport);
 
-		const id = createNodeId("n1");
+		const id = createNodeId();
 		collector.add({ action: "setStyle", id, property: "color", value: "red" });
 		collector.add({ action: "setStyle", id, property: "color", value: "blue" });
 		collector.add({ action: "setStyle", id, property: "color", value: "green" });
@@ -130,7 +130,7 @@ describe("MutationCollector coalescing", () => {
 		const collector = new MutationCollector(createAppId("test"));
 		collector.setTransport(transport);
 
-		const id = createNodeId("n1");
+		const id = createNodeId();
 		collector.add({ action: "setAttribute", id, name: "class", value: "a" });
 		collector.add({ action: "setAttribute", id, name: "class", value: "b" });
 		collector.flushSync();
@@ -145,8 +145,8 @@ describe("MutationCollector coalescing", () => {
 		const collector = new MutationCollector(createAppId("test"));
 		collector.setTransport(transport);
 
-		const id1 = createNodeId("n1");
-		const id2 = createNodeId("n2");
+		const id1 = createNodeId();
+		const id2 = createNodeId();
 		collector.add({ action: "createNode", id: id1, tag: "div" });
 		collector.add({ action: "setStyle", id: id1, property: "color", value: "red" });
 		collector.add({ action: "createNode", id: id2, tag: "span" });
@@ -165,7 +165,7 @@ describe("MutationCollector coalescing", () => {
 		const collector = new MutationCollector(createAppId("test"));
 		collector.setTransport(transport);
 
-		const id = createNodeId("temp");
+		const id = createNodeId();
 		collector.add({ action: "createNode", id, tag: "div" });
 		collector.add({ action: "setAttribute", id, name: "class", value: "foo" });
 		collector.add({ action: "removeNode", id });
@@ -180,8 +180,8 @@ describe("MutationCollector coalescing", () => {
 		const collector = new MutationCollector(createAppId("test"));
 		collector.setTransport(transport);
 
-		const parentId = createNodeId("parent");
-		const childId = createNodeId("child");
+		const parentId = createNodeId();
+		const childId = createNodeId();
 		collector.add({ action: "createNode", id: childId, tag: "div" });
 		collector.add({ action: "appendChild", id: parentId, childId });
 		collector.add({ action: "removeNode", id: childId });
@@ -196,8 +196,8 @@ describe("MutationCollector coalescing", () => {
 		const collector = new MutationCollector(createAppId("test"));
 		collector.setTransport(transport);
 
-		const parentId = createNodeId("parent");
-		const childId = createNodeId("child");
+		const parentId = createNodeId();
+		const childId = createNodeId();
 		collector.add({ action: "appendChild", id: parentId, childId });
 		collector.add({ action: "removeChild", id: parentId, childId });
 		collector.add({ action: "appendChild", id: parentId, childId });
@@ -213,7 +213,7 @@ describe("MutationCollector coalescing", () => {
 		collector.setTransport(transport);
 		collector.enableCoalescing(false);
 
-		const id = createNodeId("n1");
+		const id = createNodeId();
 		collector.add({ action: "setStyle", id, property: "color", value: "red" });
 		collector.add({ action: "setStyle", id, property: "color", value: "blue" });
 		collector.flushSync();
@@ -227,7 +227,7 @@ describe("MutationCollector coalescing", () => {
 		const collector = new MutationCollector(createAppId("test"));
 		collector.setTransport(transport);
 
-		const id = createNodeId("n1");
+		const id = createNodeId();
 		collector.add({ action: "setStyle", id, property: "color", value: "red" });
 		collector.add({ action: "setStyle", id, property: "font-size", value: "12px" });
 		collector.flushSync();

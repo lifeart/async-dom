@@ -3,7 +3,7 @@ import { QueryType, SyncChannel, SyncChannelHost } from "../../src/core/sync-cha
 
 describe("Sync Read Pipeline", () => {
 	it("simulates full query round-trip via shared buffer", () => {
-		const { channel, buffer } = SyncChannel.create();
+		const { buffer } = SyncChannel.create();
 		const host = new SyncChannelHost(buffer);
 
 		// Since we're single-threaded in tests, we can't use Atomics.wait

@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+	BODY_NODE_ID,
 	createAppId,
-	createNodeId,
+	HEAD_NODE_ID,
+	HTML_NODE_ID,
 	type Message,
 	type MutationMessage,
 } from "../../src/core/protocol.ts";
@@ -21,9 +23,9 @@ function createPipeline() {
 	scheduler.setApplier((m) => renderer.apply(m));
 
 	// Seed the node cache with structural nodes (like createAsyncDom does implicitly)
-	renderer.apply({ action: "createNode", id: createNodeId("body-node"), tag: "BODY" });
-	renderer.apply({ action: "createNode", id: createNodeId("head-node"), tag: "HEAD" });
-	renderer.apply({ action: "createNode", id: createNodeId("async-html"), tag: "HTML" });
+	renderer.apply({ action: "createNode", id: BODY_NODE_ID, tag: "BODY" });
+	renderer.apply({ action: "createNode", id: HEAD_NODE_ID, tag: "HEAD" });
+	renderer.apply({ action: "createNode", id: HTML_NODE_ID, tag: "HTML" });
 
 	const doc = new VirtualDocument(appId);
 
@@ -58,7 +60,7 @@ describe("Worker → Main Thread roundtrip", () => {
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		const node = document.getElementById(div.id);
+		const node = document.getElementById(String(div.id));
 		expect(node).toBeTruthy();
 		expect(node?.tagName).toBe("DIV");
 	});
@@ -106,13 +108,13 @@ describe("Worker → Main Thread roundtrip", () => {
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		expect(document.getElementById(div.id)).toBeTruthy();
+		expect(document.getElementById(String(div.id))).toBeTruthy();
 
 		div.remove();
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		expect(document.getElementById(div.id)).toBeNull();
+		expect(document.getElementById(String(div.id))).toBeNull();
 	});
 
 	it("insertBefore produces correct ordering", () => {
@@ -132,9 +134,9 @@ describe("Worker → Main Thread roundtrip", () => {
 
 		const realParent = renderer.getNode(parent.id) as HTMLElement;
 		expect(realParent?.children.length).toBe(3);
-		expect(realParent?.children[0]?.id).toBe(a.id);
-		expect(realParent?.children[1]?.id).toBe(b.id);
-		expect(realParent?.children[2]?.id).toBe(c.id);
+		expect(realParent?.children[0]?.id).toBe(String(a.id));
+		expect(realParent?.children[1]?.id).toBe(String(b.id));
+		expect(realParent?.children[2]?.id).toBe(String(c.id));
 	});
 
 	it("className is reflected in real DOM", () => {
@@ -175,8 +177,8 @@ describe("Worker → Main Thread roundtrip", () => {
 		scheduler.flush();
 
 		// All three should be in the DOM
-		expect(document.getElementById(a.id)).toBeTruthy();
-		expect(document.getElementById(b.id)).toBeTruthy();
-		expect(document.getElementById(c.id)).toBeTruthy();
+		expect(document.getElementById(String(a.id))).toBeTruthy();
+		expect(document.getElementById(String(b.id))).toBeTruthy();
+		expect(document.getElementById(String(c.id))).toBeTruthy();
 	});
 });

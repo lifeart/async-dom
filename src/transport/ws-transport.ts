@@ -96,7 +96,8 @@ export class WebSocketTransport implements Transport {
 
 	private flushQueue(): void {
 		while (this.messageQueue.length > 0) {
-			const msg = this.messageQueue.shift()!;
+			const msg = this.messageQueue.shift();
+			if (!msg) break;
 			this.sendRaw(msg);
 		}
 	}

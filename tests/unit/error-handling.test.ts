@@ -9,7 +9,7 @@ describe("Error handling", () => {
 	describe("MutationCollector", () => {
 		it("flush with no transport doesn't throw", () => {
 			const collector = new MutationCollector(createAppId("test"));
-			collector.add({ action: "createNode", id: createNodeId("n1"), tag: "div" });
+			collector.add({ action: "createNode", id: createNodeId(), tag: "div" });
 			expect(() => collector.flushSync()).not.toThrow();
 		});
 
@@ -24,7 +24,7 @@ describe("Error handling", () => {
 		it("createNode with unknown id doesn't throw", () => {
 			const renderer = new DomRenderer();
 			expect(() =>
-				renderer.apply({ action: "createNode", id: createNodeId("x"), tag: "div" }),
+				renderer.apply({ action: "createNode", id: createNodeId(), tag: "div" }),
 			).not.toThrow();
 		});
 
@@ -33,17 +33,15 @@ describe("Error handling", () => {
 			expect(() =>
 				renderer.apply({
 					action: "appendChild",
-					id: createNodeId("parent"),
-					childId: createNodeId("missing"),
+					id: createNodeId(),
+					childId: createNodeId(),
 				}),
 			).not.toThrow();
 		});
 
 		it("removeNode on non-existent node doesn't throw", () => {
 			const renderer = new DomRenderer();
-			expect(() =>
-				renderer.apply({ action: "removeNode", id: createNodeId("missing") }),
-			).not.toThrow();
+			expect(() => renderer.apply({ action: "removeNode", id: createNodeId() })).not.toThrow();
 		});
 
 		it("setAttribute on missing node doesn't throw", () => {
@@ -51,7 +49,7 @@ describe("Error handling", () => {
 			expect(() =>
 				renderer.apply({
 					action: "setAttribute",
-					id: createNodeId("missing"),
+					id: createNodeId(),
 					name: "class",
 					value: "foo",
 				}),
@@ -63,7 +61,7 @@ describe("Error handling", () => {
 			expect(() =>
 				renderer.apply({
 					action: "setStyle",
-					id: createNodeId("missing"),
+					id: createNodeId(),
 					property: "color",
 					value: "red",
 				}),
@@ -75,7 +73,7 @@ describe("Error handling", () => {
 			expect(() =>
 				renderer.apply({
 					action: "setTextContent",
-					id: createNodeId("missing"),
+					id: createNodeId(),
 					textContent: "hello",
 				}),
 			).not.toThrow();
@@ -83,7 +81,7 @@ describe("Error handling", () => {
 
 		it("insertBefore where parentId === newId is a no-op", () => {
 			const renderer = new DomRenderer();
-			const id = createNodeId("same");
+			const id = createNodeId();
 			expect(() =>
 				renderer.apply({ action: "insertBefore", id, newId: id, refId: null }),
 			).not.toThrow();
@@ -94,7 +92,7 @@ describe("Error handling", () => {
 		it("flush with no applier is a no-op", () => {
 			const scheduler = new FrameScheduler();
 			scheduler.enqueue(
-				[{ action: "createNode", id: createNodeId("n1"), tag: "div" }],
+				[{ action: "createNode", id: createNodeId(), tag: "div" }],
 				createAppId("a"),
 			);
 			expect(() => scheduler.flush()).not.toThrow();

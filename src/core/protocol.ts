@@ -6,11 +6,29 @@
  */
 
 // Branded types for type safety
-export type NodeId = string & { readonly __brand: "NodeId" };
+export type NodeId = number & { readonly __brand: "NodeId" };
 export type AppId = string & { readonly __brand: "AppId" };
 
-export function createNodeId(id: string): NodeId {
-	return id as NodeId;
+// Reserved structural node IDs
+export const BODY_NODE_ID = 1 as NodeId;
+export const HEAD_NODE_ID = 2 as NodeId;
+export const HTML_NODE_ID = 3 as NodeId;
+export const DOCUMENT_NODE_ID = 4 as NodeId;
+
+let _nodeIdCounter = 10; // Start after reserved IDs
+
+/**
+ * Create a new unique numeric NodeId (auto-incremented).
+ */
+export function createNodeId(): NodeId {
+	return ++_nodeIdCounter as NodeId;
+}
+
+/**
+ * Reset the node ID counter (for testing only).
+ */
+export function _resetNodeIdCounter(): void {
+	_nodeIdCounter = 10;
 }
 
 export function createAppId(id: string): AppId {

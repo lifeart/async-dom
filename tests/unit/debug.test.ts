@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MutationLogEntry, WarningLogEntry } from "../../src/core/debug.ts";
 import { DebugStats, resolveDebugHooks, WarningCode } from "../../src/core/debug.ts";
-import { createAppId, createNodeId, type Message } from "../../src/core/protocol.ts";
+import { createAppId, createNodeId, HTML_NODE_ID, type Message } from "../../src/core/protocol.ts";
 import { DomRenderer } from "../../src/main-thread/renderer.ts";
 import type { Transport } from "../../src/transport/base.ts";
 import { VirtualDocument } from "../../src/worker-thread/document.ts";
@@ -123,7 +123,7 @@ describe("resolveDebugHooks", () => {
 		const entry: MutationLogEntry = {
 			side: "main",
 			action: "createNode",
-			mutation: { action: "createNode", id: createNodeId("n1"), tag: "div" },
+			mutation: { action: "createNode", id: createNodeId(), tag: "div" },
 			timestamp: 0,
 		};
 		hooks.onMutation?.(entry);
@@ -149,7 +149,7 @@ describe("VirtualDocument.toJSON", () => {
 		const tree = doc.toJSON() as Record<string, unknown>;
 		expect(tree.type).toBe("element");
 		expect(tree.tag).toBe("HTML");
-		expect(tree.id).toBe("async-html");
+		expect(tree.id).toBe(HTML_NODE_ID);
 		const children = tree.children as unknown[];
 		expect(children).toHaveLength(2);
 		expect((children[0] as Record<string, unknown>).tag).toBe("HEAD");
@@ -206,8 +206,8 @@ describe("MutationCollector.getStats", () => {
 		const transport = createMockTransport();
 		collector.setTransport(transport);
 
-		collector.add({ action: "createNode", id: createNodeId("n1"), tag: "div" });
-		collector.add({ action: "createNode", id: createNodeId("n2"), tag: "span" });
+		collector.add({ action: "createNode", id: createNodeId(), tag: "div" });
+		collector.add({ action: "createNode", id: createNodeId(), tag: "span" });
 
 		const stats = collector.getStats();
 		expect(stats.added).toBe(2);
@@ -218,7 +218,7 @@ describe("MutationCollector.getStats", () => {
 		const transport = createMockTransport();
 		collector.setTransport(transport);
 
-		const id = createNodeId("n1");
+		const id = createNodeId();
 		collector.add({ action: "setStyle", id, property: "color", value: "red" });
 		collector.add({ action: "setStyle", id, property: "color", value: "blue" });
 		collector.add({ action: "setStyle", id, property: "color", value: "green" });
@@ -235,9 +235,9 @@ describe("MutationCollector.getStats", () => {
 		const transport = createMockTransport();
 		collector.setTransport(transport);
 
-		collector.add({ action: "createNode", id: createNodeId("n1"), tag: "div" });
+		collector.add({ action: "createNode", id: createNodeId(), tag: "div" });
 		const stats1 = collector.getStats();
-		collector.add({ action: "createNode", id: createNodeId("n2"), tag: "span" });
+		collector.add({ action: "createNode", id: createNodeId(), tag: "span" });
 		expect(stats1.added).toBe(1); // original snapshot unchanged
 	});
 
@@ -247,7 +247,7 @@ describe("MutationCollector.getStats", () => {
 		collector.setTransport(transport);
 		collector.enableCoalescing(false);
 
-		const id = createNodeId("n1");
+		const id = createNodeId();
 		collector.add({ action: "setStyle", id, property: "color", value: "red" });
 		collector.add({ action: "setStyle", id, property: "color", value: "blue" });
 		collector.flushSync();
@@ -275,8 +275,8 @@ describe("DomRenderer debug warnings", () => {
 
 		renderer.apply({
 			action: "appendChild",
-			id: createNodeId("missing-parent"),
-			childId: createNodeId("missing-child"),
+			id: createNodeId(),
+			childId: createNodeId(),
 		});
 
 		expect(warnings).toHaveLength(1);
@@ -290,7 +290,7 @@ describe("DomRenderer debug warnings", () => {
 			onWarning: (e) => warnings.push(e),
 		});
 
-		renderer.apply({ action: "removeNode", id: createNodeId("nope") });
+		renderer.apply({ action: "removeNode", id: createNodeId() });
 
 		expect(warnings).toHaveLength(1);
 		expect(warnings[0].code).toBe(WarningCode.MISSING_NODE);
@@ -305,8 +305,8 @@ describe("DomRenderer debug warnings", () => {
 
 		renderer.apply({
 			action: "insertBefore",
-			id: createNodeId("missing"),
-			newId: createNodeId("also-missing"),
+			id: createNodeId(),
+			newId: createNodeId(),
 			refId: null,
 		});
 
@@ -322,7 +322,7 @@ describe("DomRenderer debug warnings", () => {
 
 		renderer.apply({
 			action: "setAttribute",
-			id: createNodeId("nope"),
+			id: createNodeId(),
 			name: "class",
 			value: "foo",
 		});
@@ -339,7 +339,7 @@ describe("DomRenderer debug warnings", () => {
 
 		renderer.apply({
 			action: "setStyle",
-			id: createNodeId("nope"),
+			id: createNodeId(),
 			property: "color",
 			value: "red",
 		});
@@ -356,25 +356,25 @@ describe("DomRenderer debug warnings", () => {
 		expect(() => {
 			freshRenderer.apply({
 				action: "appendChild",
-				id: createNodeId("missing"),
-				childId: createNodeId("also-missing"),
+				id: createNodeId(),
+				childId: createNodeId(),
 			});
-			freshRenderer.apply({ action: "removeNode", id: createNodeId("nope") });
+			freshRenderer.apply({ action: "removeNode", id: createNodeId() });
 			freshRenderer.apply({
 				action: "insertBefore",
-				id: createNodeId("missing"),
-				newId: createNodeId("also-missing"),
+				id: createNodeId(),
+				newId: createNodeId(),
 				refId: null,
 			});
 			freshRenderer.apply({
 				action: "setAttribute",
-				id: createNodeId("nope"),
+				id: createNodeId(),
 				name: "x",
 				value: "y",
 			});
 			freshRenderer.apply({
 				action: "setStyle",
-				id: createNodeId("nope"),
+				id: createNodeId(),
 				property: "color",
 				value: "red",
 			});
@@ -387,7 +387,7 @@ describe("DomRenderer debug warnings", () => {
 			onMutation: (e) => mutations.push(e),
 		});
 
-		const id = createNodeId("log-test");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 
 		expect(mutations).toHaveLength(1);
@@ -401,7 +401,7 @@ describe("DomRenderer debug warnings", () => {
 		const freshRenderer = new DomRenderer();
 		// Just confirm no error, and no overhead
 		expect(() => {
-			freshRenderer.apply({ action: "createNode", id: createNodeId("x"), tag: "div" });
+			freshRenderer.apply({ action: "createNode", id: createNodeId(), tag: "div" });
 		}).not.toThrow();
 	});
 });

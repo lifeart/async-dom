@@ -27,7 +27,7 @@ describe("SyncChannel", () => {
 	});
 
 	it("round-trip: request and respond", () => {
-		const { channel, buffer } = SyncChannel.create();
+		const { buffer } = SyncChannel.create();
 		const host = new SyncChannelHost(buffer);
 
 		// Simulate: worker writes request, main thread polls and responds

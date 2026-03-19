@@ -1,5 +1,11 @@
 import type { AppId, DomMutation, NodeId } from "../core/protocol.ts";
-import { createNodeId } from "../core/protocol.ts";
+import {
+	BODY_NODE_ID,
+	createNodeId,
+	DOCUMENT_NODE_ID,
+	HEAD_NODE_ID,
+	HTML_NODE_ID,
+} from "../core/protocol.ts";
 import type { SyncChannel } from "../core/sync-channel.ts";
 import {
 	VirtualCommentNode,
@@ -13,13 +19,6 @@ import {
 	querySelector as selectorQuery,
 	querySelectorAll as selectorQueryAll,
 } from "./selector-engine.ts";
-
-let nodeCounter = 0;
-
-function nextNodeId(prefix: string): NodeId {
-	nodeCounter++;
-	return createNodeId(`${prefix}-${nodeCounter}`);
-}
 
 /**
  * Virtual Document that exists in a worker thread.
@@ -38,6 +37,7 @@ export class VirtualDocument {
 	_syncChannel: SyncChannel | null = null;
 
 	private _ids = new Map<string, VirtualElement>();
+	private _nodeIdToElement = new Map<NodeId, VirtualElement>();
 	private _listenerMap = new Map<string, (e: unknown) => void>();
 	private _listenerToElement = new Map<string, VirtualElement>();
 
@@ -45,9 +45,9 @@ export class VirtualDocument {
 		this.collector = new MutationCollector(appId);
 
 		// Create structural elements without emitting mutations (they map to existing DOM)
-		this.documentElement = new VirtualElement("HTML", this.collector, createNodeId("async-html"));
-		this.head = new VirtualElement("HEAD", this.collector, createNodeId("head-node"));
-		this.body = new VirtualElement("BODY", this.collector, createNodeId("body-node"));
+		this.documentElement = new VirtualElement("HTML", this.collector, HTML_NODE_ID);
+		this.head = new VirtualElement("HEAD", this.collector, HEAD_NODE_ID);
+		this.body = new VirtualElement("BODY", this.collector, BODY_NODE_ID);
 
 		this.documentElement._ownerDocument = this;
 		this.head._ownerDocument = this;
@@ -61,10 +61,10 @@ export class VirtualDocument {
 	}
 
 	createElement(tag: string): VirtualElement {
-		const id = nextNodeId("a");
+		const id = createNodeId();
 		const element = new VirtualElement(tag, this.collector, id);
 		element._ownerDocument = this;
-		this._ids.set(id, element);
+		this._nodeIdToElement.set(id, element);
 
 		const mutation: DomMutation = {
 			action: "createNode",
@@ -83,7 +83,7 @@ export class VirtualDocument {
 	}
 
 	createTextNode(text: string): VirtualTextNode {
-		const id = nextNodeId("t");
+		const id = createNodeId();
 		const node = new VirtualTextNode(text, id, this.collector);
 		node._ownerDocument = this;
 
@@ -98,7 +98,7 @@ export class VirtualDocument {
 	}
 
 	createComment(text: string): VirtualCommentNode {
-		const id = nextNodeId("c");
+		const id = createNodeId();
 		const node = new VirtualCommentNode(text, id, this.collector);
 		node._ownerDocument = this;
 
@@ -113,13 +113,13 @@ export class VirtualDocument {
 
 	createDocumentFragment(): VirtualElement {
 		// Document fragments are lightweight elements that don't emit create mutations
-		const frag = new VirtualElement("#document-fragment", this.collector, nextNodeId("f"));
+		const frag = new VirtualElement("#document-fragment", this.collector, createNodeId());
 		frag._ownerDocument = this;
 		return frag;
 	}
 
 	getElementById(id: string): VirtualElement | null {
-		return this._ids.get(id as NodeId) ?? null;
+		return this._ids.get(id) ?? null;
 	}
 
 	// Event listener routing
@@ -129,7 +129,7 @@ export class VirtualDocument {
 		this._listenerMap.set(listenerId, callback);
 		const mutation: DomMutation = {
 			action: "addEventListener",
-			id: createNodeId("document"),
+			id: DOCUMENT_NODE_ID,
 			name,
 			listenerId,
 		};
@@ -142,7 +142,7 @@ export class VirtualDocument {
 				this._listenerMap.delete(listenerId);
 				const mutation: DomMutation = {
 					action: "removeEventListener",
-					id: createNodeId("document"),
+					id: DOCUMENT_NODE_ID,
 					listenerId,
 				};
 				this.collector.add(mutation);
@@ -155,17 +155,33 @@ export class VirtualDocument {
 	 * Route an event from the main thread to the appropriate listener.
 	 * Resolves serialized target IDs to actual VirtualElement references.
 	 */
+	private _resolveTarget(value: unknown): VirtualElement | null {
+		if (typeof value === "number") {
+			return this._nodeIdToElement.get(value as NodeId) ?? null;
+		}
+		if (typeof value === "string") {
+			// Try parsing as number first (serialized numeric ID)
+			const num = Number(value);
+			if (!Number.isNaN(num)) {
+				return this._nodeIdToElement.get(num as NodeId) ?? null;
+			}
+			// Fall back to user-visible id attribute lookup
+			return this._ids.get(value) ?? null;
+		}
+		return null;
+	}
+
 	dispatchEvent(listenerId: string, event: unknown): void {
 		const evt = event as Record<string, unknown>;
-		// Resolve event target references from string IDs to VirtualElement refs
-		if (typeof evt.target === "string") {
-			evt.target = this._ids.get(evt.target as NodeId) ?? null;
+		// Resolve event target references from NodeIds to VirtualElement refs
+		if (evt.target != null && typeof evt.target !== "object") {
+			evt.target = this._resolveTarget(evt.target);
 		}
-		if (typeof evt.currentTarget === "string") {
-			evt.currentTarget = this._ids.get(evt.currentTarget as NodeId) ?? null;
+		if (evt.currentTarget != null && typeof evt.currentTarget !== "object") {
+			evt.currentTarget = this._resolveTarget(evt.currentTarget);
 		}
-		if (typeof evt.relatedTarget === "string") {
-			evt.relatedTarget = this._ids.get(evt.relatedTarget as NodeId) ?? null;
+		if (evt.relatedTarget != null && typeof evt.relatedTarget !== "object") {
+			evt.relatedTarget = this._resolveTarget(evt.relatedTarget);
 		}
 
 		// Create VirtualEvent for bubbling support
@@ -213,17 +229,17 @@ export class VirtualDocument {
 	}
 
 	/**
-	 * Register an element so it can be found by getElementById.
+	 * Register an element by its internal NodeId.
 	 */
-	registerElement(id: string, element: VirtualElement): void {
-		this._ids.set(id, element);
+	registerElement(id: NodeId, element: VirtualElement): void {
+		this._nodeIdToElement.set(id, element);
 	}
 
 	/**
 	 * Unregister an element by its internal NodeId (called during cleanup on removal).
 	 */
-	unregisterElement(id: string): void {
-		this._ids.delete(id);
+	unregisterElement(id: NodeId): void {
+		this._nodeIdToElement.delete(id);
 	}
 
 	/**

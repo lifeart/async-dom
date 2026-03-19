@@ -45,7 +45,8 @@ function parseSimpleSelector(input: string): SimpleSelector {
 			) {
 				cls += input[i++];
 			}
-			(sel.classes ??= []).push(cls);
+			if (!sel.classes) sel.classes = [];
+			sel.classes.push(cls);
 		} else if (ch === "[") {
 			i++;
 			let name = "";
@@ -66,7 +67,8 @@ function parseSimpleSelector(input: string): SimpleSelector {
 				value = v;
 			}
 			if (i < len && input[i] === "]") i++;
-			(sel.attrs ??= []).push({ name, value });
+			if (!sel.attrs) sel.attrs = [];
+			sel.attrs.push({ name, value });
 		} else if (ch === ":") {
 			i++;
 			let pseudo = "";
@@ -79,7 +81,8 @@ function parseSimpleSelector(input: string): SimpleSelector {
 			) {
 				pseudo += input[i++];
 			}
-			(sel.pseudos ??= []).push(pseudo);
+			if (!sel.pseudos) sel.pseudos = [];
+			sel.pseudos.push(pseudo);
 		} else {
 			// Tag name
 			let tag = "";
@@ -258,6 +261,7 @@ export function querySelectorAll(root: VirtualElement, selector: string): Virtua
 		if (groups.some((chain) => matchesChain(el, chain))) {
 			results.push(el);
 		}
+		return undefined;
 	});
 	return results;
 }
@@ -276,7 +280,7 @@ export function querySelector(root: VirtualElement, selector: string): VirtualEl
 
 function walkElements(
 	root: VirtualElement,
-	callback: (el: VirtualElement) => boolean | void,
+	callback: (el: VirtualElement) => boolean | undefined,
 ): boolean {
 	for (const child of root.children) {
 		if (child.nodeType === 1) {

@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createAppId, createNodeId, type DomMutation } from "../../src/core/protocol.ts";
+import {
+	createAppId,
+	createNodeId,
+	type DomMutation,
+	type NodeId,
+} from "../../src/core/protocol.ts";
 import { FrameScheduler } from "../../src/core/scheduler.ts";
 
 const A = createAppId("test");
@@ -19,15 +24,15 @@ describe("FrameScheduler", () => {
 	});
 
 	it("enqueues mutations", () => {
-		scheduler.enqueue([{ action: "createNode", id: createNodeId("n1"), tag: "div" }], A);
+		scheduler.enqueue([{ action: "createNode", id: createNodeId(), tag: "div" }], A);
 		expect(scheduler.pendingCount).toBe(1);
 	});
 
 	it("flush applies all pending mutations immediately", () => {
 		scheduler.enqueue(
 			[
-				{ action: "createNode", id: createNodeId("n1"), tag: "div" },
-				{ action: "createNode", id: createNodeId("n2"), tag: "span" },
+				{ action: "createNode", id: createNodeId(), tag: "div" },
+				{ action: "createNode", id: createNodeId(), tag: "span" },
 			],
 			A,
 		);
@@ -37,23 +42,23 @@ describe("FrameScheduler", () => {
 	});
 
 	it("processes high priority before normal", () => {
-		scheduler.enqueue(
-			[{ action: "createNode", id: createNodeId("normal"), tag: "div" }],
-			A,
-			"normal",
-		);
-		scheduler.enqueue([{ action: "createNode", id: createNodeId("high"), tag: "div" }], A, "high");
+		const normalId = createNodeId();
+		const highId = createNodeId();
+		scheduler.enqueue([{ action: "createNode", id: normalId, tag: "div" }], A, "normal");
+		scheduler.enqueue([{ action: "createNode", id: highId, tag: "div" }], A, "high");
 		scheduler.flush();
 		expect(applied[0].action).toBe("createNode");
-		expect((applied[0] as { id: string }).id).toBe("high");
+		expect((applied[0] as { id: NodeId }).id).toBe(highId);
 	});
 
 	it("processes non-optional before optional", () => {
+		const optId = createNodeId();
+		const reqId = createNodeId();
 		scheduler.enqueue(
 			[
 				{
 					action: "setStyle",
-					id: createNodeId("opt"),
+					id: optId,
 					property: "color",
 					value: "red",
 					optional: true,
@@ -63,12 +68,12 @@ describe("FrameScheduler", () => {
 			"normal",
 		);
 		scheduler.enqueue(
-			[{ action: "setAttribute", id: createNodeId("req"), name: "class", value: "foo" }],
+			[{ action: "setAttribute", id: reqId, name: "class", value: "foo" }],
 			A,
 			"normal",
 		);
 		scheduler.flush();
-		expect((applied[0] as { id: string }).id).toBe("req");
+		expect((applied[0] as { id: NodeId }).id).toBe(reqId);
 	});
 
 	it("start and stop control the RAF loop", () => {
@@ -91,21 +96,19 @@ describe("FrameScheduler", () => {
 			enablePrioritySkipping: true,
 			enableViewportCulling: false,
 		});
-		noApplierScheduler.enqueue([{ action: "createNode", id: createNodeId("n1"), tag: "div" }], A);
+		noApplierScheduler.enqueue([{ action: "createNode", id: createNodeId(), tag: "div" }], A);
 		expect(() => noApplierScheduler.flush()).not.toThrow();
 		expect(noApplierScheduler.pendingCount).toBe(1);
 	});
 
 	it("enqueue with 'low' priority processes after normal", () => {
-		scheduler.enqueue([{ action: "createNode", id: createNodeId("low"), tag: "div" }], A, "low");
-		scheduler.enqueue(
-			[{ action: "createNode", id: createNodeId("normal"), tag: "div" }],
-			A,
-			"normal",
-		);
+		const lowId = createNodeId();
+		const normalId = createNodeId();
+		scheduler.enqueue([{ action: "createNode", id: lowId, tag: "div" }], A, "low");
+		scheduler.enqueue([{ action: "createNode", id: normalId, tag: "div" }], A, "normal");
 		scheduler.flush();
-		expect((applied[0] as { id: string }).id).toBe("normal");
-		expect((applied[1] as { id: string }).id).toBe("low");
+		expect((applied[0] as { id: NodeId }).id).toBe(normalId);
+		expect((applied[1] as { id: NodeId }).id).toBe(lowId);
 	});
 
 	it("start() when already running is a no-op", () => {
@@ -121,18 +124,22 @@ describe("FrameScheduler", () => {
 	});
 
 	it("multiple enqueue/flush cycles preserve ordering", () => {
-		scheduler.enqueue([{ action: "createNode", id: createNodeId("a1"), tag: "div" }], A);
-		scheduler.enqueue([{ action: "createNode", id: createNodeId("a2"), tag: "div" }], A);
+		const a1 = createNodeId();
+		const a2 = createNodeId();
+		scheduler.enqueue([{ action: "createNode", id: a1, tag: "div" }], A);
+		scheduler.enqueue([{ action: "createNode", id: a2, tag: "div" }], A);
 		scheduler.flush();
 
-		scheduler.enqueue([{ action: "createNode", id: createNodeId("b1"), tag: "div" }], A);
-		scheduler.enqueue([{ action: "createNode", id: createNodeId("b2"), tag: "div" }], A);
+		const b1 = createNodeId();
+		const b2 = createNodeId();
+		scheduler.enqueue([{ action: "createNode", id: b1, tag: "div" }], A);
+		scheduler.enqueue([{ action: "createNode", id: b2, tag: "div" }], A);
 		scheduler.flush();
 
 		expect(applied).toHaveLength(4);
-		expect((applied[0] as { id: string }).id).toBe("a1");
-		expect((applied[1] as { id: string }).id).toBe("a2");
-		expect((applied[2] as { id: string }).id).toBe("b1");
-		expect((applied[3] as { id: string }).id).toBe("b2");
+		expect((applied[0] as { id: NodeId }).id).toBe(a1);
+		expect((applied[1] as { id: NodeId }).id).toBe(a2);
+		expect((applied[2] as { id: NodeId }).id).toBe(b1);
+		expect((applied[3] as { id: NodeId }).id).toBe(b2);
 	});
 });

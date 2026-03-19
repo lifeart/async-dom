@@ -4,6 +4,7 @@
  */
 
 export class VirtualMutationObserver {
+	// biome-ignore lint/complexity/noUselessConstructor: Stub needs constructor signature for API compatibility
 	constructor(_callback: (mutations: unknown[], observer: unknown) => void) {}
 	observe(_target: unknown, _options?: unknown): void {}
 	disconnect(): void {}
@@ -13,6 +14,7 @@ export class VirtualMutationObserver {
 }
 
 export class VirtualResizeObserver {
+	// biome-ignore lint/complexity/noUselessConstructor: Stub needs constructor signature for API compatibility
 	constructor(_callback: (entries: unknown[], observer: unknown) => void) {}
 	observe(_target: unknown, _options?: unknown): void {}
 	unobserve(_target: unknown): void {}
@@ -23,6 +25,7 @@ export class VirtualIntersectionObserver {
 	readonly root = null;
 	readonly rootMargin = "0px";
 	readonly thresholds: readonly number[] = [0];
+	// biome-ignore lint/complexity/noUselessConstructor: Stub needs constructor signature for API compatibility
 	constructor(_callback: (entries: unknown[], observer: unknown) => void, _options?: unknown) {}
 	observe(_target: unknown): void {}
 	unobserve(_target: unknown): void {}

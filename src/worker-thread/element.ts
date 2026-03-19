@@ -16,13 +16,7 @@ function kebabToCamel(str: string): string {
 	return str.replace(/-([a-z])/g, (_match, letter: string) => letter.toUpperCase());
 }
 
-let globalNodeCounter = 0;
 let listenerCounter = 0;
-
-function generateNodeId(prefix: string): NodeId {
-	globalNodeCounter++;
-	return createNodeId(`${prefix}-${globalNodeCounter}`);
-}
 
 /**
  * Virtual DOM element that records mutations via the MutationCollector
@@ -137,7 +131,7 @@ export class VirtualElement {
 	) {
 		this.nodeName = tag.toUpperCase();
 		this.tagName = this.nodeName;
-		this.id = id ?? generateNodeId("a");
+		this.id = id ?? createNodeId();
 		this.namespaceURI = "http://www.w3.org/1999/xhtml";
 		this.style = createStyleProxy(this, collector);
 		this.classList = new VirtualClassList(this);
@@ -1002,7 +996,7 @@ export class VirtualTextNode {
 	}
 
 	cloneNode(_deep?: boolean): VirtualTextNode {
-		return new VirtualTextNode(this._nodeValue, generateNodeId("t"), this.collector);
+		return new VirtualTextNode(this._nodeValue, createNodeId(), this.collector);
 	}
 }
 
@@ -1059,7 +1053,7 @@ export class VirtualCommentNode {
 	}
 
 	cloneNode(_deep?: boolean): VirtualCommentNode {
-		return new VirtualCommentNode(this._nodeValue, generateNodeId("c"), this.collector);
+		return new VirtualCommentNode(this._nodeValue, createNodeId(), this.collector);
 	}
 }
 

@@ -1,4 +1,5 @@
 import type { NodeId } from "./protocol.ts";
+import { DOCUMENT_NODE_ID } from "./protocol.ts";
 
 /**
  * Cache for mapping NodeIds to real DOM nodes on the main thread.
@@ -7,8 +8,7 @@ export class NodeCache {
 	private cache = new Map<NodeId, Node>();
 
 	get(id: NodeId): Node | null {
-		if (id === ("window" as NodeId)) return window as unknown as Node;
-		if (id === ("document" as NodeId)) return document as unknown as Node;
+		if (id === DOCUMENT_NODE_ID) return document as unknown as Node;
 
 		return this.cache.get(id) ?? null;
 	}

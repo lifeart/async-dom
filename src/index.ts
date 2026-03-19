@@ -28,7 +28,14 @@ export type {
 	SerializedLocation,
 	SystemMessage,
 } from "./core/protocol.ts";
-export { createAppId, createNodeId } from "./core/protocol.ts";
+export {
+	BODY_NODE_ID,
+	createAppId,
+	createNodeId,
+	DOCUMENT_NODE_ID,
+	HEAD_NODE_ID,
+	HTML_NODE_ID,
+} from "./core/protocol.ts";
 export {
 	type AppConfig,
 	type AsyncDomConfig,

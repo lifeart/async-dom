@@ -206,7 +206,28 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 		document: doc,
 		location,
 		history,
-		screen: { width: 1280, height: 720 },
+		screen: {
+			get width() {
+				if (doc._syncChannel) {
+					const result = doc._syncChannel.request(
+						QueryType.WindowProperty,
+						JSON.stringify({ property: "screen.width" }),
+					);
+					if (typeof result === "number") return result;
+				}
+				return 1280;
+			},
+			get height() {
+				if (doc._syncChannel) {
+					const result = doc._syncChannel.request(
+						QueryType.WindowProperty,
+						JSON.stringify({ property: "screen.height" }),
+					);
+					if (typeof result === "number") return result;
+				}
+				return 720;
+			},
+		},
 		innerWidth: 1280,
 		innerHeight: 720,
 		localStorage,
@@ -278,7 +299,7 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 		(globalThis as Record<string, unknown>).__ASYNC_DOM_DEVTOOLS__ = {
 			document: doc,
 			tree: () => doc.toJSON(),
-			findNode: (id: string) => doc.getElementById(id),
+			findNode: (id: string) => doc.getElementById(id) ?? doc.querySelector(`[id="${id}"]`),
 			stats: () => doc.collector.getStats(),
 		};
 	}

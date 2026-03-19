@@ -13,14 +13,18 @@ import {
 
 describe("protocol", () => {
 	describe("createNodeId / createAppId", () => {
-		it("creates branded string types", () => {
-			const nodeId = createNodeId("node-1");
+		it("creates branded types", () => {
+			const nodeId = createNodeId();
 			const appId = createAppId("app-1");
-			expect(nodeId).toBe("node-1");
-			expect(appId).toBe("app-1");
-			// They're still strings at runtime
-			expect(typeof nodeId).toBe("string");
+			expect(typeof nodeId).toBe("number");
 			expect(typeof appId).toBe("string");
+			expect(appId).toBe("app-1");
+		});
+
+		it("auto-increments node IDs", () => {
+			const id1 = createNodeId();
+			const id2 = createNodeId();
+			expect(id2).toBeGreaterThan(id1);
 		});
 	});
 
@@ -29,7 +33,7 @@ describe("protocol", () => {
 			type: "mutation",
 			appId: createAppId("a"),
 			uid: 1,
-			mutations: [{ action: "createNode", id: createNodeId("n1"), tag: "div" }],
+			mutations: [{ action: "createNode", id: createNodeId(), tag: "div" }],
 		};
 
 		const eventMsg: EventMessage = {
@@ -69,51 +73,54 @@ describe("protocol", () => {
 
 	describe("mutation types", () => {
 		it("supports all mutation actions as discriminated unions", () => {
+			const n1 = createNodeId();
+			const n2 = createNodeId();
+			const c1 = createNodeId();
 			const mutations: Message = {
 				type: "mutation",
 				appId: createAppId("a"),
 				uid: 1,
 				mutations: [
-					{ action: "createNode", id: createNodeId("n1"), tag: "div" },
-					{ action: "createComment", id: createNodeId("c1"), textContent: "hello" },
-					{ action: "appendChild", id: createNodeId("n1"), childId: createNodeId("n2") },
-					{ action: "removeNode", id: createNodeId("n1") },
-					{ action: "removeChild", id: createNodeId("n1"), childId: createNodeId("n2") },
+					{ action: "createNode", id: n1, tag: "div" },
+					{ action: "createComment", id: c1, textContent: "hello" },
+					{ action: "appendChild", id: n1, childId: n2 },
+					{ action: "removeNode", id: n1 },
+					{ action: "removeChild", id: n1, childId: n2 },
 					{
 						action: "insertBefore",
-						id: createNodeId("n1"),
-						newId: createNodeId("n2"),
+						id: n1,
+						newId: n2,
 						refId: null,
 					},
-					{ action: "setAttribute", id: createNodeId("n1"), name: "class", value: "foo" },
-					{ action: "removeAttribute", id: createNodeId("n1"), name: "class" },
+					{ action: "setAttribute", id: n1, name: "class", value: "foo" },
+					{ action: "removeAttribute", id: n1, name: "class" },
 					{
 						action: "setStyle",
-						id: createNodeId("n1"),
+						id: n1,
 						property: "color",
 						value: "red",
 					},
 					{
 						action: "setProperty",
-						id: createNodeId("n1"),
+						id: n1,
 						property: "checked",
 						value: true,
 					},
 					{
 						action: "setTextContent",
-						id: createNodeId("n1"),
+						id: n1,
 						textContent: "hello",
 					},
-					{ action: "setClassName", id: createNodeId("n1"), name: "foo bar" },
-					{ action: "setHTML", id: createNodeId("n1"), html: "<b>bold</b>" },
+					{ action: "setClassName", id: n1, name: "foo bar" },
+					{ action: "setHTML", id: n1, html: "<b>bold</b>" },
 					{
 						action: "addEventListener",
-						id: createNodeId("n1"),
+						id: n1,
 						name: "click",
 						listenerId: "l1",
 					},
-					{ action: "headAppendChild", id: createNodeId("n1") },
-					{ action: "bodyAppendChild", id: createNodeId("n1") },
+					{ action: "headAppendChild", id: n1 },
+					{ action: "bodyAppendChild", id: n1 },
 					{ action: "pushState", state: null, title: "", url: "/foo" },
 					{ action: "replaceState", state: null, title: "", url: "/bar" },
 					{ action: "scrollTo", x: 0, y: 0 },

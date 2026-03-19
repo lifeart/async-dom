@@ -12,7 +12,7 @@ describe("NodeCache isolation", () => {
 		const cacheA = new NodeCache();
 		const cacheB = new NodeCache();
 
-		const id = createNodeId("shared-id");
+		const id = createNodeId();
 		const nodeA = document.createElement("div");
 		const nodeB = document.createElement("span");
 
@@ -32,7 +32,7 @@ describe("NodeCache isolation", () => {
 		div.id = "iso-fallback-test";
 		document.body.appendChild(div);
 
-		const result = cache.get(createNodeId("iso-fallback-test"));
+		const result = cache.get(createNodeId());
 		expect(result).toBeNull();
 
 		div.remove();
@@ -42,7 +42,7 @@ describe("NodeCache isolation", () => {
 		const cacheA = new NodeCache();
 		const cacheB = new NodeCache();
 
-		const id = createNodeId("del-iso");
+		const id = createNodeId();
 		const node = document.createElement("div");
 
 		cacheA.set(id, node);
@@ -58,7 +58,7 @@ describe("NodeCache isolation", () => {
 		const cacheA = new NodeCache();
 		const cacheB = new NodeCache();
 
-		const id = createNodeId("clear-iso");
+		const id = createNodeId();
 		cacheA.set(id, document.createElement("div"));
 		cacheB.set(id, document.createElement("span"));
 
@@ -86,7 +86,7 @@ describe("Per-app DomRenderer isolation", () => {
 	});
 
 	it("two DomRenderers with separate NodeCaches can't cross-reference nodes", () => {
-		const id = createNodeId("cross-ref");
+		const id = createNodeId();
 
 		rendererA.apply({ action: "createNode", id, tag: "div" });
 
@@ -98,7 +98,7 @@ describe("Per-app DomRenderer isolation", () => {
 	});
 
 	it("App A's removeNode mutation doesn't affect App B's nodes", () => {
-		const id = createNodeId("remove-iso");
+		const id = createNodeId();
 
 		// Both apps create a node with the same ID
 		rendererA.apply({ action: "createNode", id, tag: "div" });
@@ -119,8 +119,8 @@ describe("Per-app DomRenderer isolation", () => {
 	});
 
 	it("App A can't appendChild to App B's parent — mutation is a no-op", () => {
-		const parentId = createNodeId("parent-iso");
-		const childIdA = createNodeId("child-a");
+		const parentId = createNodeId();
+		const childIdA = createNodeId();
 
 		// Only App B has the parent
 		rendererB.apply({ action: "createNode", id: parentId, tag: "div" });
@@ -144,8 +144,8 @@ describe("Per-app DomRenderer isolation", () => {
 	});
 
 	it("each renderer maintains independent node lifecycle", () => {
-		const id1 = createNodeId("lifecycle-1");
-		const id2 = createNodeId("lifecycle-2");
+		const id1 = createNodeId();
+		const id2 = createNodeId();
 
 		rendererA.apply({ action: "createNode", id: id1, tag: "div" });
 		rendererA.apply({ action: "createNode", id: id2, tag: "p" });
@@ -174,7 +174,7 @@ describe("Renderer permissions", () => {
 
 	it("headAppendChild is blocked when allowHeadAppend is false (default)", () => {
 		const renderer = new DomRenderer();
-		const id = createNodeId("head-blocked");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "style" });
 
 		const headChildrenBefore = document.head.children.length;
@@ -184,7 +184,7 @@ describe("Renderer permissions", () => {
 
 	it("headAppendChild works when allowHeadAppend is true", () => {
 		const renderer = new DomRenderer(undefined, { allowHeadAppend: true });
-		const id = createNodeId("head-allowed");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "style" });
 
 		renderer.apply({ action: "headAppendChild", id });
@@ -197,7 +197,7 @@ describe("Renderer permissions", () => {
 
 	it("bodyAppendChild is blocked by default", () => {
 		const renderer = new DomRenderer();
-		const id = createNodeId("body-blocked");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 
 		const bodyChildrenBefore = document.body.children.length;
@@ -207,7 +207,7 @@ describe("Renderer permissions", () => {
 
 	it("bodyAppendChild works when allowed", () => {
 		const renderer = new DomRenderer(undefined, { allowBodyAppend: true });
-		const id = createNodeId("body-allowed");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 
 		renderer.apply({ action: "bodyAppendChild", id });
@@ -218,8 +218,8 @@ describe("Renderer permissions", () => {
 	it("default permissions block head and body append", () => {
 		const renderer = new DomRenderer();
 
-		const headId = createNodeId("perm-head");
-		const bodyId = createNodeId("perm-body");
+		const headId = createNodeId();
+		const bodyId = createNodeId();
 		renderer.apply({ action: "createNode", id: headId, tag: "style" });
 		renderer.apply({ action: "createNode", id: bodyId, tag: "div" });
 
@@ -259,11 +259,11 @@ describe("Renderer permissions", () => {
 
 	it("appendChild with unknown parent is a no-op (no body fallback)", () => {
 		const renderer = new DomRenderer(undefined, { allowBodyAppend: true });
-		const childId = createNodeId("orphan-child");
+		const childId = createNodeId();
 		renderer.apply({ action: "createNode", id: childId, tag: "div" });
 
 		const bodyBefore = document.body.children.length;
-		renderer.apply({ action: "appendChild", id: createNodeId("nonexistent-parent"), childId });
+		renderer.apply({ action: "appendChild", id: createNodeId(), childId });
 
 		// Child should NOT be appended to body or anywhere
 		expect(document.body.children.length).toBe(bodyBefore);
@@ -273,7 +273,7 @@ describe("Renderer permissions", () => {
 
 	it("insertAdjacentHTML is applied correctly", () => {
 		const renderer = new DomRenderer(undefined, { allowBodyAppend: true });
-		const id = createNodeId("adj-html");
+		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
 		renderer.apply({ action: "bodyAppendChild", id });
 
@@ -315,9 +315,9 @@ describe("Scheduler fairness", () => {
 		// Enqueue several mutations
 		scheduler.enqueue(
 			[
-				{ action: "createNode", id: createNodeId("n1"), tag: "div" },
-				{ action: "createNode", id: createNodeId("n2"), tag: "span" },
-				{ action: "createNode", id: createNodeId("n3"), tag: "p" },
+				{ action: "createNode", id: createNodeId(), tag: "div" },
+				{ action: "createNode", id: createNodeId(), tag: "span" },
+				{ action: "createNode", id: createNodeId(), tag: "p" },
 			],
 			appA,
 		);
@@ -340,8 +340,8 @@ describe("Scheduler fairness", () => {
 		const appB = createAppId("app-b");
 		scheduler.setAppCount(2);
 
-		scheduler.enqueue([{ action: "createNode", id: createNodeId("a1"), tag: "div" }], appA);
-		scheduler.enqueue([{ action: "createNode", id: createNodeId("b1"), tag: "div" }], appB);
+		scheduler.enqueue([{ action: "createNode", id: createNodeId(), tag: "div" }], appA);
+		scheduler.enqueue([{ action: "createNode", id: createNodeId(), tag: "div" }], appB);
 
 		scheduler.flush();
 		// Both mutations should be applied

@@ -43,7 +43,7 @@ describe("ThreadManager", () => {
 			type: "mutation",
 			appId: appId1,
 			uid: 1,
-			mutations: [{ action: "createNode", id: createNodeId("n1"), tag: "div" }],
+			mutations: [{ action: "createNode", id: createNodeId(), tag: "div" }],
 		};
 
 		manager.sendToThread(appId1, msg);

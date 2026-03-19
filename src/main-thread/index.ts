@@ -2,7 +2,14 @@ import type { DebugOptions } from "../core/debug.ts";
 import { resolveDebugHooks } from "../core/debug.ts";
 import { NodeCache } from "../core/node-cache.ts";
 import type { AppId, DomMutation, Message, NodeId } from "../core/protocol.ts";
-import { createNodeId, isMutationMessage, isSystemMessage } from "../core/protocol.ts";
+import {
+	BODY_NODE_ID,
+	DOCUMENT_NODE_ID,
+	HEAD_NODE_ID,
+	HTML_NODE_ID,
+	isMutationMessage,
+	isSystemMessage,
+} from "../core/protocol.ts";
 import { FrameScheduler, type SchedulerConfig } from "../core/scheduler.ts";
 import { QueryType, SyncChannelHost } from "../core/sync-channel.ts";
 import { EventBridge } from "./event-bridge.ts";
@@ -151,7 +158,14 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				}
 				case QueryType.WindowProperty: {
 					if (!property) return null;
-					return (window as unknown as Record<string, unknown>)[property] ?? null;
+					// Support dotted paths like "screen.width"
+					const parts = property.split(".");
+					let current: unknown = window;
+					for (const part of parts) {
+						if (current == null) return null;
+						current = (current as Record<string, unknown>)[part];
+					}
+					return current ?? null;
 				}
 				default:
 					return null;
@@ -265,10 +279,13 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 
 		// Seed structural nodes
 		if (rendererRoot) {
-			appNodeCache.set(createNodeId("body-node"), rendererRoot.body as unknown as Node);
-			appNodeCache.set(createNodeId("head-node"), rendererRoot.head as unknown as Node);
-			appNodeCache.set(createNodeId("async-html"), rendererRoot.html);
+			appNodeCache.set(BODY_NODE_ID, rendererRoot.body as unknown as Node);
+			appNodeCache.set(HEAD_NODE_ID, rendererRoot.head as unknown as Node);
+			appNodeCache.set(HTML_NODE_ID, rendererRoot.html);
 		}
+
+		// Seed document node for document-level event listeners
+		appNodeCache.set(DOCUMENT_NODE_ID, document as unknown as Node);
 
 		// When a node is removed, detach event listeners for this app
 		appRenderer.onNodeRemoved = (id) => {
@@ -347,7 +364,7 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 					const queryMsg = message as {
 						type: "query";
 						uid: number;
-						nodeId: string;
+						nodeId: NodeId;
 						query: string;
 						property?: string;
 					};
@@ -394,7 +411,7 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			scheduler: {
 				pending: () => scheduler.pendingCount,
 			},
-			findRealNode: (nodeId: string) => {
+			findRealNode: (nodeId: number) => {
 				for (const r of renderers.values()) {
 					const node = r.getNode(nodeId as NodeId);
 					if (node) return node;
