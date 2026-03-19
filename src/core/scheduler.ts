@@ -113,11 +113,10 @@ export class FrameScheduler {
 		const applier = this.applier;
 		if (!applier) return;
 		this.queue.sort(prioritySort);
-		while (this.queue.length > 0) {
-			const item = this.queue.shift();
-			if (!item) break;
+		for (const item of this.queue) {
 			applier(item.mutation, item.appId);
 		}
+		this.queue.length = 0;
 	}
 
 	get pendingCount(): number {
@@ -149,7 +148,8 @@ export class FrameScheduler {
 			this.appBudgets.clear();
 		}
 
-		while (this.queue.length > 0 && processed < maxActions) {
+		let cursor = 0;
+		while (cursor < this.queue.length && processed < maxActions) {
 			const elapsed = performance.now() - start;
 
 			// Under normal load, respect frame budget
@@ -157,8 +157,8 @@ export class FrameScheduler {
 				break;
 			}
 
-			const item = this.queue.shift();
-			if (!item) break;
+			const item = this.queue[cursor];
+			cursor++;
 
 			if (this.shouldSkip(item)) {
 				continue;
@@ -180,6 +180,13 @@ export class FrameScheduler {
 			const actionTime = performance.now() - actionStart;
 			this.recordTiming(item.mutation.action, actionTime);
 			processed++;
+		}
+
+		// Remove processed items efficiently
+		if (cursor === this.queue.length) {
+			this.queue.length = 0;
+		} else if (cursor > 0) {
+			this.queue = this.queue.slice(cursor);
 		}
 
 		// Re-enqueue deferred items for next frame

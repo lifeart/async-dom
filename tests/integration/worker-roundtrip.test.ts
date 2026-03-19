@@ -60,7 +60,7 @@ describe("Worker → Main Thread roundtrip", () => {
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		const node = document.getElementById(String(div.id));
+		const node = document.getElementById(String(div._nodeId));
 		expect(node).toBeTruthy();
 		expect(node?.tagName).toBe("DIV");
 	});
@@ -73,7 +73,7 @@ describe("Worker → Main Thread roundtrip", () => {
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		const node = renderer.getNode(div.id) as HTMLElement;
+		const node = renderer.getNode(div._nodeId) as HTMLElement;
 		expect(node?.getAttribute("data-test")).toBe("hello");
 	});
 
@@ -85,7 +85,7 @@ describe("Worker → Main Thread roundtrip", () => {
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		const node = renderer.getNode(div.id) as HTMLElement;
+		const node = renderer.getNode(div._nodeId) as HTMLElement;
 		expect(node?.style.color).toBe("red");
 	});
 
@@ -97,7 +97,7 @@ describe("Worker → Main Thread roundtrip", () => {
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		const node = renderer.getNode(div.id) as HTMLElement;
+		const node = renderer.getNode(div._nodeId) as HTMLElement;
 		expect(node?.textContent).toBe("hello world");
 	});
 
@@ -108,13 +108,13 @@ describe("Worker → Main Thread roundtrip", () => {
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		expect(document.getElementById(String(div.id))).toBeTruthy();
+		expect(document.getElementById(String(div._nodeId))).toBeTruthy();
 
 		div.remove();
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		expect(document.getElementById(String(div.id))).toBeNull();
+		expect(document.getElementById(String(div._nodeId))).toBeNull();
 	});
 
 	it("insertBefore produces correct ordering", () => {
@@ -132,11 +132,11 @@ describe("Worker → Main Thread roundtrip", () => {
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		const realParent = renderer.getNode(parent.id) as HTMLElement;
+		const realParent = renderer.getNode(parent._nodeId) as HTMLElement;
 		expect(realParent?.children.length).toBe(3);
-		expect(realParent?.children[0]?.id).toBe(String(a.id));
-		expect(realParent?.children[1]?.id).toBe(String(b.id));
-		expect(realParent?.children[2]?.id).toBe(String(c.id));
+		expect(realParent?.children[0]?.id).toBe(String(a._nodeId));
+		expect(realParent?.children[1]?.id).toBe(String(b._nodeId));
+		expect(realParent?.children[2]?.id).toBe(String(c._nodeId));
 	});
 
 	it("className is reflected in real DOM", () => {
@@ -147,7 +147,7 @@ describe("Worker → Main Thread roundtrip", () => {
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		const node = renderer.getNode(div.id) as HTMLElement;
+		const node = renderer.getNode(div._nodeId) as HTMLElement;
 		expect(node?.className).toBe("foo bar");
 	});
 
@@ -159,7 +159,7 @@ describe("Worker → Main Thread roundtrip", () => {
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		const node = renderer.getNode(div.id) as HTMLElement;
+		const node = renderer.getNode(div._nodeId) as HTMLElement;
 		expect(node?.innerHTML).toBe("<b>bold</b>");
 	});
 
@@ -177,8 +177,8 @@ describe("Worker → Main Thread roundtrip", () => {
 		scheduler.flush();
 
 		// All three should be in the DOM
-		expect(document.getElementById(String(a.id))).toBeTruthy();
-		expect(document.getElementById(String(b.id))).toBeTruthy();
-		expect(document.getElementById(String(c.id))).toBeTruthy();
+		expect(document.getElementById(String(a._nodeId))).toBeTruthy();
+		expect(document.getElementById(String(b._nodeId))).toBeTruthy();
+		expect(document.getElementById(String(c._nodeId))).toBeTruthy();
 	});
 });

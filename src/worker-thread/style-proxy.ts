@@ -14,7 +14,7 @@ export function toKebabCase(str: string): string {
 }
 
 export interface StyleProxyOwner {
-	readonly id: NodeId;
+	readonly _nodeId: NodeId;
 }
 
 /**
@@ -29,8 +29,47 @@ export function createStyleProxy(
 	const backing: Record<string, string> = { ...initialStyles };
 
 	return new Proxy(backing, {
-		get(target, prop: string): string {
+		get(target, prop: string): unknown {
 			if (typeof prop !== "string") return "";
+
+			// Method stubs for CSSStyleDeclaration API
+			if (prop === "getPropertyValue") {
+				return (name: string) => target[toKebabCase(name)] ?? "";
+			}
+			if (prop === "removeProperty") {
+				return (name: string) => {
+					const key = toKebabCase(name);
+					const old = target[key] ?? "";
+					delete target[key];
+					const mutation: DomMutation = {
+						action: "setStyle",
+						id: owner._nodeId,
+						property: key,
+						value: "",
+					};
+					collector.add(mutation);
+					return old;
+				};
+			}
+			if (prop === "setProperty") {
+				return (name: string, value: string, _priority?: string) => {
+					const key = toKebabCase(name);
+					target[key] = value;
+					const mutation: DomMutation = {
+						action: "setStyle",
+						id: owner._nodeId,
+						property: key,
+						value: String(value),
+					};
+					collector.add(mutation);
+				};
+			}
+			if (prop === "cssText") {
+				return Object.entries(target)
+					.map(([k, v]) => `${k}: ${v}`)
+					.join("; ");
+			}
+
 			const key = toKebabCase(prop);
 			return target[key] ?? "";
 		},
@@ -45,7 +84,7 @@ export function createStyleProxy(
 					target[k] = v;
 					const mutation: DomMutation = {
 						action: "setStyle",
-						id: owner.id,
+						id: owner._nodeId,
 						property: k,
 						value: v,
 					};
@@ -57,7 +96,7 @@ export function createStyleProxy(
 			target[key] = value;
 			const mutation: DomMutation = {
 				action: "setStyle",
-				id: owner.id,
+				id: owner._nodeId,
 				property: key,
 				value: String(value),
 			};

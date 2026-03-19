@@ -25,7 +25,7 @@ describe("VirtualDocument", () => {
 		const div = doc.createElement("div");
 		expect(div).toBeInstanceOf(VirtualElement);
 		expect(div.tagName).toBe("DIV");
-		expect(div.id).toBeTruthy();
+		expect(div._nodeId).toBeTruthy();
 	});
 
 	it("creates text nodes", () => {
@@ -179,7 +179,7 @@ describe("VirtualElement", () => {
 			expect(child.parentElement).toBe(parent);
 		});
 
-		it("childNodes returns children array", () => {
+		it("childNodes returns all child nodes", () => {
 			const parent = doc.createElement("div");
 			const child = doc.createElement("span");
 			parent.appendChild(child);
@@ -198,8 +198,8 @@ describe("VirtualElement", () => {
 			const el = doc.createElement("div");
 			el.innerHTML = "<b>bold</b>";
 			expect(el.innerHTML).toBe("<b>bold</b>");
-			// innerHTML clears children
-			expect(el.children).toHaveLength(0);
+			// innerHTML clears childNodes
+			expect(el.childNodes).toHaveLength(0);
 		});
 	});
 
@@ -329,7 +329,7 @@ describe("VirtualTextNode", () => {
 		const text = doc.createTextNode("hello");
 		parent.appendChild(text);
 		text.remove();
-		expect(parent.children).toHaveLength(0);
+		expect(parent.childNodes).toHaveLength(0);
 	});
 });
 

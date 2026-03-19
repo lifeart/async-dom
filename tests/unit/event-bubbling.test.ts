@@ -84,8 +84,8 @@ describe("Event Bubbling", () => {
 
 		doc.dispatchEvent(listenerId, {
 			type: "click",
-			target: child.id,
-			currentTarget: child.id,
+			target: child._nodeId,
+			currentTarget: child._nodeId,
 			bubbles: true,
 		});
 
@@ -106,8 +106,8 @@ describe("Event Bubbling", () => {
 
 		doc.dispatchEvent(listenerId, {
 			type: "click",
-			target: el.id,
-			currentTarget: el.id,
+			target: el._nodeId,
+			currentTarget: el._nodeId,
 			bubbles: true,
 		});
 
@@ -131,8 +131,8 @@ describe("Event Bubbling", () => {
 
 		doc.dispatchEvent(listenerId, {
 			type: "click",
-			target: el.id,
-			currentTarget: el.id,
+			target: el._nodeId,
+			currentTarget: el._nodeId,
 			bubbles: true,
 		});
 
@@ -159,8 +159,8 @@ describe("Event Bubbling", () => {
 
 		doc.dispatchEvent(listenerId, {
 			type: "click",
-			target: child.id,
-			currentTarget: child.id,
+			target: child._nodeId,
+			currentTarget: child._nodeId,
 			bubbles: true,
 		});
 
@@ -188,8 +188,8 @@ describe("Event Bubbling", () => {
 
 		doc.dispatchEvent(listenerId, {
 			type: "click",
-			target: child.id,
-			currentTarget: child.id,
+			target: child._nodeId,
+			currentTarget: child._nodeId,
 			bubbles: true,
 		});
 
@@ -215,8 +215,8 @@ describe("Event Bubbling", () => {
 
 		doc.dispatchEvent(listenerId, {
 			type: "focus",
-			target: child.id,
-			currentTarget: child.id,
+			target: child._nodeId,
+			currentTarget: child._nodeId,
 			bubbles: false,
 		});
 

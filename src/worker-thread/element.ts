@@ -29,7 +29,7 @@ export class VirtualElement {
 	static readonly DOCUMENT_NODE = 9;
 	static readonly DOCUMENT_FRAGMENT_NODE = 11;
 
-	readonly id: NodeId;
+	readonly _nodeId: NodeId;
 	readonly nodeName: string;
 	readonly tagName: string;
 	readonly nodeType = 1;
@@ -37,7 +37,7 @@ export class VirtualElement {
 
 	parentNode: VirtualElement | null = null;
 	_ownerDocument: VirtualDocument | null = null;
-	children: VirtualNode[] = [];
+	childNodes: VirtualNode[] = [];
 
 	private _attributes = new Map<string, string>();
 	private _classes: string[] = [];
@@ -51,6 +51,37 @@ export class VirtualElement {
 
 	style: Record<string, string>;
 	classList: VirtualClassList;
+
+	// --- DOM-spec id getter/setter (maps to "id" attribute) ---
+
+	get id(): string {
+		return this.getAttribute("id") ?? "";
+	}
+
+	set id(value: string) {
+		this.setAttribute("id", value);
+	}
+
+	// --- Element-only children getter ---
+
+	get children(): VirtualElement[] {
+		return this.childNodes.filter((c): c is VirtualElement => c.nodeType === 1);
+	}
+
+	get childElementCount(): number {
+		return this.childNodes.filter((c) => c.nodeType === 1).length;
+	}
+
+	get firstElementChild(): VirtualElement | null {
+		return this.childNodes.find((c): c is VirtualElement => c.nodeType === 1) ?? null;
+	}
+
+	get lastElementChild(): VirtualElement | null {
+		for (let i = this.childNodes.length - 1; i >= 0; i--) {
+			if (this.childNodes[i].nodeType === 1) return this.childNodes[i] as VirtualElement;
+		}
+		return null;
+	}
 
 	get clientWidth(): number {
 		return this._readNodeProperty("clientWidth") ?? 0;
@@ -91,7 +122,7 @@ export class VirtualElement {
 	set scrollTop(v: number) {
 		const mutation: DomMutation = {
 			action: "setProperty",
-			id: this.id,
+			id: this._nodeId,
 			property: "scrollTop",
 			value: v,
 		};
@@ -105,7 +136,7 @@ export class VirtualElement {
 	set scrollLeft(v: number) {
 		const mutation: DomMutation = {
 			action: "setProperty",
-			id: this.id,
+			id: this._nodeId,
 			property: "scrollLeft",
 			value: v,
 		};
@@ -117,7 +148,7 @@ export class VirtualElement {
 		if (channel) {
 			const result = channel.request(
 				QueryType.NodeProperty,
-				JSON.stringify({ nodeId: this.id, property: prop }),
+				JSON.stringify({ nodeId: this._nodeId, property: prop }),
 			);
 			if (typeof result === "number") return result;
 		}
@@ -131,7 +162,7 @@ export class VirtualElement {
 	) {
 		this.nodeName = tag.toUpperCase();
 		this.tagName = this.nodeName;
-		this.id = id ?? createNodeId();
+		this._nodeId = id ?? createNodeId();
 		this.namespaceURI = "http://www.w3.org/1999/xhtml";
 		this.style = createStyleProxy(this, collector);
 		this.classList = new VirtualClassList(this);
@@ -155,7 +186,7 @@ export class VirtualElement {
 			}
 			const mutation: DomMutation = {
 				action: "setAttribute",
-				id: this.id,
+				id: this._nodeId,
 				name: "id",
 				value,
 			};
@@ -166,7 +197,7 @@ export class VirtualElement {
 			this._parseAndSetStyles(value);
 			const mutation: DomMutation = {
 				action: "setAttribute",
-				id: this.id,
+				id: this._nodeId,
 				name: "style",
 				value,
 				optional: true,
@@ -177,7 +208,7 @@ export class VirtualElement {
 		this._attributes.set(name, value);
 		const mutation: DomMutation = {
 			action: "setAttribute",
-			id: this.id,
+			id: this._nodeId,
 			name,
 			value,
 		};
@@ -196,7 +227,7 @@ export class VirtualElement {
 		this._attributes.delete(name);
 		const mutation: DomMutation = {
 			action: "removeAttribute",
-			id: this.id,
+			id: this._nodeId,
 			name,
 		};
 		this.collector.add(mutation);
@@ -233,11 +264,11 @@ export class VirtualElement {
 	appendChild(child: VirtualNode): VirtualNode {
 		if (child instanceof VirtualElement && child.nodeName === "#DOCUMENT-FRAGMENT") {
 			// Flatten document fragment
-			const fragmentChildren = [...child.children];
+			const fragmentChildren = [...child.childNodes];
 			for (const fc of fragmentChildren) {
 				this._appendSingleChild(fc);
 			}
-			child.children.length = 0;
+			child.childNodes.length = 0;
 			return child;
 		}
 		this._appendSingleChild(child);
@@ -246,14 +277,14 @@ export class VirtualElement {
 
 	private _appendSingleChild(child: VirtualNode): void {
 		if (child.parentNode) {
-			child.parentNode.children = child.parentNode.children.filter((c) => c !== child);
+			child.parentNode.childNodes = child.parentNode.childNodes.filter((c) => c !== child);
 		}
 		child.parentNode = this;
-		this.children.push(child);
+		this.childNodes.push(child);
 		const mutation: DomMutation = {
 			action: "appendChild",
-			id: this.id,
-			childId: child.id,
+			id: this._nodeId,
+			childId: child._nodeId,
 		};
 		this.collector.add(mutation);
 	}
@@ -262,12 +293,12 @@ export class VirtualElement {
 		if (child instanceof VirtualElement) {
 			child._cleanupFromDocument();
 		}
-		this.children = this.children.filter((c) => c !== child);
+		this.childNodes = this.childNodes.filter((c) => c !== child);
 		child.parentNode = null;
 		const mutation: DomMutation = {
 			action: "removeChild",
-			id: this.id,
-			childId: child.id,
+			id: this._nodeId,
+			childId: child._nodeId,
 		};
 		this.collector.add(mutation);
 		return child;
@@ -276,35 +307,35 @@ export class VirtualElement {
 	insertBefore(newChild: VirtualNode, refChild: VirtualNode | null): VirtualNode {
 		// Flatten document fragments
 		if (newChild instanceof VirtualElement && newChild.nodeName === "#DOCUMENT-FRAGMENT") {
-			const fragmentChildren = [...newChild.children];
+			const fragmentChildren = [...newChild.childNodes];
 			for (const fc of fragmentChildren) {
 				this.insertBefore(fc, refChild);
 			}
-			newChild.children.length = 0;
+			newChild.childNodes.length = 0;
 			return newChild;
 		}
 
 		if (newChild.parentNode) {
-			newChild.parentNode.children = newChild.parentNode.children.filter((c) => c !== newChild);
+			newChild.parentNode.childNodes = newChild.parentNode.childNodes.filter((c) => c !== newChild);
 		}
 		newChild.parentNode = this;
 
 		if (refChild === null) {
-			this.children.push(newChild);
+			this.childNodes.push(newChild);
 		} else {
-			const index = this.children.indexOf(refChild);
+			const index = this.childNodes.indexOf(refChild);
 			if (index === -1) {
-				this.children.push(newChild);
+				this.childNodes.push(newChild);
 			} else {
-				this.children.splice(index, 0, newChild);
+				this.childNodes.splice(index, 0, newChild);
 			}
 		}
 
 		const mutation: DomMutation = {
 			action: "insertBefore",
-			id: this.id,
-			newId: newChild.id,
-			refId: refChild?.id ?? null,
+			id: this._nodeId,
+			newId: newChild._nodeId,
+			refId: refChild?._nodeId ?? null,
 		};
 		this.collector.add(mutation);
 		return newChild;
@@ -313,12 +344,12 @@ export class VirtualElement {
 	remove(): void {
 		this._cleanupFromDocument();
 		if (this.parentNode) {
-			this.parentNode.children = this.parentNode.children.filter((c) => c !== this);
+			this.parentNode.childNodes = this.parentNode.childNodes.filter((c) => c !== this);
 		}
 		this.parentNode = null;
 		const mutation: DomMutation = {
 			action: "removeNode",
-			id: this.id,
+			id: this._nodeId,
 		};
 		this.collector.add(mutation);
 	}
@@ -364,8 +395,8 @@ export class VirtualElement {
 	}
 
 	replaceChildren(...nodes: VirtualNode[]): void {
-		while (this.children.length > 0) {
-			this.removeChild(this.children[0]);
+		while (this.childNodes.length > 0) {
+			this.removeChild(this.childNodes[0]);
 		}
 		for (const node of nodes) {
 			this.appendChild(node);
@@ -382,7 +413,7 @@ export class VirtualElement {
 		this._textContent = value;
 		const mutation: DomMutation = {
 			action: "setTextContent",
-			id: this.id,
+			id: this._nodeId,
 			textContent: value,
 		};
 		this.collector.add(mutation);
@@ -395,10 +426,10 @@ export class VirtualElement {
 	set innerHTML(value: string) {
 		this._innerHTML = value;
 		// Clear children
-		this.children.length = 0;
+		this.childNodes.length = 0;
 		const mutation: DomMutation = {
 			action: "setHTML",
-			id: this.id,
+			id: this._nodeId,
 			html: value,
 		};
 		this.collector.add(mutation);
@@ -414,7 +445,7 @@ export class VirtualElement {
 		this._value = v;
 		const mutation: DomMutation = {
 			action: "setProperty",
-			id: this.id,
+			id: this._nodeId,
 			property: "value",
 			value: v,
 		};
@@ -429,7 +460,7 @@ export class VirtualElement {
 		this._checked = v;
 		const mutation: DomMutation = {
 			action: "setProperty",
-			id: this.id,
+			id: this._nodeId,
 			property: "checked",
 			value: v,
 		};
@@ -444,7 +475,7 @@ export class VirtualElement {
 		this._disabled = v;
 		const mutation: DomMutation = {
 			action: "setProperty",
-			id: this.id,
+			id: this._nodeId,
 			property: "disabled",
 			value: v,
 		};
@@ -459,7 +490,7 @@ export class VirtualElement {
 		this._selectedIndex = v;
 		const mutation: DomMutation = {
 			action: "setProperty",
-			id: this.id,
+			id: this._nodeId,
 			property: "selectedIndex",
 			value: v,
 		};
@@ -482,7 +513,7 @@ export class VirtualElement {
 		this._classes = value ? value.split(" ").filter(Boolean) : [];
 		const mutation: DomMutation = {
 			action: "setClassName",
-			id: this.id,
+			id: this._nodeId,
 			name: value,
 		};
 		this.collector.add(mutation);
@@ -494,16 +525,34 @@ export class VirtualElement {
 	private _listenerEventNames = new Map<string, string>();
 	private _onHandlers = new Map<string, (e: unknown) => void>();
 
-	addEventListener(name: string, callback: (e: unknown) => void): void {
+	addEventListener(
+		name: string,
+		callback: (e: unknown) => void,
+		options?: AddEventListenerOptions | boolean,
+	): void {
 		if (!name) return;
-		const listenerId = `${this.id}_${name}_${++listenerCounter}`;
+		const listenerId = `${this._nodeId}_${name}_${++listenerCounter}`;
+
+		// Parse options
+		const once = typeof options === "object" ? (options?.once ?? false) : false;
+
+		// Wrap callback for 'once' support
+		let effectiveCallback = callback;
+		if (once) {
+			const originalCb = callback;
+			effectiveCallback = (e: unknown) => {
+				originalCb(e);
+				this.removeEventListener(name, effectiveCallback);
+			};
+		}
+
 		// Store the callback for the document to route events back
-		this._eventListeners.set(listenerId, callback);
+		this._eventListeners.set(listenerId, effectiveCallback);
 		this._listenerEventNames.set(listenerId, name);
 		this._ownerDocument?.registerListener(listenerId, this);
 		const mutation: DomMutation = {
 			action: "addEventListener",
-			id: this.id,
+			id: this._nodeId,
 			name,
 			listenerId,
 		};
@@ -522,7 +571,7 @@ export class VirtualElement {
 				this._ownerDocument?.unregisterListener(listenerId);
 				const mutation: DomMutation = {
 					action: "removeEventListener",
-					id: this.id,
+					id: this._nodeId,
 					listenerId,
 				};
 				this.collector.add(mutation);
@@ -553,14 +602,14 @@ export class VirtualElement {
 		this._listenerEventNames.clear();
 		this._onHandlers.clear();
 		if (this._ownerDocument) {
-			this._ownerDocument.unregisterElement(this.id);
+			this._ownerDocument.unregisterElement(this._nodeId);
 		}
-		for (const child of this.children) {
+		for (const child of this.childNodes) {
 			if (child instanceof VirtualElement) {
 				child._cleanupFromDocument();
 			} else if (this._ownerDocument) {
 				// Clean up text/comment node IDs from _ids map
-				this._ownerDocument.unregisterElement(child.id);
+				this._ownerDocument.unregisterElement(child._nodeId);
 			}
 		}
 	}
@@ -568,7 +617,7 @@ export class VirtualElement {
 	preventDefaultFor(eventName: string): void {
 		const mutation: DomMutation = {
 			action: "configureEvent",
-			id: this.id,
+			id: this._nodeId,
 			name: eventName,
 			preventDefault: true,
 		};
@@ -657,27 +706,23 @@ export class VirtualElement {
 	// --- Navigation ---
 
 	get firstChild(): VirtualNode | null {
-		return this.children[0] ?? null;
+		return this.childNodes[0] ?? null;
 	}
 
 	get lastChild(): VirtualNode | null {
-		return this.children[this.children.length - 1] ?? null;
-	}
-
-	get childNodes(): VirtualNode[] {
-		return this.children;
+		return this.childNodes[this.childNodes.length - 1] ?? null;
 	}
 
 	get nextSibling(): VirtualNode | null {
 		if (!this.parentNode) return null;
-		const idx = this.parentNode.children.indexOf(this);
-		return this.parentNode.children[idx + 1] ?? null;
+		const idx = this.parentNode.childNodes.indexOf(this);
+		return this.parentNode.childNodes[idx + 1] ?? null;
 	}
 
 	get previousSibling(): VirtualNode | null {
 		if (!this.parentNode) return null;
-		const idx = this.parentNode.children.indexOf(this);
-		return this.parentNode.children[idx - 1] ?? null;
+		const idx = this.parentNode.childNodes.indexOf(this);
+		return this.parentNode.childNodes[idx - 1] ?? null;
 	}
 
 	get parentElement(): VirtualElement | null {
@@ -705,7 +750,7 @@ export class VirtualElement {
 
 	get nextElementSibling(): VirtualElement | null {
 		if (!this.parentNode) return null;
-		const siblings = this.parentNode.children;
+		const siblings = this.parentNode.childNodes;
 		const idx = siblings.indexOf(this);
 		for (let i = idx + 1; i < siblings.length; i++) {
 			if (siblings[i].nodeType === 1) return siblings[i] as VirtualElement;
@@ -715,7 +760,7 @@ export class VirtualElement {
 
 	get previousElementSibling(): VirtualElement | null {
 		if (!this.parentNode) return null;
-		const siblings = this.parentNode.children;
+		const siblings = this.parentNode.childNodes;
 		const idx = siblings.indexOf(this);
 		for (let i = idx - 1; i >= 0; i--) {
 			if (siblings[i].nodeType === 1) return siblings[i] as VirtualElement;
@@ -724,11 +769,11 @@ export class VirtualElement {
 	}
 
 	hasChildNodes(): boolean {
-		return this.children.length > 0;
+		return this.childNodes.length > 0;
 	}
 
 	replaceChild(newChild: VirtualNode, oldChild: VirtualNode): VirtualNode {
-		const idx = this.children.indexOf(oldChild);
+		const idx = this.childNodes.indexOf(oldChild);
 		if (idx === -1) return oldChild;
 		this.insertBefore(newChild, oldChild);
 		this.removeChild(oldChild);
@@ -754,7 +799,7 @@ export class VirtualElement {
 		// Emit createNode mutation for the clone
 		const createMutation: DomMutation = {
 			action: "createNode",
-			id: clone.id,
+			id: clone._nodeId,
 			tag: this.tagName,
 			textContent: this._textContent || "",
 		};
@@ -765,7 +810,7 @@ export class VirtualElement {
 		clone._classes = [...this._classes];
 		clone._ownerDocument = this._ownerDocument;
 		if (deep) {
-			for (const child of this.children) {
+			for (const child of this.childNodes) {
 				clone.appendChild(child.cloneNode(true));
 			}
 		}
@@ -829,7 +874,7 @@ export class VirtualElement {
 	insertAdjacentHTML(position: InsertPosition, html: string): void {
 		const mutation: DomMutation = {
 			action: "insertAdjacentHTML",
-			id: this.id,
+			id: this._nodeId,
 			position,
 			html,
 		};
@@ -841,7 +886,7 @@ export class VirtualElement {
 	contains(other: VirtualNode | null): boolean {
 		if (!other) return false;
 		if (other === (this as VirtualNode)) return true;
-		return this.children.some(
+		return this.childNodes.some(
 			(child) => child === other || (child instanceof VirtualElement && child.contains(other)),
 		);
 	}
@@ -901,7 +946,10 @@ export class VirtualElement {
 	} {
 		const channel = this._ownerDocument?._syncChannel;
 		if (channel) {
-			const result = channel.request(QueryType.BoundingRect, JSON.stringify({ nodeId: this.id }));
+			const result = channel.request(
+				QueryType.BoundingRect,
+				JSON.stringify({ nodeId: this._nodeId }),
+			);
 			if (result && typeof result === "object") {
 				const r = result as Record<string, number>;
 				return {
@@ -950,7 +998,7 @@ export class VirtualTextNode {
 
 	constructor(
 		text: string,
-		readonly id: NodeId,
+		readonly _nodeId: NodeId,
 		private collector: MutationCollector,
 	) {
 		this._nodeValue = text;
@@ -968,7 +1016,7 @@ export class VirtualTextNode {
 		this._nodeValue = value;
 		const mutation: DomMutation = {
 			action: "setProperty",
-			id: this.id,
+			id: this._nodeId,
 			property: "nodeValue",
 			value,
 		};
@@ -985,12 +1033,12 @@ export class VirtualTextNode {
 
 	remove(): void {
 		if (this.parentNode) {
-			this.parentNode.children = this.parentNode.children.filter((c) => c !== this);
+			this.parentNode.childNodes = this.parentNode.childNodes.filter((c) => c !== this);
 		}
 		this.parentNode = null;
 		const mutation: DomMutation = {
 			action: "removeNode",
-			id: this.id,
+			id: this._nodeId,
 		};
 		this.collector.add(mutation);
 	}
@@ -1018,7 +1066,7 @@ export class VirtualCommentNode {
 
 	constructor(
 		text: string,
-		readonly id: NodeId,
+		readonly _nodeId: NodeId,
 		private collector: MutationCollector,
 	) {
 		this._nodeValue = text;
@@ -1042,12 +1090,12 @@ export class VirtualCommentNode {
 
 	remove(): void {
 		if (this.parentNode) {
-			this.parentNode.children = this.parentNode.children.filter((c) => c !== this);
+			this.parentNode.childNodes = this.parentNode.childNodes.filter((c) => c !== this);
 		}
 		this.parentNode = null;
 		const mutation: DomMutation = {
 			action: "removeNode",
-			id: this.id,
+			id: this._nodeId,
 		};
 		this.collector.add(mutation);
 	}

@@ -241,10 +241,10 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 			doc.collector.add({ action: "scrollTo", x, y });
 		},
 		getComputedStyle(el: unknown) {
-			if (doc._syncChannel && el && typeof el === "object" && "id" in el) {
+			if (doc._syncChannel && el && typeof el === "object" && "_nodeId" in el) {
 				const result = doc._syncChannel.request(
 					QueryType.ComputedStyle,
-					JSON.stringify({ nodeId: (el as { id: string }).id }),
+					JSON.stringify({ nodeId: (el as { _nodeId: unknown })._nodeId }),
 				);
 				if (result && typeof result === "object") {
 					return result as Record<string, string>;

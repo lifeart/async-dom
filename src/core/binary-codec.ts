@@ -246,16 +246,22 @@ export class BinaryMutationDecoder {
 	}
 
 	private readU8(): number {
+		if (this.offset + 1 > this.view.byteLength)
+			throw new Error("Binary decode: unexpected end of buffer");
 		return this.view.getUint8(this.offset++);
 	}
 
 	private readU16(): number {
+		if (this.offset + 2 > this.view.byteLength)
+			throw new Error("Binary decode: unexpected end of buffer");
 		const v = this.view.getUint16(this.offset, true);
 		this.offset += 2;
 		return v;
 	}
 
 	private readU32(): number {
+		if (this.offset + 4 > this.view.byteLength)
+			throw new Error("Binary decode: unexpected end of buffer");
 		const v = this.view.getUint32(this.offset, true);
 		this.offset += 4;
 		return v;

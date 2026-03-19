@@ -313,8 +313,8 @@ export class VirtualDocument {
 		const nodes: VirtualNode[] = [];
 		function collect(node: VirtualNode) {
 			nodes.push(node);
-			if ("children" in node) {
-				for (const child of (node as VirtualElement).children) {
+			if (node instanceof VirtualElement) {
+				for (const child of node.childNodes) {
 					collect(child);
 				}
 			}
@@ -374,10 +374,10 @@ export class VirtualDocument {
 
 	private _serializeNode(node: VirtualNode): unknown {
 		if (node.nodeType === 3) {
-			return { type: "text", id: node.id, text: (node as VirtualTextNode).nodeValue };
+			return { type: "text", id: node._nodeId, text: (node as VirtualTextNode).nodeValue };
 		}
 		if (node.nodeType === 8) {
-			return { type: "comment", id: node.id, text: (node as VirtualCommentNode).nodeValue };
+			return { type: "comment", id: node._nodeId, text: (node as VirtualCommentNode).nodeValue };
 		}
 		const el = node as VirtualElement;
 		const attrs: Record<string, string> = {};
@@ -388,11 +388,11 @@ export class VirtualDocument {
 		}
 		return {
 			type: "element",
-			id: el.id,
+			id: el._nodeId,
 			tag: el.tagName,
 			...(Object.keys(attrs).length > 0 ? { attributes: attrs } : {}),
 			...(el.className ? { className: el.className } : {}),
-			children: el.children.map((c) => this._serializeNode(c)),
+			children: el.childNodes.map((c) => this._serializeNode(c)),
 		};
 	}
 }

@@ -205,11 +205,11 @@ function matchesSimple(el: VirtualElement, sel: SimpleSelector): boolean {
 		for (const pseudo of sel.pseudos) {
 			if (pseudo === "first-child") {
 				if (!el.parentNode) return false;
-				const siblings = el.parentNode.children.filter((c) => c.nodeType === 1);
+				const siblings = el.parentNode.childNodes.filter((c) => c.nodeType === 1);
 				if (siblings[0] !== el) return false;
 			} else if (pseudo === "last-child") {
 				if (!el.parentNode) return false;
-				const siblings = el.parentNode.children.filter((c) => c.nodeType === 1);
+				const siblings = el.parentNode.childNodes.filter((c) => c.nodeType === 1);
 				if (siblings[siblings.length - 1] !== el) return false;
 			}
 		}
@@ -282,7 +282,7 @@ function walkElements(
 	root: VirtualElement,
 	callback: (el: VirtualElement) => boolean | undefined,
 ): boolean {
-	for (const child of root.children) {
+	for (const child of root.childNodes) {
 		if (child.nodeType === 1) {
 			const el = child as VirtualElement;
 			if (callback(el) === true) return true;

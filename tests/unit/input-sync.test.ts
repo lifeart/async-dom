@@ -117,8 +117,8 @@ describe("Input State Synchronization", () => {
 
 			doc.dispatchEvent(listenerId, {
 				type: "input",
-				target: input.id,
-				currentTarget: input.id,
+				target: input._nodeId,
+				currentTarget: input._nodeId,
 				value: "typed-text",
 				bubbles: true,
 			});
@@ -139,8 +139,8 @@ describe("Input State Synchronization", () => {
 
 			doc.dispatchEvent(listenerId, {
 				type: "change",
-				target: checkbox.id,
-				currentTarget: checkbox.id,
+				target: checkbox._nodeId,
+				currentTarget: checkbox._nodeId,
 				checked: true,
 				bubbles: true,
 			});
