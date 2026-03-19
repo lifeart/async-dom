@@ -36,7 +36,7 @@ describe("sanitizeHTML", () => {
 		});
 
 		it("strips nested dangerous tags", () => {
-			const html = '<div><script>alert(1)</script><p>safe</p></div>';
+			const html = "<div><script>alert(1)</script><p>safe</p></div>";
 			const result = sanitizeHTML(html);
 			expect(result).not.toContain("script");
 			expect(result).toContain("<p>safe</p>");

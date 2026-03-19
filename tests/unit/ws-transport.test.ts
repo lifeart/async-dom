@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createAppId, createNodeId, type Message, type MutationMessage } from "../../src/core/protocol.ts";
+import {
+	createAppId,
+	createNodeId,
+	type Message,
+	type MutationMessage,
+} from "../../src/core/protocol.ts";
 
 // Mock WebSocket class
 class MockWebSocket {
@@ -64,7 +69,8 @@ describe("WebSocketTransport", () => {
 		};
 		// Also set static constants on the replacement
 		(globalThis.WebSocket as unknown as Record<string, number>).OPEN = MockWebSocket.OPEN;
-		(globalThis.WebSocket as unknown as Record<string, number>).CONNECTING = MockWebSocket.CONNECTING;
+		(globalThis.WebSocket as unknown as Record<string, number>).CONNECTING =
+			MockWebSocket.CONNECTING;
 		(globalThis.WebSocket as unknown as Record<string, number>).CLOSED = MockWebSocket.CLOSED;
 		(globalThis.WebSocket as unknown as Record<string, number>).CLOSING = MockWebSocket.CLOSING;
 	});

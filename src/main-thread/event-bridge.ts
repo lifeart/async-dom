@@ -7,7 +7,10 @@ import type { Transport } from "../transport/base.ts";
  * Uses AbortController for clean listener removal.
  */
 export class EventBridge {
-	private listeners = new Map<string, { controller: AbortController; nodeId: NodeId; eventName: string }>();
+	private listeners = new Map<
+		string,
+		{ controller: AbortController; nodeId: NodeId; eventName: string }
+	>();
 	private eventConfig = new Map<string, { preventDefault: boolean; passive?: boolean }>();
 	private nodeCache: NodeCache;
 	private transport: Transport | null = null;
@@ -26,7 +29,11 @@ export class EventBridge {
 		this.nodeCache = nodeCache;
 	}
 
-	configureEvent(nodeId: NodeId, eventName: string, config: { preventDefault: boolean; passive?: boolean }): void {
+	configureEvent(
+		nodeId: NodeId,
+		eventName: string,
+		config: { preventDefault: boolean; passive?: boolean },
+	): void {
 		this.eventConfig.set(`${nodeId}_${eventName}`, config);
 
 		// If setting preventDefault on a passive event, re-attach as non-passive
@@ -116,7 +123,12 @@ function isPassiveEvent(name: string): boolean {
 
 function getNodeId(el: Element | null): string | null {
 	if (!el) return null;
-	return el.getAttribute("data-async-dom-id") ?? el.id ?? null;
+	return (
+		(el as unknown as Record<string, string>).__asyncDomId ??
+		el.getAttribute("data-async-dom-id") ??
+		el.id ??
+		null
+	);
 }
 
 /**
@@ -140,10 +152,7 @@ function serializeEvent(e: Event): SerializedEvent {
 
 	// Only preventDefault on click events on anchors
 	if (e.type === "click") {
-		if (
-			e.target instanceof HTMLAnchorElement ||
-			e.currentTarget instanceof HTMLAnchorElement
-		) {
+		if (e.target instanceof HTMLAnchorElement || e.currentTarget instanceof HTMLAnchorElement) {
 			e.preventDefault();
 		}
 	}
@@ -195,8 +204,7 @@ function serializeEvent(e: Event): SerializedEvent {
 	}
 
 	if (e instanceof FocusEvent) {
-		base.relatedTarget =
-			e.relatedTarget instanceof Element ? getNodeId(e.relatedTarget) : null;
+		base.relatedTarget = e.relatedTarget instanceof Element ? getNodeId(e.relatedTarget) : null;
 	}
 
 	if (e instanceof WheelEvent) {

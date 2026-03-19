@@ -8,8 +8,15 @@ const decoder = new TextDecoder();
  * Returns true if the value is an ArrayBuffer (or ArrayBuffer-like from Uint8Array.buffer).
  */
 function isArrayBuffer(value: unknown): value is ArrayBuffer {
-	return value instanceof ArrayBuffer ||
-		(typeof value === "object" && value !== null && "byteLength" in value && "slice" in value && typeof (value as ArrayBuffer).slice === "function" && !ArrayBuffer.isView(value));
+	return (
+		value instanceof ArrayBuffer ||
+		(typeof value === "object" &&
+			value !== null &&
+			"byteLength" in value &&
+			"slice" in value &&
+			typeof (value as ArrayBuffer).slice === "function" &&
+			!ArrayBuffer.isView(value))
+	);
 }
 
 /**
@@ -66,7 +73,11 @@ export class BinaryWorkerTransport implements Transport {
 			if (this.handlers.length === 0) return;
 			const msg = isArrayBuffer(e.data) ? decodeBinaryMessage(e.data) : e.data;
 			for (const h of this.handlers) {
-				try { h(msg); } catch (err) { console.error("[async-dom] Handler error:", err); }
+				try {
+					h(msg);
+				} catch (err) {
+					console.error("[async-dom] Handler error:", err);
+				}
 			}
 		};
 		worker.onerror = (e: ErrorEvent) => {
@@ -132,7 +143,11 @@ export class BinaryWorkerSelfTransport implements Transport {
 			if (this.handlers.length === 0) return;
 			const msg = isArrayBuffer(e.data) ? decodeBinaryMessage(e.data) : e.data;
 			for (const h of this.handlers) {
-				try { h(msg); } catch (err) { console.error("[async-dom] Handler error:", err); }
+				try {
+					h(msg);
+				} catch (err) {
+					console.error("[async-dom] Handler error:", err);
+				}
 			}
 		};
 	}

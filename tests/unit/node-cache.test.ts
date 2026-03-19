@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createNodeId } from "../../src/core/protocol.ts";
 import { NodeCache } from "../../src/core/node-cache.ts";
+import { createNodeId } from "../../src/core/protocol.ts";
 
 describe("NodeCache", () => {
 	let cache: NodeCache;

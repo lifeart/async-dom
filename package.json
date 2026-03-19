@@ -74,5 +74,8 @@
     "comlink": {
       "optional": true
     }
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

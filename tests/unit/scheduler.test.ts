@@ -42,11 +42,7 @@ describe("FrameScheduler", () => {
 			A,
 			"normal",
 		);
-		scheduler.enqueue(
-			[{ action: "createNode", id: createNodeId("high"), tag: "div" }],
-			A,
-			"high",
-		);
+		scheduler.enqueue([{ action: "createNode", id: createNodeId("high"), tag: "div" }], A, "high");
 		scheduler.flush();
 		expect(applied[0].action).toBe("createNode");
 		expect((applied[0] as { id: string }).id).toBe("high");
@@ -95,20 +91,13 @@ describe("FrameScheduler", () => {
 			enablePrioritySkipping: true,
 			enableViewportCulling: false,
 		});
-		noApplierScheduler.enqueue(
-			[{ action: "createNode", id: createNodeId("n1"), tag: "div" }],
-			A,
-		);
+		noApplierScheduler.enqueue([{ action: "createNode", id: createNodeId("n1"), tag: "div" }], A);
 		expect(() => noApplierScheduler.flush()).not.toThrow();
 		expect(noApplierScheduler.pendingCount).toBe(1);
 	});
 
 	it("enqueue with 'low' priority processes after normal", () => {
-		scheduler.enqueue(
-			[{ action: "createNode", id: createNodeId("low"), tag: "div" }],
-			A,
-			"low",
-		);
+		scheduler.enqueue([{ action: "createNode", id: createNodeId("low"), tag: "div" }], A, "low");
 		scheduler.enqueue(
 			[{ action: "createNode", id: createNodeId("normal"), tag: "div" }],
 			A,

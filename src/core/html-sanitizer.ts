@@ -19,28 +19,20 @@ const DANGEROUS_TAGS = new Set([
 
 const DANGEROUS_ATTR_PATTERN = /^on/i;
 
-const DANGEROUS_URI_ATTRS = new Set([
-	"href",
-	"src",
-	"data",
-	"action",
-	"formaction",
-	"xlink:href",
-]);
+const DANGEROUS_URI_ATTRS = new Set(["href", "src", "data", "action", "formaction", "xlink:href"]);
 
-const DANGEROUS_ATTRS = new Set([
-	"srcdoc",
-	"formaction",
-]);
+const DANGEROUS_ATTRS = new Set(["srcdoc", "formaction"]);
 
 /**
  * Returns true if the given URI string starts with `javascript:` (ignoring whitespace and case).
  */
 function isDangerousURI(value: string): boolean {
 	const trimmed = value.trim().toLowerCase();
-	return /^\s*javascript\s*:/i.test(trimmed) ||
+	return (
+		/^\s*javascript\s*:/i.test(trimmed) ||
 		/^\s*vbscript\s*:/i.test(trimmed) ||
-		/^\s*data\s*:\s*text\/html/i.test(trimmed);
+		/^\s*data\s*:\s*text\/html/i.test(trimmed)
+	);
 }
 
 /**

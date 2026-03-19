@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+	VirtualIntersectionObserver,
 	VirtualMutationObserver,
 	VirtualResizeObserver,
-	VirtualIntersectionObserver,
 } from "../../src/worker-thread/observers.ts";
 
 describe("VirtualMutationObserver", () => {

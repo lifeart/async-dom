@@ -1,10 +1,14 @@
 import type { DomMutation, InsertPosition, NodeId } from "../core/protocol.ts";
 import { createNodeId } from "../core/protocol.ts";
 import { QueryType } from "../core/sync-channel.ts";
-import type { MutationCollector } from "./mutation-collector.ts";
 import type { VirtualDocument } from "./document.ts";
+import type { MutationCollector } from "./mutation-collector.ts";
+import {
+	matches as selectorMatches,
+	querySelector as selectorQuery,
+	querySelectorAll as selectorQueryAll,
+} from "./selector-engine.ts";
 import { createStyleProxy, toKebabCase } from "./style-proxy.ts";
-import { querySelectorAll as selectorQueryAll, querySelector as selectorQuery, matches as selectorMatches } from "./selector-engine.ts";
 
 export type VirtualNode = VirtualElement | VirtualTextNode | VirtualCommentNode;
 
@@ -237,6 +241,9 @@ export class VirtualElement {
 	}
 
 	removeChild(child: VirtualNode): VirtualNode {
+		if (child instanceof VirtualElement) {
+			child._cleanupFromDocument();
+		}
 		this.children = this.children.filter((c) => c !== child);
 		child.parentNode = null;
 		const mutation: DomMutation = {
@@ -286,6 +293,7 @@ export class VirtualElement {
 	}
 
 	remove(): void {
+		this._cleanupFromDocument();
 		if (this.parentNode) {
 			this.parentNode.children = this.parentNode.children.filter((c) => c !== this);
 		}
@@ -464,12 +472,17 @@ export class VirtualElement {
 
 	// --- Events ---
 
+	private _eventListeners = new Map<string, (e: unknown) => void>();
+	private _listenerEventNames = new Map<string, string>();
+	private _onHandlers = new Map<string, (e: unknown) => void>();
+
 	addEventListener(name: string, callback: (e: unknown) => void): void {
 		if (!name) return;
 		const listenerId = `${this.id}_${name}_${++listenerCounter}`;
 		// Store the callback for the document to route events back
 		this._eventListeners.set(listenerId, callback);
 		this._listenerEventNames.set(listenerId, name);
+		this._ownerDocument?.registerListener(listenerId, this);
 		const mutation: DomMutation = {
 			action: "addEventListener",
 			id: this.id,
@@ -478,9 +491,6 @@ export class VirtualElement {
 		};
 		this.collector.add(mutation);
 	}
-
-	private _eventListeners = new Map<string, (e: unknown) => void>();
-	private _listenerEventNames = new Map<string, string>();
 
 	getEventListener(listenerId: string): ((e: unknown) => void) | undefined {
 		return this._eventListeners.get(listenerId);
@@ -491,6 +501,7 @@ export class VirtualElement {
 			if (cb === callback) {
 				this._eventListeners.delete(listenerId);
 				this._listenerEventNames.delete(listenerId);
+				this._ownerDocument?.unregisterListener(listenerId);
 				const mutation: DomMutation = {
 					action: "removeEventListener",
 					id: this.id,
@@ -511,6 +522,28 @@ export class VirtualElement {
 		}
 	}
 
+	/**
+	 * Recursively clean up this element and all children from the document's registries.
+	 * Called before emitting removal mutations to prevent memory leaks.
+	 */
+	_cleanupFromDocument(): void {
+		// Unregister all listeners from document's O(1) lookup map
+		for (const listenerId of this._eventListeners.keys()) {
+			this._ownerDocument?.unregisterListener(listenerId);
+		}
+		this._eventListeners.clear();
+		this._listenerEventNames.clear();
+		this._onHandlers.clear();
+		if (this._ownerDocument) {
+			this._ownerDocument.unregisterElement(this.id);
+		}
+		for (const child of this.children) {
+			if (child instanceof VirtualElement) {
+				child._cleanupFromDocument();
+			}
+		}
+	}
+
 	preventDefaultFor(eventName: string): void {
 		const mutation: DomMutation = {
 			action: "configureEvent",
@@ -521,56 +554,67 @@ export class VirtualElement {
 		this.collector.add(mutation);
 	}
 
+	private _setOnHandler(eventName: string, cb: ((e: unknown) => void) | null): void {
+		const prev = this._onHandlers.get(eventName);
+		if (prev) this.removeEventListener(eventName, prev);
+		if (cb) {
+			this.addEventListener(eventName, cb);
+			this._onHandlers.set(eventName, cb);
+		} else {
+			this._onHandlers.delete(eventName);
+		}
+	}
+
 	set onclick(cb: ((e: unknown) => void) | null) {
-		if (cb) this.addEventListener("click", cb);
+		this._setOnHandler("click", cb);
 	}
 
 	set ondblclick(cb: ((e: unknown) => void) | null) {
-		if (cb) this.addEventListener("dblclick", cb);
+		this._setOnHandler("dblclick", cb);
 	}
 
 	set onmouseenter(cb: ((e: unknown) => void) | null) {
-		if (cb) this.addEventListener("mouseenter", cb);
+		this._setOnHandler("mouseenter", cb);
 	}
 
 	set onmouseleave(cb: ((e: unknown) => void) | null) {
-		if (cb) this.addEventListener("mouseleave", cb);
+		this._setOnHandler("mouseleave", cb);
 	}
 
 	set onmousedown(cb: ((e: unknown) => void) | null) {
-		if (cb) this.addEventListener("mousedown", cb);
+		this._setOnHandler("mousedown", cb);
 	}
 
 	set onmouseup(cb: ((e: unknown) => void) | null) {
-		if (cb) this.addEventListener("mouseup", cb);
+		this._setOnHandler("mouseup", cb);
 	}
 
 	set onmouseover(cb: ((e: unknown) => void) | null) {
-		if (cb) this.addEventListener("mouseover", cb);
+		this._setOnHandler("mouseover", cb);
 	}
 
 	set onmousemove(cb: ((e: unknown) => void) | null) {
-		if (cb) this.addEventListener("mousemove", cb);
+		this._setOnHandler("mousemove", cb);
 	}
 
 	set onkeydown(cb: ((e: unknown) => void) | null) {
-		if (cb) this.addEventListener("keydown", cb);
+		this._setOnHandler("keydown", cb);
 	}
 
 	set onkeyup(cb: ((e: unknown) => void) | null) {
-		if (cb) this.addEventListener("keyup", cb);
+		this._setOnHandler("keyup", cb);
 	}
 
 	set onkeypress(cb: ((e: unknown) => void) | null) {
-		if (cb) this.addEventListener("keypress", cb);
+		this._setOnHandler("keypress", cb);
 	}
 
 	set onchange(cb: ((e: unknown) => void) | null) {
-		if (cb) this.addEventListener("change", cb);
+		this._setOnHandler("change", cb);
 	}
 
 	set oncontextmenu(cb: ((e: unknown) => void) | null) {
-		if (cb) this.addEventListener("contextmenu", cb);
+		this._setOnHandler("contextmenu", cb);
 	}
 
 	// --- Navigation ---
@@ -665,7 +709,7 @@ export class VirtualElement {
 				const attrs = el.attributes;
 				for (let i = 0; i < attrs.length; i++) {
 					const attr = attrs.item(i);
-					if (attr && attr.name.startsWith("data-")) {
+					if (attr?.name.startsWith("data-")) {
 						keys.push(kebabToCamel(attr.name.slice(5)));
 					}
 				}
@@ -675,7 +719,12 @@ export class VirtualElement {
 				if (typeof prop !== "string") return undefined;
 				const attrName = `data-${toKebabCase(prop)}`;
 				if (!el.hasAttribute(attrName)) return undefined;
-				return { configurable: true, enumerable: true, writable: true, value: el.getAttribute(attrName) };
+				return {
+					configurable: true,
+					enumerable: true,
+					writable: true,
+					value: el.getAttribute(attrName),
+				};
 			},
 		});
 		return this._datasetProxy;
@@ -719,7 +768,11 @@ export class VirtualElement {
 	}
 
 	getElementsByClassName(className: string): VirtualElement[] {
-		const selector = className.split(/\s+/).filter(Boolean).map(c => `.${c}`).join("");
+		const selector = className
+			.split(/\s+/)
+			.filter(Boolean)
+			.map((c) => `.${c}`)
+			.join("");
 		return selectorQueryAll(this, selector);
 	}
 
@@ -752,10 +805,7 @@ export class VirtualElement {
 	} {
 		const channel = this._ownerDocument?._syncChannel;
 		if (channel) {
-			const result = channel.request(
-				QueryType.BoundingRect,
-				JSON.stringify({ nodeId: this.id }),
-			);
+			const result = channel.request(QueryType.BoundingRect, JSON.stringify({ nodeId: this.id }));
 			if (result && typeof result === "object") {
 				const r = result as Record<string, number>;
 				return {

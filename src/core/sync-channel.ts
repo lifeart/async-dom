@@ -23,7 +23,7 @@ const SIGNAL_RESPONSE = 2;
 const MAX_RETRIES = 5;
 const WAIT_TIMEOUT_MS = 100;
 
-export const enum QueryType {
+export enum QueryType {
 	BoundingRect = 0,
 	ComputedStyle = 1,
 	NodeProperty = 2,

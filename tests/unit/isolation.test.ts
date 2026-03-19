@@ -277,7 +277,12 @@ describe("Renderer permissions", () => {
 		renderer.apply({ action: "createNode", id, tag: "div" });
 		renderer.apply({ action: "bodyAppendChild", id });
 
-		renderer.apply({ action: "insertAdjacentHTML", id, position: "beforeend", html: "<span>inner</span>" });
+		renderer.apply({
+			action: "insertAdjacentHTML",
+			id,
+			position: "beforeend",
+			html: "<span>inner</span>",
+		});
 		const node = renderer.getNode(id) as HTMLElement;
 		expect(node.innerHTML).toBe("<span>inner</span>");
 	});
@@ -335,14 +340,8 @@ describe("Scheduler fairness", () => {
 		const appB = createAppId("app-b");
 		scheduler.setAppCount(2);
 
-		scheduler.enqueue(
-			[{ action: "createNode", id: createNodeId("a1"), tag: "div" }],
-			appA,
-		);
-		scheduler.enqueue(
-			[{ action: "createNode", id: createNodeId("b1"), tag: "div" }],
-			appB,
-		);
+		scheduler.enqueue([{ action: "createNode", id: createNodeId("a1"), tag: "div" }], appA);
+		scheduler.enqueue([{ action: "createNode", id: createNodeId("b1"), tag: "div" }], appB);
 
 		scheduler.flush();
 		// Both mutations should be applied

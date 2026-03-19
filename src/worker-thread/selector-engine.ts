@@ -23,14 +23,26 @@ function parseSimpleSelector(input: string): SimpleSelector {
 		if (ch === "#") {
 			i++;
 			let id = "";
-			while (i < len && input[i] !== "." && input[i] !== "#" && input[i] !== "[" && input[i] !== ":") {
+			while (
+				i < len &&
+				input[i] !== "." &&
+				input[i] !== "#" &&
+				input[i] !== "[" &&
+				input[i] !== ":"
+			) {
 				id += input[i++];
 			}
 			sel.id = id;
 		} else if (ch === ".") {
 			i++;
 			let cls = "";
-			while (i < len && input[i] !== "." && input[i] !== "#" && input[i] !== "[" && input[i] !== ":") {
+			while (
+				i < len &&
+				input[i] !== "." &&
+				input[i] !== "#" &&
+				input[i] !== "[" &&
+				input[i] !== ":"
+			) {
 				cls += input[i++];
 			}
 			(sel.classes ??= []).push(cls);
@@ -58,14 +70,28 @@ function parseSimpleSelector(input: string): SimpleSelector {
 		} else if (ch === ":") {
 			i++;
 			let pseudo = "";
-			while (i < len && input[i] !== "." && input[i] !== "#" && input[i] !== "[" && input[i] !== ":") {
+			while (
+				i < len &&
+				input[i] !== "." &&
+				input[i] !== "#" &&
+				input[i] !== "[" &&
+				input[i] !== ":"
+			) {
 				pseudo += input[i++];
 			}
 			(sel.pseudos ??= []).push(pseudo);
 		} else {
 			// Tag name
 			let tag = "";
-			while (i < len && input[i] !== "." && input[i] !== "#" && input[i] !== "[" && input[i] !== ":" && input[i] !== " " && input[i] !== ">") {
+			while (
+				i < len &&
+				input[i] !== "." &&
+				input[i] !== "#" &&
+				input[i] !== "[" &&
+				input[i] !== ":" &&
+				input[i] !== " " &&
+				input[i] !== ">"
+			) {
 				tag += input[i++];
 			}
 			if (tag) sel.tag = tag.toUpperCase();
@@ -139,7 +165,11 @@ function tokenize(input: string): string[] {
 			}
 			if (ch === ">") {
 				tokens.push(">");
-			} else if (tokens.length > 0 && tokens[tokens.length - 1] !== ">" && tokens[tokens.length - 1] !== " ") {
+			} else if (
+				tokens.length > 0 &&
+				tokens[tokens.length - 1] !== ">" &&
+				tokens[tokens.length - 1] !== " "
+			) {
 				tokens.push(" ");
 			}
 		} else {
@@ -244,7 +274,10 @@ export function querySelector(root: VirtualElement, selector: string): VirtualEl
 	return found;
 }
 
-function walkElements(root: VirtualElement, callback: (el: VirtualElement) => boolean | void): boolean {
+function walkElements(
+	root: VirtualElement,
+	callback: (el: VirtualElement) => boolean | void,
+): boolean {
 	for (const child of root.children) {
 		if (child.nodeType === 1) {
 			const el = child as VirtualElement;

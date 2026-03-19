@@ -6,7 +6,11 @@ import { QueryType, SyncChannel } from "../core/sync-channel.ts";
 import type { Transport } from "../transport/base.ts";
 import { WorkerSelfTransport } from "../transport/worker-transport.ts";
 import { VirtualDocument } from "./document.ts";
-import { VirtualMutationObserver, VirtualResizeObserver, VirtualIntersectionObserver } from "./observers.ts";
+import {
+	VirtualIntersectionObserver,
+	VirtualMutationObserver,
+	VirtualResizeObserver,
+} from "./observers.ts";
 
 export interface WorkerDomConfig {
 	appId?: AppId;
@@ -106,7 +110,15 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 
 	// Install global error handlers to forward crashes to main thread
 	const workerScope = self as unknown as {
-		onerror: ((event: ErrorEvent | string, source?: string, lineno?: number, colno?: number, error?: Error) => void) | null;
+		onerror:
+			| ((
+					event: ErrorEvent | string,
+					source?: string,
+					lineno?: number,
+					colno?: number,
+					error?: Error,
+			  ) => void)
+			| null;
 		onunhandledrejection: ((event: PromiseRejectionEvent) => void) | null;
 	};
 
@@ -117,7 +129,8 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 		colno?: number,
 		error?: Error,
 	) => {
-		const message = typeof event === "string" ? event : (event as ErrorEvent).message ?? "Unknown worker error";
+		const message =
+			typeof event === "string" ? event : ((event as ErrorEvent).message ?? "Unknown worker error");
 		const serializedError: import("../core/protocol.ts").SerializedError = {
 			message,
 			stack: error?.stack,

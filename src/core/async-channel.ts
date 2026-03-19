@@ -6,15 +6,18 @@
  * blocking synchronously.
  */
 
-import type { AppId, NodeId } from "./protocol.ts";
 import type { Transport } from "../transport/base.ts";
+import type { AppId, NodeId } from "./protocol.ts";
 
 export type AsyncQueryType = "boundingRect" | "computedStyle" | "nodeProperty" | "windowProperty";
 
 let queryUidCounter = 0;
 
 export class AsyncChannel {
-	private pending = new Map<number, { resolve: (value: unknown) => void; reject: (reason: unknown) => void }>();
+	private pending = new Map<
+		number,
+		{ resolve: (value: unknown) => void; reject: (reason: unknown) => void }
+	>();
 	private transport: Transport | null = null;
 	private appId: AppId;
 	private timeoutMs: number;

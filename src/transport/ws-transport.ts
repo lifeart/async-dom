@@ -53,7 +53,11 @@ export class WebSocketTransport implements Transport {
 			try {
 				const data = JSON.parse(e.data as string) as Message;
 				for (const h of this.handlers) {
-					try { h(data); } catch (err) { console.error("[async-dom] Handler error:", err); }
+					try {
+						h(data);
+					} catch (err) {
+						console.error("[async-dom] Handler error:", err);
+					}
 				}
 			} catch {
 				console.error("[async-dom] Failed to parse WebSocket message");

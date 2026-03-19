@@ -251,7 +251,12 @@ describe("DomRenderer", () => {
 			const id = createNodeId("prop-block-1");
 			renderer.apply({ action: "createNode", id, tag: "div" });
 			renderer.apply({ action: "bodyAppendChild", id });
-			renderer.apply({ action: "setProperty", id, property: "innerHTML", value: "<script>alert(1)</script>" });
+			renderer.apply({
+				action: "setProperty",
+				id,
+				property: "innerHTML",
+				value: "<script>alert(1)</script>",
+			});
 
 			const node = renderer.getNode(id) as HTMLElement;
 			expect(node.innerHTML).toBe("");
@@ -321,7 +326,7 @@ describe("DomRenderer", () => {
 			const id = createNodeId("sanitize-1");
 			renderer.apply({ action: "createNode", id, tag: "div" });
 			renderer.apply({ action: "bodyAppendChild", id });
-			renderer.apply({ action: "setHTML", id, html: '<b>bold</b><script>alert(1)</script>' });
+			renderer.apply({ action: "setHTML", id, html: "<b>bold</b><script>alert(1)</script>" });
 
 			const node = renderer.getNode(id) as HTMLElement;
 			expect(node.innerHTML).toBe("<b>bold</b>");
@@ -361,7 +366,7 @@ describe("DomRenderer", () => {
 				action: "insertAdjacentHTML",
 				id,
 				position: "beforeend",
-				html: '<p>safe</p><script>alert(1)</script>',
+				html: "<p>safe</p><script>alert(1)</script>",
 			});
 
 			const node = renderer.getNode(id) as HTMLElement;

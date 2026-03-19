@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-	createAppId,
-	createNodeId,
-	type Message,
-	type MutationMessage,
-} from "../../src/core/protocol.ts";
+import { createAppId, type Message, type MutationMessage } from "../../src/core/protocol.ts";
 
 describe("Multiple onMessage handlers (I7)", () => {
 	describe("WorkerTransport", () => {
@@ -74,7 +69,9 @@ describe("Multiple onMessage handlers (I7)", () => {
 
 	describe("BinaryWorkerTransport", () => {
 		it("supports multiple onMessage handlers", async () => {
-			const { BinaryWorkerTransport } = await import("../../src/transport/binary-worker-transport.ts");
+			const { BinaryWorkerTransport } = await import(
+				"../../src/transport/binary-worker-transport.ts"
+			);
 			let capturedOnMessage: ((e: MessageEvent) => void) | null = null;
 
 			const mockWorker = {
@@ -110,7 +107,9 @@ describe("Multiple onMessage handlers (I7)", () => {
 
 	describe("BinaryWorkerSelfTransport", () => {
 		it("supports multiple onMessage handlers", async () => {
-			const { BinaryWorkerSelfTransport } = await import("../../src/transport/binary-worker-transport.ts");
+			const { BinaryWorkerSelfTransport } = await import(
+				"../../src/transport/binary-worker-transport.ts"
+			);
 			const scope = {
 				postMessage: vi.fn(),
 				onmessage: null as ((e: MessageEvent) => void) | null,
@@ -158,7 +157,9 @@ describe("Worker error forwarding (B4)", () => {
 			let closeCalled = false;
 
 			transport.onError = (err) => errors.push(err);
-			transport.onClose = () => { closeCalled = true; };
+			transport.onClose = () => {
+				closeCalled = true;
+			};
 
 			capturedOnerror?.({ message: "test error" } as ErrorEvent);
 
@@ -195,7 +196,9 @@ describe("Worker error forwarding (B4)", () => {
 
 	describe("BinaryWorkerTransport", () => {
 		it("calls onError and onClose when worker.onerror fires", async () => {
-			const { BinaryWorkerTransport } = await import("../../src/transport/binary-worker-transport.ts");
+			const { BinaryWorkerTransport } = await import(
+				"../../src/transport/binary-worker-transport.ts"
+			);
 			let capturedOnerror: ((e: ErrorEvent) => void) | null = null;
 
 			const mockWorker = {
@@ -213,7 +216,9 @@ describe("Worker error forwarding (B4)", () => {
 			let closeCalled = false;
 
 			transport.onError = (err) => errors.push(err);
-			transport.onClose = () => { closeCalled = true; };
+			transport.onClose = () => {
+				closeCalled = true;
+			};
 
 			capturedOnerror?.({ message: "binary error" } as ErrorEvent);
 

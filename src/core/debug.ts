@@ -75,13 +75,19 @@ const defaultLogger: DebugLogger = {
 		console.log(`[async-dom:${entry.side}] mutation:${entry.action}`, entry.mutation);
 	},
 	event(entry) {
-		console.log(`[async-dom:${entry.side}] event:${entry.phase} ${entry.eventType} listenerId=${entry.listenerId}`);
+		console.log(
+			`[async-dom:${entry.side}] event:${entry.phase} ${entry.eventType} listenerId=${entry.listenerId}`,
+		);
 	},
 	syncRead(entry) {
-		console.log(`[async-dom] sync:${entry.queryType} node=${entry.nodeId} ${entry.result} (${entry.latencyMs.toFixed(1)}ms)`);
+		console.log(
+			`[async-dom] sync:${entry.queryType} node=${entry.nodeId} ${entry.result} (${entry.latencyMs.toFixed(1)}ms)`,
+		);
 	},
 	scheduler(entry) {
-		console.log(`[async-dom] frame:${entry.frameId} actions=${entry.actionsProcessed} time=${entry.frameTimeMs.toFixed(1)}ms queue=${entry.queueDepth}`);
+		console.log(
+			`[async-dom] frame:${entry.frameId} actions=${entry.actionsProcessed} time=${entry.frameTimeMs.toFixed(1)}ms queue=${entry.queueDepth}`,
+		);
 	},
 };
 
@@ -127,7 +133,14 @@ export function resolveDebugHooks(options?: DebugOptions): {
 	onScheduler: ((entry: SchedulerLogEntry) => void) | null;
 	onWarning: ((entry: WarningLogEntry) => void) | null;
 } {
-	if (!options) return { onMutation: null, onEvent: null, onSyncRead: null, onScheduler: null, onWarning: null };
+	if (!options)
+		return {
+			onMutation: null,
+			onEvent: null,
+			onSyncRead: null,
+			onScheduler: null,
+			onWarning: null,
+		};
 	const logger = { ...defaultLogger, ...options.logger };
 	return {
 		onMutation: options.logMutations ? (e) => logger.mutation(e) : null,

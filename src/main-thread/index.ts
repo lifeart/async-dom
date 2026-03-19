@@ -53,7 +53,10 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 	let lastRenderer: DomRenderer | null = null;
 	let lastAppId: AppId | null = null;
 
-	function handleSyncQuery(appRenderer: DomRenderer, query: { queryType: QueryType; data: string }): unknown {
+	function handleSyncQuery(
+		appRenderer: DomRenderer,
+		query: { queryType: QueryType; data: string },
+	): unknown {
 		try {
 			const parsed = JSON.parse(query.data);
 			const nodeId = parsed.nodeId;
@@ -64,7 +67,16 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 					const node = appRenderer.getNode(nodeId) as Element | null;
 					if (!node || !("getBoundingClientRect" in node)) return null;
 					const rect = node.getBoundingClientRect();
-					return { top: rect.top, left: rect.left, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height, x: rect.x, y: rect.y };
+					return {
+						top: rect.top,
+						left: rect.left,
+						right: rect.right,
+						bottom: rect.bottom,
+						width: rect.width,
+						height: rect.height,
+						x: rect.x,
+						y: rect.y,
+					};
 				}
 				case QueryType.ComputedStyle: {
 					const node = appRenderer.getNode(nodeId) as Element | null;
@@ -72,19 +84,59 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 					const cs = window.getComputedStyle(node);
 					const result: Record<string, string> = {};
 					const props = [
-						"display", "position", "top", "left", "right", "bottom",
-						"width", "height", "color", "background-color",
-						"font-size", "font-family", "font-weight", "line-height",
-						"text-align", "visibility", "opacity", "overflow",
-						"z-index", "float", "clear", "cursor", "pointer-events",
-						"box-sizing", "flex-direction", "justify-content", "align-items",
-						"flex-wrap", "flex-grow", "flex-shrink", "flex-basis",
-						"grid-template-columns", "grid-template-rows", "gap",
-						"transform", "border-radius", "box-shadow", "text-decoration",
-						"white-space", "word-break", "overflow-wrap",
-						"min-width", "max-width", "min-height", "max-height",
-						"margin-top", "margin-right", "margin-bottom", "margin-left",
-						"padding-top", "padding-right", "padding-bottom", "padding-left",
+						"display",
+						"position",
+						"top",
+						"left",
+						"right",
+						"bottom",
+						"width",
+						"height",
+						"color",
+						"background-color",
+						"font-size",
+						"font-family",
+						"font-weight",
+						"line-height",
+						"text-align",
+						"visibility",
+						"opacity",
+						"overflow",
+						"z-index",
+						"float",
+						"clear",
+						"cursor",
+						"pointer-events",
+						"box-sizing",
+						"flex-direction",
+						"justify-content",
+						"align-items",
+						"flex-wrap",
+						"flex-grow",
+						"flex-shrink",
+						"flex-basis",
+						"grid-template-columns",
+						"grid-template-rows",
+						"gap",
+						"transform",
+						"border-radius",
+						"box-shadow",
+						"text-decoration",
+						"white-space",
+						"word-break",
+						"overflow-wrap",
+						"min-width",
+						"max-width",
+						"min-height",
+						"max-height",
+						"margin-top",
+						"margin-right",
+						"margin-bottom",
+						"margin-left",
+						"padding-top",
+						"padding-right",
+						"padding-bottom",
+						"padding-left",
 					];
 					for (const p of props) {
 						const v = cs.getPropertyValue(p);
@@ -166,7 +218,13 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		addAppInternal(config.worker);
 	}
 
-	function addAppInternal(worker: Worker, mountPoint?: string | Element, shadow?: boolean | ShadowRootInit, customTransport?: import("../transport/base.ts").Transport, onError?: (error: import("../core/protocol.ts").SerializedError, appId: AppId) => void): AppId {
+	function addAppInternal(
+		worker: Worker,
+		mountPoint?: string | Element,
+		shadow?: boolean | ShadowRootInit,
+		customTransport?: import("../transport/base.ts").Transport,
+		onError?: (error: import("../core/protocol.ts").SerializedError, appId: AppId) => void,
+	): AppId {
 		const appId = threadManager.createWorkerThread({ worker, transport: customTransport });
 
 		// Per-app NodeCache and DomRenderer for isolation
@@ -175,17 +233,13 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		// Resolve mount point element
 		let mountEl: Element | null = null;
 		if (mountPoint) {
-			mountEl = typeof mountPoint === "string"
-				? document.querySelector(mountPoint)
-				: mountPoint;
+			mountEl = typeof mountPoint === "string" ? document.querySelector(mountPoint) : mountPoint;
 		}
 
 		// Set up renderer root (shadow DOM for CSS isolation)
 		let rendererRoot: RendererRoot | undefined;
 		if (mountEl && shadow) {
-			const shadowInit: ShadowRootInit = shadow === true
-				? { mode: "open" }
-				: shadow;
+			const shadowInit: ShadowRootInit = shadow === true ? { mode: "open" } : shadow;
 			const shadowRoot = mountEl.attachShadow(shadowInit);
 			rendererRoot = {
 				body: shadowRoot,
@@ -203,7 +257,10 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		const appRenderer = new DomRenderer(appNodeCache, undefined, rendererRoot);
 
 		if (debugHooks.onWarning || debugHooks.onMutation) {
-			appRenderer.setDebugHooks({ onWarning: debugHooks.onWarning, onMutation: debugHooks.onMutation });
+			appRenderer.setDebugHooks({
+				onWarning: debugHooks.onWarning,
+				onMutation: debugHooks.onMutation,
+			});
 		}
 
 		// Seed structural nodes
@@ -257,7 +314,11 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			// Also handle error system messages from the worker
 			appTransport.onMessage((message: Message) => {
 				if (isSystemMessage(message) && message.type === "error" && "error" in message) {
-					const errMsg = message as { type: "error"; appId: AppId; error: import("../core/protocol.ts").SerializedError };
+					const errMsg = message as {
+						type: "error";
+						appId: AppId;
+						error: import("../core/protocol.ts").SerializedError;
+					};
 					onError?.(errMsg.error, appId);
 				}
 			});
@@ -283,7 +344,13 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		if (appTransport) {
 			appTransport.onMessage((message: Message) => {
 				if (isSystemMessage(message) && message.type === "query") {
-					const queryMsg = message as { type: "query"; uid: number; nodeId: string; query: string; property?: string };
+					const queryMsg = message as {
+						type: "query";
+						uid: number;
+						nodeId: string;
+						query: string;
+						property?: string;
+					};
 					const queryTypeMap: Record<string, QueryType> = {
 						boundingRect: QueryType.BoundingRect,
 						computedStyle: QueryType.ComputedStyle,
@@ -339,12 +406,13 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 	}
 
 	// Visibility change forwarding
-	document.addEventListener("visibilitychange", () => {
+	const visibilityHandler = () => {
 		threadManager.broadcast({
 			type: "visibility",
 			state: document.visibilityState,
 		});
-	});
+	};
+	document.addEventListener("visibilitychange", visibilityHandler);
 
 	return {
 		start() {
@@ -371,11 +439,18 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				host.stopPolling();
 			}
 			syncHosts.clear();
+			document.removeEventListener("visibilitychange", visibilityHandler);
 			threadManager.destroyAll();
 		},
 
 		addApp(appConfig: AppConfig): AppId {
-			return addAppInternal(appConfig.worker, appConfig.mountPoint, appConfig.shadow, appConfig.transport, appConfig.onError);
+			return addAppInternal(
+				appConfig.worker,
+				appConfig.mountPoint,
+				appConfig.shadow,
+				appConfig.transport,
+				appConfig.onError,
+			);
 		},
 
 		removeApp(appId: AppId): void {

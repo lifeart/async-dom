@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createAppId, createNodeId } from "../../src/core/protocol.ts";
 import type { Message } from "../../src/core/protocol.ts";
+import { createAppId } from "../../src/core/protocol.ts";
 import type { Transport, TransportReadyState } from "../../src/transport/base.ts";
 import { VirtualDocument } from "../../src/worker-thread/document.ts";
 

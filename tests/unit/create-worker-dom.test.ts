@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createWorkerDom } from "../../src/worker-thread/index.ts";
-import { VirtualDocument } from "../../src/worker-thread/document.ts";
 import type { Message } from "../../src/core/protocol.ts";
 import type { Transport, TransportReadyState } from "../../src/transport/base.ts";
+import { VirtualDocument } from "../../src/worker-thread/document.ts";
+import { createWorkerDom } from "../../src/worker-thread/index.ts";
 
 function createMockTransport(): Transport & { sent: Message[] } {
 	const sent: Message[] = [];

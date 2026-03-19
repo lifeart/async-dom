@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createAppId, createNodeId, type Message, type MutationMessage } from "../../src/core/protocol.ts";
+import {
+	createAppId,
+	createNodeId,
+	type Message,
+	type MutationMessage,
+} from "../../src/core/protocol.ts";
 import { FrameScheduler } from "../../src/core/scheduler.ts";
 import { DomRenderer } from "../../src/main-thread/renderer.ts";
-import { VirtualDocument } from "../../src/worker-thread/document.ts";
 import type { Transport, TransportReadyState } from "../../src/transport/base.ts";
+import { VirtualDocument } from "../../src/worker-thread/document.ts";
 
 const appId = createAppId("roundtrip");
 
@@ -74,7 +79,7 @@ describe("Worker → Main Thread roundtrip", () => {
 		const { doc, scheduler, renderer } = createPipeline();
 		const div = doc.createElement("div");
 		doc.body.appendChild(div);
-		div.style["color"] = "red";
+		div.style.color = "red";
 		doc.collector.flushSync();
 		scheduler.flush();
 

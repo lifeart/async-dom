@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { AsyncChannel } from "../../src/core/async-channel.ts";
-import { createAppId, createNodeId } from "../../src/core/protocol.ts";
 import type { Message } from "../../src/core/protocol.ts";
+import { createAppId, createNodeId } from "../../src/core/protocol.ts";
 import type { Transport, TransportReadyState } from "../../src/transport/base.ts";
 
 function createMockTransport(): Transport & { sent: Message[] } {

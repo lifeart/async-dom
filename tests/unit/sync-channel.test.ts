@@ -54,8 +54,8 @@ describe("SyncChannel", () => {
 		// 3. Host polls and gets the query
 		const query = host.poll();
 		expect(query).not.toBeNull();
-		expect(query!.queryType).toBe(QueryType.BoundingRect);
-		expect(query!.data).toBe(requestData);
+		expect(query?.queryType).toBe(QueryType.BoundingRect);
+		expect(query?.data).toBe(requestData);
 
 		// 4. Host responds
 		const responseData = { top: 10, left: 20, width: 100, height: 50 };

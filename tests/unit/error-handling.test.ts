@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createAppId, createNodeId } from "../../src/core/protocol.ts";
 import { FrameScheduler } from "../../src/core/scheduler.ts";
 import { DomRenderer } from "../../src/main-thread/renderer.ts";

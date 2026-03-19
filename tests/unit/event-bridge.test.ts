@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createAppId, createNodeId, type Message } from "../../src/core/protocol.ts";
 import { NodeCache } from "../../src/core/node-cache.ts";
+import { createAppId, createNodeId, type Message } from "../../src/core/protocol.ts";
 import { EventBridge } from "../../src/main-thread/event-bridge.ts";
 import type { Transport } from "../../src/transport/base.ts";
 

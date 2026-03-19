@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createAppId } from "../../src/core/protocol.ts";
 import { VirtualDocument } from "../../src/worker-thread/document.ts";
-import { VirtualEvent, VirtualCustomEvent } from "../../src/worker-thread/events.ts";
+import { VirtualCustomEvent, VirtualEvent } from "../../src/worker-thread/events.ts";
 
 describe("VirtualEvent", () => {
 	it("creates event with type", () => {

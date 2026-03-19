@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createNodeId } from "../../src/core/protocol.ts";
 import { NodeCache } from "../../src/core/node-cache.ts";
+import { createNodeId } from "../../src/core/protocol.ts";
 import { DomRenderer } from "../../src/main-thread/renderer.ts";
 
 describe("Shadow DOM Support", () => {
@@ -38,11 +38,15 @@ describe("Shadow DOM Support", () => {
 			const shadow = host.attachShadow({ mode: "open" });
 
 			const cache = new NodeCache();
-			const renderer = new DomRenderer(cache, {}, {
-				body: shadow,
-				head: shadow,
-				html: host,
-			});
+			const renderer = new DomRenderer(
+				cache,
+				{},
+				{
+					body: shadow,
+					head: shadow,
+					html: host,
+				},
+			);
 
 			const htmlId = createNodeId("html-node");
 			renderer.apply({ action: "createNode", id: htmlId, tag: "HTML" });
@@ -168,7 +172,7 @@ describe("Shadow DOM Support", () => {
 				{ allowHeadAppend: true, allowBodyAppend: true },
 				{ body: shadow1, head: shadow1, html: host1 },
 			);
-			const renderer2 = new DomRenderer(
+			const _renderer2 = new DomRenderer(
 				cache2,
 				{ allowHeadAppend: true, allowBodyAppend: true },
 				{ body: shadow2, head: shadow2, html: host2 },

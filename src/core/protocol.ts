@@ -63,7 +63,13 @@ export type DomMutation =
 	| { action: "replaceState"; state: unknown; title: string; url: string }
 	| { action: "scrollTo"; x: number; y: number }
 	| { action: "insertAdjacentHTML"; id: NodeId; position: InsertPosition; html: string }
-	| { action: "configureEvent"; id: NodeId; name: string; preventDefault: boolean; passive?: boolean }
+	| {
+			action: "configureEvent";
+			id: NodeId;
+			name: string;
+			preventDefault: boolean;
+			passive?: boolean;
+	  }
 	| { action: "removeEventListener"; id: NodeId; listenerId: string };
 
 export type MutationAction = DomMutation["action"];

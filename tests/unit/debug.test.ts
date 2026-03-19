@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { MutationLogEntry, WarningLogEntry } from "../../src/core/debug.ts";
 import { DebugStats, resolveDebugHooks, WarningCode } from "../../src/core/debug.ts";
-import type { WarningLogEntry, MutationLogEntry } from "../../src/core/debug.ts";
 import { createAppId, createNodeId, type Message } from "../../src/core/protocol.ts";
+import { DomRenderer } from "../../src/main-thread/renderer.ts";
 import type { Transport } from "../../src/transport/base.ts";
 import { VirtualDocument } from "../../src/worker-thread/document.ts";
 import { MutationCollector } from "../../src/worker-thread/mutation-collector.ts";
-import { DomRenderer } from "../../src/main-thread/renderer.ts";
 
 function createMockTransport(): Transport & { sent: Message[] } {
 	const sent: Message[] = [];
@@ -126,7 +126,7 @@ describe("resolveDebugHooks", () => {
 			mutation: { action: "createNode", id: createNodeId("n1"), tag: "div" },
 			timestamp: 0,
 		};
-		hooks.onMutation!(entry);
+		hooks.onMutation?.(entry);
 		expect(customMutation).toHaveBeenCalledWith(entry);
 	});
 });

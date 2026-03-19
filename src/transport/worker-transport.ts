@@ -14,7 +14,11 @@ export class WorkerTransport implements Transport {
 	constructor(private worker: Worker) {
 		worker.onmessage = (e: MessageEvent<Message>) => {
 			for (const h of this.handlers) {
-				try { h(e.data); } catch (err) { console.error("[async-dom] Handler error:", err); }
+				try {
+					h(e.data);
+				} catch (err) {
+					console.error("[async-dom] Handler error:", err);
+				}
 			}
 		};
 		worker.onerror = (e: ErrorEvent) => {
@@ -73,7 +77,11 @@ export class WorkerSelfTransport implements Transport {
 		this.scope = scope ?? (self as unknown as typeof this.scope);
 		this.scope.onmessage = (e: MessageEvent<Message>) => {
 			for (const h of this.handlers) {
-				try { h(e.data); } catch (err) { console.error("[async-dom] Handler error:", err); }
+				try {
+					h(e.data);
+				} catch (err) {
+					console.error("[async-dom] Handler error:", err);
+				}
 			}
 		};
 	}

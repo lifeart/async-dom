@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createAppId, createNodeId, type AppId, type Message, type MutationMessage } from "../../src/core/protocol.ts";
+import {
+	type AppId,
+	createAppId,
+	createNodeId,
+	type Message,
+	type MutationMessage,
+} from "../../src/core/protocol.ts";
 import { ThreadManager } from "../../src/main-thread/thread-manager.ts";
 
 function createMockWorker() {
@@ -31,7 +37,7 @@ describe("ThreadManager", () => {
 		const worker2 = createMockWorker();
 
 		const appId1 = manager.createWorkerThread({ worker: worker1 });
-		const appId2 = manager.createWorkerThread({ worker: worker2 });
+		const _appId2 = manager.createWorkerThread({ worker: worker2 });
 
 		const msg: MutationMessage = {
 			type: "mutation",

@@ -3,10 +3,8 @@
  * attempt to use browser observers in a worker context.
  */
 
-type MutationCallback = (mutations: unknown[], observer: unknown) => void;
-
 export class VirtualMutationObserver {
-	constructor(_callback: MutationCallback) {}
+	constructor(_callback: (mutations: unknown[], observer: unknown) => void) {}
 	observe(_target: unknown, _options?: unknown): void {}
 	disconnect(): void {}
 	takeRecords(): unknown[] {
@@ -14,23 +12,18 @@ export class VirtualMutationObserver {
 	}
 }
 
-type ResizeCallback = (entries: unknown[], observer: unknown) => void;
-
 export class VirtualResizeObserver {
-	constructor(_callback: ResizeCallback) {}
+	constructor(_callback: (entries: unknown[], observer: unknown) => void) {}
 	observe(_target: unknown, _options?: unknown): void {}
 	unobserve(_target: unknown): void {}
 	disconnect(): void {}
 }
 
-type IntersectionCallback = (entries: unknown[], observer: unknown) => void;
-
 export class VirtualIntersectionObserver {
 	readonly root = null;
 	readonly rootMargin = "0px";
 	readonly thresholds: readonly number[] = [0];
-
-	constructor(_callback: IntersectionCallback, _options?: unknown) {}
+	constructor(_callback: (entries: unknown[], observer: unknown) => void, _options?: unknown) {}
 	observe(_target: unknown): void {}
 	unobserve(_target: unknown): void {}
 	disconnect(): void {}

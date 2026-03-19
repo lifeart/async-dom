@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createAppId } from "../../src/core/protocol.ts";
 import { VirtualDocument } from "../../src/worker-thread/document.ts";
-import { querySelector, querySelectorAll, matches } from "../../src/worker-thread/selector-engine.ts";
+import {
+	matches,
+	querySelector,
+	querySelectorAll,
+} from "../../src/worker-thread/selector-engine.ts";
 
 describe("Selector Engine", () => {
 	let doc: VirtualDocument;

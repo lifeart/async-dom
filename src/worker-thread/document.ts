@@ -1,10 +1,18 @@
 import type { AppId, DomMutation, NodeId } from "../core/protocol.ts";
 import { createNodeId } from "../core/protocol.ts";
 import type { SyncChannel } from "../core/sync-channel.ts";
-import { type VirtualNode, VirtualCommentNode, VirtualElement, VirtualTextNode } from "./element.ts";
+import {
+	VirtualCommentNode,
+	VirtualElement,
+	type VirtualNode,
+	VirtualTextNode,
+} from "./element.ts";
 import { VirtualEvent } from "./events.ts";
 import { MutationCollector } from "./mutation-collector.ts";
-import { querySelectorAll as selectorQueryAll, querySelector as selectorQuery } from "./selector-engine.ts";
+import {
+	querySelector as selectorQuery,
+	querySelectorAll as selectorQueryAll,
+} from "./selector-engine.ts";
 
 let nodeCounter = 0;
 
@@ -31,6 +39,7 @@ export class VirtualDocument {
 
 	private _ids = new Map<string, VirtualElement>();
 	private _listenerMap = new Map<string, (e: unknown) => void>();
+	private _listenerToElement = new Map<string, VirtualElement>();
 
 	constructor(appId: AppId) {
 		this.collector = new MutationCollector(appId);
@@ -168,7 +177,9 @@ export class VirtualDocument {
 			if (evt.checked !== undefined) inputState.checked = evt.checked as boolean;
 			if (evt.selectedIndex !== undefined) inputState.selectedIndex = evt.selectedIndex as number;
 			if (Object.keys(inputState).length > 0) {
-				(targetEl as { _updateInputState: (s: typeof inputState) => void })._updateInputState(inputState);
+				(targetEl as { _updateInputState: (s: typeof inputState) => void })._updateInputState(
+					inputState,
+				);
 			}
 		}
 
@@ -179,15 +190,8 @@ export class VirtualDocument {
 			return;
 		}
 
-		// Find the element that owns this listener and dispatch to ALL its listeners for this event type
-		let targetElement: VirtualElement | null = null;
-		for (const el of this._ids.values()) {
-			const listener = el.getEventListener(listenerId);
-			if (listener) {
-				targetElement = el;
-				break;
-			}
-		}
+		// O(1) lookup of the element that owns this listener
+		const targetElement = this._listenerToElement.get(listenerId) ?? null;
 
 		if (targetElement) {
 			virtualEvent.currentTarget = targetElement;
@@ -214,6 +218,13 @@ export class VirtualDocument {
 	}
 
 	/**
+	 * Unregister an element by its internal NodeId (called during cleanup on removal).
+	 */
+	unregisterElement(id: string): void {
+		this._ids.delete(id);
+	}
+
+	/**
 	 * Register an element by its user-visible id attribute (distinct from internal NodeId).
 	 */
 	registerElementById(id: string, element: VirtualElement): void {
@@ -225,6 +236,20 @@ export class VirtualDocument {
 	 */
 	unregisterElementById(id: string): void {
 		this._ids.delete(id);
+	}
+
+	/**
+	 * Register a listener ID to its owning element for O(1) event dispatch.
+	 */
+	registerListener(listenerId: string, element: VirtualElement): void {
+		this._listenerToElement.set(listenerId, element);
+	}
+
+	/**
+	 * Unregister a listener ID (called on removeEventListener or element cleanup).
+	 */
+	unregisterListener(listenerId: string): void {
+		this._listenerToElement.delete(listenerId);
 	}
 
 	querySelector(selector: string): VirtualElement | null {
@@ -245,7 +270,11 @@ export class VirtualDocument {
 	}
 
 	getElementsByClassName(className: string): VirtualElement[] {
-		const selector = className.split(/\s+/).filter(Boolean).map(c => `.${c}`).join("");
+		const selector = className
+			.split(/\s+/)
+			.filter(Boolean)
+			.map((c) => `.${c}`)
+			.join("");
 		return this.querySelectorAll(selector);
 	}
 

@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAppId, createNodeId, type Message, type MutationMessage } from "../../src/core/protocol.ts";
+import {
+	createAppId,
+	createNodeId,
+	type Message,
+	type MutationMessage,
+} from "../../src/core/protocol.ts";
 import type { Transport } from "../../src/transport/base.ts";
 import { createComlinkEndpoint } from "../../src/transport/comlink-adapter.ts";
 

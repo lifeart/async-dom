@@ -26,8 +26,8 @@ describe("Sync Read Pipeline", () => {
 		// 2. Host polls and reads request
 		const query = host.poll();
 		expect(query).not.toBeNull();
-		expect(query!.queryType).toBe(QueryType.NodeProperty);
-		const parsedData = JSON.parse(query!.data);
+		expect(query?.queryType).toBe(QueryType.NodeProperty);
+		const parsedData = JSON.parse(query?.data);
 		expect(parsedData.nodeId).toBe("test-node");
 		expect(parsedData.property).toBe("offsetWidth");
 
@@ -56,7 +56,7 @@ describe("Sync Read Pipeline", () => {
 		Atomics.store(signal, 0, 1);
 
 		const query = host.poll();
-		expect(query!.queryType).toBe(QueryType.BoundingRect);
+		expect(query?.queryType).toBe(QueryType.BoundingRect);
 
 		const rect = { top: 10, left: 20, right: 120, bottom: 60, width: 100, height: 50 };
 		host.respond(rect);
@@ -82,7 +82,7 @@ describe("Sync Read Pipeline", () => {
 		Atomics.store(signal, 0, 1);
 
 		const query = host.poll();
-		expect(query!.queryType).toBe(QueryType.ComputedStyle);
+		expect(query?.queryType).toBe(QueryType.ComputedStyle);
 
 		const styles = { color: "rgb(0, 0, 0)", display: "block", fontSize: "16px" };
 		host.respond(styles);
@@ -108,7 +108,7 @@ describe("Sync Read Pipeline", () => {
 		Atomics.store(signal, 0, 1);
 
 		const query = host.poll();
-		expect(query!.queryType).toBe(QueryType.WindowProperty);
+		expect(query?.queryType).toBe(QueryType.WindowProperty);
 
 		host.respond(1920);
 

@@ -1,7 +1,7 @@
-import { NodeCache } from "../core/node-cache.ts";
 import type { MutationLogEntry, WarningLogEntry } from "../core/debug.ts";
 import { WarningCode } from "../core/debug.ts";
 import { sanitizeHTML } from "../core/html-sanitizer.ts";
+import { NodeCache } from "../core/node-cache.ts";
 import type { DomMutation, InsertPosition, NodeId } from "../core/protocol.ts";
 
 const DANGEROUS_ATTR_NAMES = new Set(["srcdoc", "formaction"]);
@@ -9,9 +9,11 @@ const DANGEROUS_URI_ATTR_NAMES = new Set(["href", "src", "data", "action", "xlin
 
 function isDangerousURI(value: string): boolean {
 	const trimmed = value.trim().toLowerCase();
-	return /^\s*javascript\s*:/i.test(trimmed) ||
+	return (
+		/^\s*javascript\s*:/i.test(trimmed) ||
 		/^\s*vbscript\s*:/i.test(trimmed) ||
-		/^\s*data\s*:\s*text\/html/i.test(trimmed);
+		/^\s*data\s*:\s*text\/html/i.test(trimmed)
+	);
 }
 
 export interface RendererPermissions {
@@ -33,19 +35,47 @@ const DEFAULT_PERMISSIONS: RendererPermissions = {
 
 const ALLOWED_PROPERTIES = new Set([
 	// Input
-	"value", "checked", "disabled", "selectedIndex", "indeterminate",
-	"readOnly", "required", "placeholder", "type", "name",
+	"value",
+	"checked",
+	"disabled",
+	"selectedIndex",
+	"indeterminate",
+	"readOnly",
+	"required",
+	"placeholder",
+	"type",
+	"name",
 	// Scroll
-	"scrollTop", "scrollLeft",
+	"scrollTop",
+	"scrollLeft",
 	// Text
-	"textContent", "nodeValue",
+	"textContent",
+	"nodeValue",
 	// Media
-	"src", "currentTime", "volume", "muted", "controls",
-	"loop", "poster", "autoplay",
+	"src",
+	"currentTime",
+	"volume",
+	"muted",
+	"controls",
+	"loop",
+	"poster",
+	"autoplay",
 	// Misc safe
-	"tabIndex", "title", "lang", "dir", "hidden", "draggable",
-	"contentEditable", "htmlFor", "open", "selected", "multiple",
-	"width", "height", "colSpan", "rowSpan",
+	"tabIndex",
+	"title",
+	"lang",
+	"dir",
+	"hidden",
+	"draggable",
+	"contentEditable",
+	"htmlFor",
+	"open",
+	"selected",
+	"multiple",
+	"width",
+	"height",
+	"colSpan",
+	"rowSpan",
 ]);
 
 const SVG_TAGS = new Set([
@@ -98,7 +128,10 @@ export class DomRenderer {
 	private _onWarning: ((entry: WarningLogEntry) => void) | null = null;
 	private _onMutation: ((entry: MutationLogEntry) => void) | null = null;
 
-	setDebugHooks(hooks: { onWarning?: ((e: WarningLogEntry) => void) | null; onMutation?: ((e: MutationLogEntry) => void) | null }): void {
+	setDebugHooks(hooks: {
+		onWarning?: ((e: WarningLogEntry) => void) | null;
+		onMutation?: ((e: MutationLogEntry) => void) | null;
+	}): void {
 		this._onWarning = hooks.onWarning ?? null;
 		this._onMutation = hooks.onMutation ?? null;
 	}
@@ -120,7 +153,12 @@ export class DomRenderer {
 
 	apply(mutation: DomMutation): void {
 		if (this._onMutation) {
-			this._onMutation({ side: "main", action: mutation.action, mutation, timestamp: performance.now() });
+			this._onMutation({
+				side: "main",
+				action: mutation.action,
+				mutation,
+				timestamp: performance.now(),
+			});
 		}
 		switch (mutation.action) {
 			case "createNode":
@@ -246,6 +284,7 @@ export class DomRenderer {
 
 		node.id = id;
 		node.setAttribute("data-async-dom-id", id);
+		(node as unknown as Record<string, string>).__asyncDomId = id;
 		if (textContent) {
 			node.textContent = textContent;
 		}
@@ -262,7 +301,12 @@ export class DomRenderer {
 		const parent = this.nodeCache.get(parentId);
 		const child = this.nodeCache.get(childId);
 		if (!parent || !child) {
-			this._onWarning?.({ code: WarningCode.MISSING_NODE, message: `appendChild: ${!parent ? "parent" : "child"} not found`, context: { parentId, childId }, timestamp: performance.now() });
+			this._onWarning?.({
+				code: WarningCode.MISSING_NODE,
+				message: `appendChild: ${!parent ? "parent" : "child"} not found`,
+				context: { parentId, childId },
+				timestamp: performance.now(),
+			});
 			return;
 		}
 		(parent as Element).appendChild(child);
@@ -271,7 +315,12 @@ export class DomRenderer {
 	private removeNode(id: NodeId): void {
 		const node = this.nodeCache.get(id);
 		if (!node) {
-			this._onWarning?.({ code: WarningCode.MISSING_NODE, message: "removeNode: node not found", context: { id }, timestamp: performance.now() });
+			this._onWarning?.({
+				code: WarningCode.MISSING_NODE,
+				message: "removeNode: node not found",
+				context: { id },
+				timestamp: performance.now(),
+			});
 			return;
 		}
 		this.onNodeRemoved?.(id);
@@ -298,7 +347,12 @@ export class DomRenderer {
 		const parent = this.nodeCache.get(parentId);
 		const newEl = this.nodeCache.get(newId);
 		if (!parent || !newEl) {
-			this._onWarning?.({ code: WarningCode.MISSING_NODE, message: `insertBefore: ${!parent ? "parent" : "newNode"} not found`, context: { parentId, newId, refId }, timestamp: performance.now() });
+			this._onWarning?.({
+				code: WarningCode.MISSING_NODE,
+				message: `insertBefore: ${!parent ? "parent" : "newNode"} not found`,
+				context: { parentId, newId, refId },
+				timestamp: performance.now(),
+			});
 			return;
 		}
 
@@ -309,7 +363,12 @@ export class DomRenderer {
 	private setAttribute(id: NodeId, name: string, value: string): void {
 		const node = this.nodeCache.get(id) as Element | null;
 		if (!node || !("setAttribute" in node)) {
-			this._onWarning?.({ code: WarningCode.MISSING_NODE, message: "setAttribute: node not found", context: { id, name, value }, timestamp: performance.now() });
+			this._onWarning?.({
+				code: WarningCode.MISSING_NODE,
+				message: "setAttribute: node not found",
+				context: { id, name, value },
+				timestamp: performance.now(),
+			});
 			return;
 		}
 
@@ -335,7 +394,12 @@ export class DomRenderer {
 	private setStyle(id: NodeId, property: string, value: string): void {
 		const node = this.nodeCache.get(id) as HTMLElement | null;
 		if (!node?.style) {
-			this._onWarning?.({ code: WarningCode.MISSING_NODE, message: "setStyle: node not found", context: { id, property, value }, timestamp: performance.now() });
+			this._onWarning?.({
+				code: WarningCode.MISSING_NODE,
+				message: "setStyle: node not found",
+				context: { id, property, value },
+				timestamp: performance.now(),
+			});
 			return;
 		}
 		node.style.setProperty(property, value);
