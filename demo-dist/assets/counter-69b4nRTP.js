@@ -1,1 +1,0 @@
-import"./modulepreload-polyfill-B5Qt9EMX.js";import{createAsyncDom as e}from"./index-VirPnhBW.js";const t=e({target:document.getElementById("app"),worker:new Worker(new URL("/assets/worker-CnfgThHs.js",import.meta.url),{type:"module"})});t.start();

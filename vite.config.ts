@@ -18,6 +18,7 @@ export default defineConfig({
 				"audio-player": resolve(__dirname, "examples/audio-player/index.html"),
 				"react-mandelbrot": resolve(__dirname, "examples/react-mandelbrot/index.html"),
 				"vue-gameoflife": resolve(__dirname, "examples/vue-gameoflife/index.html"),
+				"svelte-particles": resolve(__dirname, "examples/svelte-particles/index.html"),
 			},
 		},
 	},
