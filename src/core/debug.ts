@@ -33,6 +33,9 @@ export interface EventLogEntry {
 	listenerId: string;
 	targetId: string | null;
 	timestamp: number;
+	transportMs?: number;
+	dispatchMs?: number;
+	mutationCount?: number;
 }
 
 export interface SyncReadLogEntry {

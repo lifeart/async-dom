@@ -148,6 +148,106 @@ describe("EventBridge", () => {
 		expect(transport.sent[0].type).toBe("event");
 	});
 
+	describe("getListenersForNode()", () => {
+		it("returns listeners attached to a given node", () => {
+			const div = document.createElement("div");
+			document.body.appendChild(div);
+			const id = createNodeId();
+			nodeCache.set(id, div);
+
+			bridge.attach(id, "click", "l-click");
+			bridge.attach(id, "keydown", "l-keydown");
+
+			const result = bridge.getListenersForNode(id);
+			expect(result).toHaveLength(2);
+			expect(result).toContainEqual({ listenerId: "l-click", eventName: "click" });
+			expect(result).toContainEqual({ listenerId: "l-keydown", eventName: "keydown" });
+		});
+
+		it("does not return listeners for other nodes", () => {
+			const div1 = document.createElement("div");
+			const div2 = document.createElement("div");
+			document.body.appendChild(div1);
+			document.body.appendChild(div2);
+			const id1 = createNodeId();
+			const id2 = createNodeId();
+			nodeCache.set(id1, div1);
+			nodeCache.set(id2, div2);
+
+			bridge.attach(id1, "click", "l-1");
+			bridge.attach(id2, "click", "l-2");
+
+			expect(bridge.getListenersForNode(id1)).toHaveLength(1);
+			expect(bridge.getListenersForNode(id1)[0].listenerId).toBe("l-1");
+		});
+
+		it("returns empty array for node with no listeners", () => {
+			const id = createNodeId();
+			expect(bridge.getListenersForNode(id)).toEqual([]);
+		});
+	});
+
+	describe("updateTraceWithWorkerTiming()", () => {
+		it("matches trace by listenerId and populates timing fields", () => {
+			const div = document.createElement("div");
+			document.body.appendChild(div);
+			const id = createNodeId();
+			nodeCache.set(id, div);
+
+			bridge.attach(id, "click", "l-timing");
+			div.click();
+
+			// Trace should exist but without timing data yet
+			const tracesBefore = bridge.getEventTraces();
+			expect(tracesBefore).toHaveLength(1);
+			expect(tracesBefore[0].listenerId).toBe("l-timing");
+			expect(tracesBefore[0].transportMs).toBeUndefined();
+
+			bridge.updateTraceWithWorkerTiming("l-timing", 5.0, 3);
+
+			const tracesAfter = bridge.getEventTraces();
+			expect(tracesAfter[0].dispatchMs).toBe(5.0);
+			expect(tracesAfter[0].mutationCount).toBe(3);
+			expect(tracesAfter[0].transportMs).toBeTypeOf("number");
+		});
+
+		it("does not match trace with wrong listenerId", () => {
+			const div = document.createElement("div");
+			document.body.appendChild(div);
+			const id = createNodeId();
+			nodeCache.set(id, div);
+
+			bridge.attach(id, "click", "l-correct");
+			div.click();
+
+			bridge.updateTraceWithWorkerTiming("l-wrong", 5.0, 3);
+
+			const traces = bridge.getEventTraces();
+			expect(traces[0].transportMs).toBeUndefined();
+		});
+
+		it("matches most recent unresolved trace for same listenerId", () => {
+			const div = document.createElement("div");
+			document.body.appendChild(div);
+			const id = createNodeId();
+			nodeCache.set(id, div);
+
+			bridge.attach(id, "click", "l-multi");
+			div.click();
+			div.click();
+
+			// First update resolves the most-recent (last) unresolved trace
+			bridge.updateTraceWithWorkerTiming("l-multi", 1.0, 1);
+			// Second update resolves the remaining (first) unresolved trace
+			bridge.updateTraceWithWorkerTiming("l-multi", 2.0, 2);
+
+			const traces = bridge.getEventTraces();
+			// The backward search resolved traces[1] first, then traces[0]
+			expect(traces[1].dispatchMs).toBe(1.0);
+			expect(traces[0].dispatchMs).toBe(2.0);
+		});
+	});
+
 	it("preventDefault only called on anchor click events, not other event types", () => {
 		const anchor = document.createElement("a");
 		anchor.href = "https://example.com";

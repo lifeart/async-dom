@@ -322,6 +322,18 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			scheduler.enqueue(message.mutations, appId, message.priority ?? "normal", message.uid);
 			return;
 		}
+		// Handle event timing results from the worker
+		if (isSystemMessage(message) && message.type === "eventTimingResult") {
+			const bridge = eventBridges.get(appId);
+			if (bridge) {
+				bridge.updateTraceWithWorkerTiming(
+					message.listenerId,
+					message.dispatchMs,
+					message.mutationCount,
+				);
+			}
+			return;
+		}
 		// Cache debug results from worker threads
 		if (isSystemMessage(message) && message.type === "debugResult") {
 			const debugMsg = message as { type: "debugResult"; query: string; result: unknown };
@@ -471,6 +483,22 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				}
 			});
 		}
+		// Wire timing result callback to emit EventLogEntry via debug hooks
+		if (debugHooks.onEvent) {
+			bridge.onTimingResult = (trace) => {
+				debugHooks.onEvent?.({
+					side: "main",
+					phase: "dispatch",
+					eventType: trace.eventType,
+					listenerId: trace.listenerId,
+					targetId: null,
+					timestamp: trace.timestamp,
+					transportMs: trace.transportMs,
+					dispatchMs: trace.dispatchMs,
+					mutationCount: trace.mutationCount,
+				});
+			};
+		}
 		eventBridges.set(appId, bridge);
 		scheduler.setAppCount(renderers.size);
 
@@ -570,6 +598,13 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 					if (node) return node;
 				}
 				return null;
+			},
+			getListenersForNode: (nodeId: number) => {
+				const results: Array<{ listenerId: string; eventName: string }> = [];
+				for (const bridge of eventBridges.values()) {
+					results.push(...bridge.getListenersForNode(nodeId as NodeId));
+				}
+				return results;
 			},
 			debugStats: () => debugStats.snapshot(),
 			apps: () => [...renderers.keys()],

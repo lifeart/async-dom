@@ -90,6 +90,25 @@ describe("MutationCollector", () => {
 		expect(transport.sent).toHaveLength(1);
 	});
 
+	it("totalAdded returns cumulative count of added mutations", async () => {
+		const transport = createMockTransport();
+		const collector = new MutationCollector(createAppId("test"));
+		collector.setTransport(transport);
+
+		expect(collector.totalAdded).toBe(0);
+
+		collector.add({ action: "createNode", id: createNodeId(), tag: "div" });
+		collector.add({ action: "createNode", id: createNodeId(), tag: "span" });
+		expect(collector.totalAdded).toBe(2);
+
+		collector.flushSync();
+		// totalAdded keeps growing even after flush
+		expect(collector.totalAdded).toBe(2);
+
+		collector.add({ action: "createNode", id: createNodeId(), tag: "p" });
+		expect(collector.totalAdded).toBe(3);
+	});
+
 	it("pendingCount is 0 after flush", () => {
 		const transport = createMockTransport();
 		const collector = new MutationCollector(createAppId("test"));

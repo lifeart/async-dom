@@ -19,6 +19,9 @@ interface EventTraceEntry {
 	eventType: string;
 	serializeMs: number;
 	timestamp: number;
+	transportMs?: number;
+	dispatchMs?: number;
+	mutationCount?: number;
 }
 
 interface DevtoolsAPI {
@@ -38,6 +41,7 @@ interface DevtoolsAPI {
 	};
 	debugStats: () => Record<string, number>;
 	getEventTraces: () => EventTraceEntry[];
+	getListenersForNode: (nodeId: number) => Array<{ listenerId: string; eventName: string }>;
 	enableHighlightUpdates: (enabled: boolean) => void;
 	findRealNode: (nodeId: number) => Node | null;
 	apps: () => string[];
@@ -570,6 +574,29 @@ const PANEL_CSS = `
 }
 .event-trace-type { color: #569cd6; font-weight: 600; }
 .event-trace-time { color: #d7ba7d; }
+
+.event-timeline { display: flex; align-items: center; gap: 2px; height: 16px; margin: 2px 0; cursor: pointer; }
+.event-timeline:hover { background: #2a2d2e; }
+.event-phase { height: 12px; border-radius: 2px; min-width: 4px; position: relative; }
+.event-phase.serialize { background: #569cd6; }
+.event-phase.transport { background: #d7ba7d; }
+.event-phase.dispatch { background: #4ec9b0; }
+.event-phase-label { font-size: 9px; color: #808080; white-space: nowrap; }
+.event-mutation-count { color: #ce9178; font-weight: 600; font-size: 10px; }
+.event-timeline-detail {
+  padding: 4px 8px; background: #1a1a1a; border: 1px solid #333;
+  border-radius: 3px; margin: 2px 0 4px 0; font-size: 10px; color: #d4d4d4; display: none;
+}
+.event-timeline-detail.visible { display: block; }
+
+.sidebar-listener {
+  padding: 2px 0;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 10px;
+}
+.sidebar-listener-event { color: #d7ba7d; font-weight: 600; }
+.sidebar-listener-id { color: #555; margin-left: 4px; }
+.sidebar-computed-val { color: #b5cea8; }
 
 /* ---- Node Inspector Sidebar ---- */
 
@@ -1219,6 +1246,31 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			sidebar.appendChild(emptyAttr);
 		}
 
+		// Event Listeners
+		if (dt && node.id != null) {
+			const listeners = dt.getListenersForNode(node.id);
+			const listenerTitle = document.createElement("div");
+			listenerTitle.className = "sidebar-title";
+			listenerTitle.textContent = `Event Listeners (${listeners.length})`;
+			sidebar.appendChild(listenerTitle);
+
+			if (listeners.length === 0) {
+				const emptyListeners = document.createElement("div");
+				emptyListeners.className = "sidebar-empty";
+				emptyListeners.textContent = "none";
+				sidebar.appendChild(emptyListeners);
+			} else {
+				for (const listener of listeners) {
+					const listenerDiv = document.createElement("div");
+					listenerDiv.className = "sidebar-listener";
+					listenerDiv.innerHTML =
+						`<span class="sidebar-listener-event">${escapeHtml(listener.eventName)}</span>` +
+						`<span class="sidebar-listener-id">${escapeHtml(listener.listenerId)}</span>`;
+					sidebar.appendChild(listenerDiv);
+				}
+			}
+		}
+
 		// Inline styles (from style attribute)
 		if (attrs.style) {
 			const styleTitle = document.createElement("div");
@@ -1239,7 +1291,49 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			}
 		}
 
-		// Recent mutations targeting this node
+		// Computed Styles (from real DOM node)
+		if (dt && node.id != null) {
+			const realNode = dt.findRealNode(node.id) as HTMLElement | null;
+			if (realNode && realNode.nodeType === 1 && typeof getComputedStyle === "function") {
+				const computed = getComputedStyle(realNode);
+				const keyProps = [
+					"display",
+					"position",
+					"width",
+					"height",
+					"margin",
+					"padding",
+					"color",
+					"backgroundColor",
+					"fontSize",
+					"fontFamily",
+					"overflow",
+					"visibility",
+					"opacity",
+					"zIndex",
+				];
+				const styleTitle = document.createElement("div");
+				styleTitle.className = "sidebar-title";
+				styleTitle.textContent = "Computed Styles";
+				sidebar.appendChild(styleTitle);
+
+				for (const prop of keyProps) {
+					const val = computed.getPropertyValue(
+						prop.replace(/([A-Z])/g, "-$1").toLowerCase(),
+					);
+					if (val) {
+						const row = document.createElement("div");
+						row.className = "sidebar-row";
+						row.innerHTML =
+							`<span class="sidebar-key">${escapeHtml(prop)}</span>` +
+							`<span class="sidebar-val sidebar-computed-val">${escapeHtml(truncate(val, 24))}</span>`;
+						sidebar.appendChild(row);
+					}
+				}
+			}
+		}
+
+		// Recent mutations targeting this node (with action details)
 		if (node.id != null) {
 			const nodeId = node.id;
 			const recentMuts = mutationLog.filter((entry) => {
@@ -1248,7 +1342,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			});
 			const mutTitle = document.createElement("div");
 			mutTitle.className = "sidebar-title";
-			mutTitle.textContent = `Mutations (${recentMuts.length})`;
+			mutTitle.textContent = `Mutation History (${recentMuts.length})`;
 			sidebar.appendChild(mutTitle);
 
 			if (recentMuts.length === 0) {
@@ -1259,9 +1353,21 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			} else {
 				const last10 = recentMuts.slice(-10);
 				for (const entry of last10) {
+					const m = entry.mutation as Record<string, unknown>;
+					let detail = "";
+					if (m.name) detail += ` ${m.name}`;
+					if (m.property) detail += ` .${m.property}`;
+					if (m.value !== undefined) detail += `="${truncate(String(m.value), 20)}"`;
+					if (m.tag) detail += ` <${m.tag}>`;
+					if (m.textContent !== undefined) detail += ` "${truncate(String(m.textContent), 20)}"`;
+					if (m.childId !== undefined) detail += ` child:${m.childId}`;
+
 					const div = document.createElement("div");
 					div.className = "sidebar-mutation";
-					div.innerHTML = `<span class="sidebar-mut-time">${formatTime(entry.timestamp)}</span> <span class="sidebar-mut-action">${escapeHtml(entry.action)}</span>`;
+					div.innerHTML =
+						`<span class="sidebar-mut-time">${formatTime(entry.timestamp)}</span> ` +
+						`<span class="sidebar-mut-action">${escapeHtml(entry.action)}</span>` +
+						(detail ? `<br><span style="color:#808080;font-size:9px;padding-left:4px">${escapeHtml(detail.trim())}</span>` : "");
 					sidebar.appendChild(div);
 				}
 			}
@@ -1828,7 +1934,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		logList.innerHTML = "";
 		logList.appendChild(fragment);
 
-		// Event round-trip tracer section
+		// Event round-trip tracer section with visual timeline bars
 		const dt = getDevtools();
 		if (dt) {
 			const traces = dt.getEventTraces();
@@ -1838,23 +1944,122 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 				const traceTitle = document.createElement("div");
 				traceTitle.className = "event-trace-title";
-				traceTitle.textContent = `Events (${traces.length})`;
+				traceTitle.textContent = `Event Round-Trips (${traces.length})`;
 				traceSection.appendChild(traceTitle);
 
 				const recent = traces.slice(-20);
+
+				// Compute max total time for scaling bars
+				let maxTotalMs = 1;
 				for (const trace of recent) {
-					const eventTime = trace.timestamp;
-					const mutCount = mutationLog.filter(
-						(m) => m.timestamp >= eventTime && m.timestamp <= eventTime + 100,
-					).length;
-					const div = document.createElement("div");
-					div.className = "event-trace-entry";
-					div.innerHTML =
-						`[<span class="event-trace-type">${escapeHtml(trace.eventType)}</span>]` +
-						` serialize <span class="event-trace-time">${trace.serializeMs.toFixed(1)}ms</span>` +
-						` transport dispatch` +
-						`${mutCount > 0 ? ` ${mutCount} mutations` : ""}`;
-					traceSection.appendChild(div);
+					const total =
+						trace.serializeMs + (trace.transportMs ?? 0) + (trace.dispatchMs ?? 0);
+					if (total > maxTotalMs) maxTotalMs = total;
+				}
+
+				for (const trace of recent) {
+					const serMs = trace.serializeMs;
+					const trnMs = trace.transportMs ?? 0;
+					const dspMs = trace.dispatchMs ?? 0;
+					const mutCount =
+						trace.mutationCount ??
+						mutationLog.filter(
+							(m) =>
+								m.timestamp >= trace.timestamp &&
+								m.timestamp <= trace.timestamp + 100,
+						).length;
+
+					const totalMs = serMs + trnMs + dspMs;
+					const scale = 120 / (maxTotalMs || 1); // 120px max bar width
+
+					// Timeline row
+					const row = document.createElement("div");
+					row.className = "event-timeline";
+
+					// Event type label
+					const typeLabel = document.createElement("span");
+					typeLabel.className = "event-trace-type";
+					typeLabel.style.cssText = "width:60px;flex-shrink:0;font-size:10px;overflow:hidden;text-overflow:ellipsis;";
+					typeLabel.textContent = `[${trace.eventType}]`;
+					row.appendChild(typeLabel);
+
+					// Serialize phase bar
+					const serBar = document.createElement("span");
+					serBar.className = "event-phase serialize";
+					serBar.style.width = `${Math.max(serMs * scale, 4)}px`;
+					serBar.title = `serialize: ${serMs.toFixed(1)}ms`;
+					row.appendChild(serBar);
+
+					const serLabel = document.createElement("span");
+					serLabel.className = "event-phase-label";
+					serLabel.textContent = `${serMs.toFixed(1)}ms`;
+					row.appendChild(serLabel);
+
+					// Arrow
+					const arrow1 = document.createElement("span");
+					arrow1.className = "event-phase-label";
+					arrow1.textContent = "\u2192";
+					row.appendChild(arrow1);
+
+					// Transport phase bar
+					const trnBar = document.createElement("span");
+					trnBar.className = "event-phase transport";
+					trnBar.style.width = `${Math.max(trnMs * scale, 4)}px`;
+					trnBar.title = `transport: ${trnMs.toFixed(1)}ms`;
+					row.appendChild(trnBar);
+
+					const trnLabel = document.createElement("span");
+					trnLabel.className = "event-phase-label";
+					trnLabel.textContent = `${trnMs.toFixed(1)}ms`;
+					row.appendChild(trnLabel);
+
+					// Arrow
+					const arrow2 = document.createElement("span");
+					arrow2.className = "event-phase-label";
+					arrow2.textContent = "\u2192";
+					row.appendChild(arrow2);
+
+					// Dispatch phase bar
+					const dspBar = document.createElement("span");
+					dspBar.className = "event-phase dispatch";
+					dspBar.style.width = `${Math.max(dspMs * scale, 4)}px`;
+					dspBar.title = `dispatch: ${dspMs.toFixed(1)}ms`;
+					row.appendChild(dspBar);
+
+					const dspLabel = document.createElement("span");
+					dspLabel.className = "event-phase-label";
+					dspLabel.textContent = `${dspMs.toFixed(1)}ms`;
+					row.appendChild(dspLabel);
+
+					// Arrow + mutation count
+					if (mutCount > 0) {
+						const arrow3 = document.createElement("span");
+						arrow3.className = "event-phase-label";
+						arrow3.textContent = "\u2192";
+						row.appendChild(arrow3);
+
+						const mutSpan = document.createElement("span");
+						mutSpan.className = "event-mutation-count";
+						mutSpan.textContent = `${mutCount} mut${mutCount !== 1 ? "s" : ""}`;
+						row.appendChild(mutSpan);
+					}
+
+					// Detail panel (shown on click)
+					const detail = document.createElement("div");
+					detail.className = "event-timeline-detail";
+					detail.innerHTML =
+						`<div><strong>${escapeHtml(trace.eventType)}</strong> total: ${totalMs.toFixed(1)}ms</div>` +
+						`<div>main:serialize ${serMs.toFixed(2)}ms</div>` +
+						`<div>transport ${trnMs.toFixed(2)}ms</div>` +
+						`<div>worker:dispatch ${dspMs.toFixed(2)}ms</div>` +
+						`<div>mutations generated: ${mutCount}</div>`;
+
+					row.addEventListener("click", () => {
+						detail.classList.toggle("visible");
+					});
+
+					traceSection.appendChild(row);
+					traceSection.appendChild(detail);
 				}
 
 				logList.appendChild(traceSection);
