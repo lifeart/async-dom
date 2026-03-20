@@ -313,8 +313,8 @@ export class DomRenderer {
 			node = document.createElement(tag);
 		}
 
+		// Store internal nodeId for lookup — don't set node.id (would pollute HTML with internal IDs)
 		const idStr = String(id);
-		node.id = idStr;
 		node.setAttribute("data-async-dom-id", idStr);
 		(node as unknown as Record<string, unknown>).__asyncDomId = id;
 		if (textContent) {

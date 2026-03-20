@@ -4,5 +4,10 @@
     "lib": ["ES2022", "WebWorker"],
     "types": []
   },
-  "include": ["src/worker-thread/**/*.ts", "src/core/**/*.ts", "src/transport/**/*.ts"]
+  "include": ["src/worker-thread/**/*.ts", "src/core/**/*.ts", "src/transport/**/*.ts"],
+  "exclude": [
+    "src/core/html-sanitizer.ts",
+    "src/core/node-cache.ts",
+    "src/core/scheduler.ts"
+  ]
 }

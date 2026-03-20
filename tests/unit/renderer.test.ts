@@ -139,7 +139,7 @@ describe("DomRenderer", () => {
 
 		const parent = renderer.getNode(parentId) as HTMLElement;
 		expect(parent.children).toHaveLength(3);
-		expect(parent.children[1].id).toBe(String(bId));
+		expect(parent.children[1].getAttribute("data-async-dom-id")).toBe(String(bId));
 	});
 
 	it("sets properties", () => {

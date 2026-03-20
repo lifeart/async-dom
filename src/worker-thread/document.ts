@@ -40,6 +40,7 @@ export class VirtualDocument {
 	private _nodeIdToElement = new Map<NodeId, VirtualElement>();
 	private _listenerMap = new Map<string, (e: unknown) => void>();
 	private _listenerToElement = new Map<string, VirtualElement>();
+	private _listenerCounter = 0;
 
 	constructor(appId: AppId) {
 		this.collector = new MutationCollector(appId);
@@ -125,7 +126,7 @@ export class VirtualDocument {
 	// Event listener routing
 	addEventListener(name: string, callback: (e: unknown) => void): void {
 		if (!name) return;
-		const listenerId = `document_${name}_${Date.now()}`;
+		const listenerId = `document_${name}_${++this._listenerCounter}`;
 		this._listenerMap.set(listenerId, callback);
 		const mutation: DomMutation = {
 			action: "addEventListener",

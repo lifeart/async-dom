@@ -54,15 +54,15 @@ describe("Worker → Main Thread roundtrip", () => {
 	});
 
 	it("createElement + appendChild appears in real DOM", () => {
-		const { doc, scheduler } = createPipeline();
+		const { doc, scheduler, renderer } = createPipeline();
 		const div = doc.createElement("div");
 		doc.body.appendChild(div);
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		const node = document.getElementById(String(div._nodeId));
+		const node = renderer.getNode(div._nodeId);
 		expect(node).toBeTruthy();
-		expect(node?.tagName).toBe("DIV");
+		expect(node?.nodeName).toBe("DIV");
 	});
 
 	it("setAttribute is reflected in real DOM", () => {
@@ -102,19 +102,19 @@ describe("Worker → Main Thread roundtrip", () => {
 	});
 
 	it("removeNode removes from real DOM", () => {
-		const { doc, scheduler } = createPipeline();
+		const { doc, scheduler, renderer } = createPipeline();
 		const div = doc.createElement("div");
 		doc.body.appendChild(div);
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		expect(document.getElementById(String(div._nodeId))).toBeTruthy();
+		expect(renderer.getNode(div._nodeId)).toBeTruthy();
 
 		div.remove();
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		expect(document.getElementById(String(div._nodeId))).toBeNull();
+		expect(renderer.getNode(div._nodeId)).toBeNull();
 	});
 
 	it("insertBefore produces correct ordering", () => {
@@ -134,9 +134,9 @@ describe("Worker → Main Thread roundtrip", () => {
 
 		const realParent = renderer.getNode(parent._nodeId) as HTMLElement;
 		expect(realParent?.children.length).toBe(3);
-		expect(realParent?.children[0]?.id).toBe(String(a._nodeId));
-		expect(realParent?.children[1]?.id).toBe(String(b._nodeId));
-		expect(realParent?.children[2]?.id).toBe(String(c._nodeId));
+		expect(realParent?.children[0]?.getAttribute("data-async-dom-id")).toBe(String(a._nodeId));
+		expect(realParent?.children[1]?.getAttribute("data-async-dom-id")).toBe(String(b._nodeId));
+		expect(realParent?.children[2]?.getAttribute("data-async-dom-id")).toBe(String(c._nodeId));
 	});
 
 	it("className is reflected in real DOM", () => {
@@ -164,7 +164,7 @@ describe("Worker → Main Thread roundtrip", () => {
 	});
 
 	it("multiple mutations batch correctly", () => {
-		const { doc, scheduler } = createPipeline();
+		const { doc, scheduler, renderer } = createPipeline();
 
 		const a = doc.createElement("div");
 		const b = doc.createElement("span");
@@ -176,9 +176,8 @@ describe("Worker → Main Thread roundtrip", () => {
 		doc.collector.flushSync();
 		scheduler.flush();
 
-		// All three should be in the DOM
-		expect(document.getElementById(String(a._nodeId))).toBeTruthy();
-		expect(document.getElementById(String(b._nodeId))).toBeTruthy();
-		expect(document.getElementById(String(c._nodeId))).toBeTruthy();
+		expect(renderer.getNode(a._nodeId)).toBeTruthy();
+		expect(renderer.getNode(b._nodeId)).toBeTruthy();
+		expect(renderer.getNode(c._nodeId)).toBeTruthy();
 	});
 });

@@ -39,7 +39,7 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "build:demo": "vite build",
-    "ci": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "ci": "npm run lint && npm run typecheck && npm run typecheck:worker && npm run test && npm run build"
   },
   "repository": {
     "type": "git",
