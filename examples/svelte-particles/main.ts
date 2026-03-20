@@ -49,10 +49,13 @@ info.innerHTML =
   'Colored particles follow attraction/repulsion rules creating emergent life-like patterns. The worker manages <strong>300+</strong> particles and renders a <strong>60\u00D760</strong> grid (3,600 cells).';
 app.appendChild(info);
 
-// Container for async-dom (the worker will render into this)
-const container = document.createElement("div");
-container.style.cssText =
+// Outer wrapper for styling (worker can't overwrite this)
+const wrapper = document.createElement("div");
+wrapper.style.cssText =
   "max-width: 720px; margin: 0 auto; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; background: #161b22;";
+
+// Inner container — this is the async-dom target (worker renders here)
+const container = document.createElement("div");
 
 // Loading fallback
 const fallback = document.createElement("div");
@@ -63,8 +66,9 @@ fallback.innerHTML = `
   <p>Initializing Particle Life worker...</p>
   <style>@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }</style>
 `;
-container.appendChild(fallback);
-app.appendChild(container);
+wrapper.appendChild(fallback);
+wrapper.appendChild(container);
+app.appendChild(wrapper);
 
 // API showcase footer
 const footer = document.createElement("div");
