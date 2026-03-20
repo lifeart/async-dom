@@ -68,6 +68,9 @@ export class FrameScheduler {
 	private healthCheckTimer: ReturnType<typeof setTimeout> | null = null;
 	private queueOverflowWarned = false;
 
+	// Latency tracking: time from enqueue to next tick completion
+	private lastEnqueueTime = 0;
+
 	constructor(config: SchedulerConfig = {}) {
 		this.frameBudgetMs = config.frameBudgetMs ?? DEFAULT_FRAME_BUDGET_MS;
 		this.enableViewportCulling = config.enableViewportCulling ?? true;
@@ -83,6 +86,7 @@ export class FrameScheduler {
 	}
 
 	enqueue(mutations: DomMutation[], appId: AppId, priority: Priority = "normal"): void {
+		this.lastEnqueueTime = performance.now();
 		for (const mutation of mutations) {
 			this.uidCounter++;
 			this.queue.push({ mutation, priority, uid: this.uidCounter, appId });
@@ -175,6 +179,7 @@ export class FrameScheduler {
 		lastFrameActions: number;
 		isRunning: boolean;
 		lastTickTime: number;
+		enqueueToApplyMs: number;
 	} {
 		return {
 			pending: this.queue.length,
@@ -183,6 +188,10 @@ export class FrameScheduler {
 			lastFrameActions: this.totalActionsLastFrame,
 			isRunning: this.running,
 			lastTickTime: this.lastTickTime,
+			enqueueToApplyMs:
+				this.lastTickTime > 0 && this.lastEnqueueTime > 0
+					? Math.max(0, this.lastTickTime - this.lastEnqueueTime)
+					: 0,
 		};
 	}
 

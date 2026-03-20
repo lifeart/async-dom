@@ -452,6 +452,11 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				stats: () => scheduler.getStats(),
 				flush: () => scheduler.flush(),
 			},
+			enableHighlightUpdates: (enabled: boolean) => {
+				for (const r of renderers.values()) {
+					r.enableHighlightUpdates(enabled);
+				}
+			},
 			findRealNode: (nodeId: number) => {
 				for (const r of renderers.values()) {
 					const node = r.getNode(nodeId as NodeId);

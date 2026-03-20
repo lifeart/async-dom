@@ -13,9 +13,11 @@ interface DevtoolsAPI {
 			lastFrameActions: number;
 			isRunning: boolean;
 			lastTickTime: number;
+			enqueueToApplyMs: number;
 		};
 		flush: () => void;
 	};
+	enableHighlightUpdates: (enabled: boolean) => void;
 	findRealNode: (nodeId: number) => Node | null;
 	apps: () => string[];
 	renderers: () => Record<string, { root: unknown }>;
@@ -503,7 +505,16 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	// Collapsed toggle tab
 	const toggleTab = document.createElement("button");
 	toggleTab.className = "toggle-tab";
-	toggleTab.textContent = "async-dom \u25B2";
+
+	const healthDot = document.createElement("span");
+	healthDot.style.cssText =
+		"display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background-color:#4ec9b0;vertical-align:middle;";
+	toggleTab.appendChild(healthDot);
+
+	const toggleTabText = document.createElement("span");
+	toggleTabText.textContent = "async-dom \u25B2";
+	toggleTab.appendChild(toggleTabText);
+
 	panel.appendChild(toggleTab);
 
 	// Header bar
@@ -517,6 +528,20 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 	const headerActions = document.createElement("div");
 	headerActions.className = "header-actions";
+
+	const highlightBtn = document.createElement("button");
+	highlightBtn.className = "header-btn";
+	highlightBtn.textContent = "\u2B24";
+	highlightBtn.title = "Highlight DOM updates";
+	highlightBtn.style.fontSize = "8px";
+	highlightBtn.style.color = "#808080";
+	highlightBtn.addEventListener("click", () => {
+		highlightUpdatesEnabled = !highlightUpdatesEnabled;
+		highlightBtn.style.color = highlightUpdatesEnabled ? "#4ec9b0" : "#808080";
+		const dt = getDevtools();
+		if (dt) dt.enableHighlightUpdates(highlightUpdatesEnabled);
+	});
+	headerActions.appendChild(highlightBtn);
 
 	const refreshBtn = document.createElement("button");
 	refreshBtn.className = "header-btn";
@@ -676,6 +701,24 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	let autoScroll = true;
 	const queueHistory: number[] = [];
 	const MAX_HISTORY = 30;
+	let highlightUpdatesEnabled = false;
+
+	// ---- Feature 1: Queue pressure health dot (polls even when collapsed) ----
+	function updateHealthDot(): void {
+		const dt = getDevtools();
+		if (!dt?.scheduler?.stats) return;
+		const stats = dt.scheduler.stats();
+		const pending = stats.pending;
+		if (pending > 1000 || !stats.isRunning) {
+			healthDot.style.backgroundColor = "#f44747"; // red
+		} else if (pending > 100) {
+			healthDot.style.backgroundColor = "#d7ba7d"; // yellow
+		} else {
+			healthDot.style.backgroundColor = "#4ec9b0"; // green
+		}
+	}
+
+	const healthDotTimer = setInterval(updateHealthDot, 2000);
 
 	function getDevtools(): DevtoolsAPI | null {
 		return (globalThis as Record<string, unknown>).__ASYNC_DOM_DEVTOOLS__ as DevtoolsAPI | null;
@@ -973,6 +1016,11 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 		html += `<div class="perf-row"><span class="perf-label">Last Tick</span><span class="perf-value">${stats.lastTickTime > 0 ? `${stats.lastTickTime.toFixed(0)}ms` : "N/A"}</span></div>`;
 
+		// Enqueue-to-apply latency
+		const latencyMs = stats.enqueueToApplyMs;
+		const latencyClass = latencyMs > 16 ? "red" : latencyMs > 5 ? "yellow" : "green";
+		html += `<div class="perf-row"><span class="perf-label">Enqueue\u2192Apply</span><span class="perf-value ${latencyClass}">${latencyMs > 0 ? `${latencyMs.toFixed(1)}ms` : "N/A"}</span></div>`;
+
 		// Queue depth sparkline
 		if (queueHistory.length > 1) {
 			html += `<div class="perf-row"><span class="perf-label">Queue (${MAX_HISTORY}f)</span><span class="perf-sparkline">${sparkline(queueHistory)}</span></div>`;
@@ -1161,8 +1209,8 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		} else {
 			warningBadge.style.display = "none";
 		}
-		// Update collapsed tab text
-		toggleTab.textContent =
+		// Update collapsed tab text (preserving the health dot element)
+		toggleTabText.textContent =
 			warningBadgeCount > 0
 				? `async-dom (${warningBadgeCount > 99 ? "99+" : warningBadgeCount}) \u25B2`
 				: "async-dom \u25B2";
@@ -1221,6 +1269,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	return {
 		destroy(): void {
 			stopPolling();
+			clearInterval(healthDotTimer);
 			onWarningBadgeUpdate = null;
 			// Reset module-level state for clean re-creation (e.g., HMR)
 			mutationLog.length = 0;

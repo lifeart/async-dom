@@ -127,6 +127,7 @@ export class DomRenderer {
 	onNodeRemoved: ((id: NodeId) => void) | null = null;
 	private _onWarning: ((entry: WarningLogEntry) => void) | null = null;
 	private _onMutation: ((entry: MutationLogEntry) => void) | null = null;
+	private highlightEnabled = false;
 
 	setDebugHooks(hooks: {
 		onWarning?: ((e: WarningLogEntry) => void) | null;
@@ -134,6 +135,21 @@ export class DomRenderer {
 	}): void {
 		this._onWarning = hooks.onWarning ?? null;
 		this._onMutation = hooks.onMutation ?? null;
+	}
+
+	enableHighlightUpdates(enabled: boolean): void {
+		this.highlightEnabled = enabled;
+	}
+
+	private highlightNode(id: NodeId): void {
+		if (!this.highlightEnabled) return;
+		const node = this.nodeCache.get(id) as HTMLElement | null;
+		if (!node?.style) return;
+		const prev = node.style.outline;
+		node.style.outline = "2px solid rgba(78, 201, 176, 0.8)";
+		setTimeout(() => {
+			node.style.outline = prev;
+		}, 300);
 	}
 
 	constructor(
@@ -233,6 +249,21 @@ export class DomRenderer {
 			case "insertAdjacentHTML":
 				this.insertAdjacentHTML(mutation.id, mutation.position, mutation.html);
 				break;
+		}
+
+		// Highlight visual mutations when debug highlighting is enabled
+		if (this.highlightEnabled && "id" in mutation) {
+			const action = mutation.action;
+			if (
+				action === "appendChild" ||
+				action === "setAttribute" ||
+				action === "setStyle" ||
+				action === "setClassName" ||
+				action === "setTextContent" ||
+				action === "setHTML"
+			) {
+				this.highlightNode(mutation.id);
+			}
 		}
 	}
 
