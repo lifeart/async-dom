@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>async-dom — Framework Showcase</title>
+  <script src="../coi-serviceworker.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; }
+    .header { text-align: center; padding: 32px 16px 16px; }
+    .header h1 { font-size: 2rem; font-weight: 700; }
+    .header p { color: #8b949e; margin-top: 6px; font-size: 0.95rem; }
+    .status-bar { display: flex; justify-content: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; padding: 0 16px; }
+    .status-pill { padding: 6px 14px; border-radius: 8px; font-size: 0.8rem; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 1200px; margin: 0 auto; padding: 0 16px 32px; }
+    .panel { background: #161b22; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; min-height: 400px; display: flex; flex-direction: column; }
+    .panel-header { padding: 10px 16px; border-bottom: 1px solid #30363d; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .panel-body { flex: 1; position: relative; }
+    .panel-footer { padding: 8px 12px; border-top: 1px solid #21262d; font-size: 0.7rem; color: #8b949e; font-family: monospace; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Three Frameworks, One Page, Zero Jank</h1>
+    <p>React, Vue, and Svelte each drive a separate Web Worker &mdash; all isolated via async-dom with shadow DOM</p>
+  </div>
+  <div class="status-bar">
+    <div id="hue-pill" class="status-pill" style="background: hsl(0,70%,20%); border: 1px solid hsl(0,70%,40%);">
+      &#127912; Main thread alive
+    </div>
+    <div id="react-status" class="status-pill" style="background: #3a1a1a; border: 1px solid #da3633;">&#9203; React...</div>
+    <div id="vue-status" class="status-pill" style="background: #3a1a1a; border: 1px solid #da3633;">&#9203; Vue...</div>
+    <div id="svelte-status" class="status-pill" style="background: #3a1a1a; border: 1px solid #da3633;">&#9203; Svelte...</div>
+  </div>
+  <div class="grid">
+    <div class="panel" style="border-color: #1f4a6f;">
+      <div class="panel-header"><span class="dot" style="background: #61dafb;"></span> <span style="color: #61dafb;">React</span> &mdash; Mandelbrot</div>
+      <div class="panel-body" id="react-root"></div>
+      <div class="panel-footer">&lt;AsyncDom worker="./mandelbrot.ts" /&gt;</div>
+    </div>
+    <div class="panel" style="border-color: #1f4a3a;">
+      <div class="panel-header"><span class="dot" style="background: #42b883;"></span> <span style="color: #42b883;">Vue</span> &mdash; Game of Life</div>
+      <div class="panel-body" id="vue-root"></div>
+      <div class="panel-footer">&lt;AsyncDom :worker="fn" @ready="..." /&gt;</div>
+    </div>
+    <div class="panel" style="border-color: #4a1a00;">
+      <div class="panel-header"><span class="dot" style="background: #ff3e00;"></span> <span style="color: #ff3e00;">Svelte</span> &mdash; Particles</div>
+      <div class="panel-body" id="svelte-root"></div>
+      <div class="panel-footer">use:asyncDom={{ worker: fn }}</div>
+    </div>
+  </div>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
