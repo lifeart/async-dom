@@ -190,7 +190,54 @@ self.onconnect = (e) => {
 
 ### 2.4 SAB Support
 
-SharedWorker can receive SharedArrayBuffer via MessagePort if COOP/COEP headers are set. Transfer SAB in the init message as already done for regular workers.
+SharedWorker can receive SharedArrayBuffer via MessagePort if COOP/COEP headers are set. Transfer SAB in the init message as already done for regular workers. The SharedWorker inherits cross-origin isolation from the creating page. Verify with `self.crossOriginIsolated` in both contexts. `Atomics.wait` is supported in SharedWorker context.
+
+### 2.5 Multi-App in One SharedWorker
+
+Each connecting tab gets its own `MessagePort` via `self.onconnect`. The natural architecture is **one `createWorkerDom()` per port** — each tab is fully isolated.
+
+```
+// shared-worker.js
+self.onconnect = (e) => {
+  const port = e.ports[0];
+  const transport = new SharedWorkerSelfTransport(port);
+  const { document, window } = createWorkerDom({ transport });
+  myApp(document, window);
+  port.addEventListener('close', () => document.destroy());
+};
+```
+
+No routing needed — each MessagePort is a dedicated channel. Shared resources (framework code, utility functions) are deduped in the single JS heap.
+
+### 2.6 Disconnect Detection
+
+`MessagePort.close` event shipped in **Chrome 122** (early 2024). Firefox/Safari support unconfirmed. Required strategy:
+
+1. **Heartbeat** (primary): ping/pong every 5s, timeout at 15s
+2. **`close` event** (optimization): `port.addEventListener('close', ...)` for instant detection in Chrome
+3. On disconnect: call `VirtualDocument.destroy()`, clean up transport
+
+### 2.7 Browser Compatibility
+
+| Browser | Desktop | Mobile |
+|---------|---------|--------|
+| Chrome | 4+ | **NOT supported on Android** |
+| Firefox | 29+ | 147+ |
+| Safari | 16+ (reinstated after removal in 6.1-15.6) | 16+ iOS |
+| Edge | 79+ | N/A |
+
+**~50% global coverage.** Critical gap: Chrome Android. Mobile must fall back to dedicated Workers. The transport abstraction handles this — caller picks the transport.
+
+### 2.8 Performance
+
+`port.postMessage()` in SharedWorker uses the same MessagePort mechanism as dedicated Worker. **Identical latency and throughput** — 0-1ms for small messages, structured clone cost scales linearly with size.
+
+### 2.9 Error Handling
+
+- Script load errors: `sharedWorker.onerror` fires on the main thread (handled externally, not by transport)
+- Runtime errors inside worker: `self.onerror` catches them; must send through MessagePort (already done by `createWorkerDom`)
+- Deserialization errors: wire `port.onmessageerror` to transport's `onError`
+- `port.start()` is required when using `addEventListener` (implicit with `onmessage =`)
 
 ---
 
@@ -640,3 +687,5 @@ This plan incorporates feedback from three domain expert reviews and two deep-di
 4. **PlatformHost Audit**: Complete inventory of all browser globals in worker-thread/ (40+ references across 5 files). Only `navigator`, error handlers, and `beforeunload` need abstraction. Full VirtualDocument.destroy() cleanup list. Module-level global leaks identified.
 
 5. **MutationLog & Replay Audit**: All 23 mutation action types classified for replay safety. 4 dangerous actions identified (addEventListener, pushState, insertAdjacentHTML, callMethod). Duplicate listener bug in EventBridge.attach() documented. toJSON() snapshot gaps analyzed. Compaction algorithm specified with cost estimates.
+
+6. **SharedWorker Deep Dive**: MessagePort.close event (Chrome 122+, other browsers unconfirmed). One VirtualDocument per port is the natural multi-app architecture. SAB works if page is cross-origin isolated (SharedWorker inherits). ~50% global browser coverage (Chrome Android gap). Identical performance to dedicated Worker postMessage. Heartbeat required for cross-browser disconnect detection.
