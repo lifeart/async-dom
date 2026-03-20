@@ -423,7 +423,27 @@ const PANEL_CSS = `
 .warn-code.ASYNC_DOM_BLOCKED_PROPERTY { color: #d7ba7d; }
 
 .warn-msg { color: #d4d4d4; }
+.warn-stack {
+  margin: 4px 0 0 0; padding: 8px; background: #1a1a1a; border: 1px solid #333;
+  border-radius: 3px; font-size: 11px; color: #ce9178; white-space: pre-wrap;
+  word-break: break-all; max-height: 200px; overflow-y: auto; line-height: 1.4;
+}
+.warn-code.WORKER_ERROR, .warn-code.WORKER_UNHANDLED_REJECTION { color: #f44747; }
 .warn-empty { color: #808080; padding: 16px; text-align: center; }
+
+/* Responsive / mobile-friendly */
+@media (max-width: 600px) {
+  .panel { width: calc(100vw - 16px) !important; height: 50vh !important; left: 8px; right: 8px; bottom: 8px; }
+  .panel.collapsed { width: auto; height: auto; }
+  .tab-bar button { padding: 4px 8px; font-size: 10px; }
+  .header-bar { padding: 2px 8px; }
+  .tree-tag, .log-action { font-size: 11px; }
+  .stat-row { font-size: 11px; }
+}
+@media (max-width: 400px) {
+  .panel { width: calc(100vw - 8px) !important; left: 4px; right: 4px; }
+  .tab-bar button { padding: 3px 6px; font-size: 9px; }
+}
 `;
 
 // ---- Helpers ----
@@ -1097,8 +1117,23 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 			const msgSpan = document.createElement("span");
 			msgSpan.className = "warn-msg";
-			msgSpan.textContent = truncate(entry.message, 120);
+			// Show first line as summary, full message expandable on click
+			const firstLine = entry.message.split("\n")[0];
+			const hasStack = entry.message.includes("\n");
+			msgSpan.textContent = firstLine;
 			div.appendChild(msgSpan);
+
+			if (hasStack) {
+				div.style.cursor = "pointer";
+				const stackPre = document.createElement("pre");
+				stackPre.className = "warn-stack";
+				stackPre.textContent = entry.message;
+				stackPre.style.display = "none";
+				div.appendChild(stackPre);
+				div.addEventListener("click", () => {
+					stackPre.style.display = stackPre.style.display === "none" ? "block" : "none";
+				});
+			}
 
 			fragment.appendChild(div);
 		}
@@ -1187,6 +1222,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		destroy(): void {
 			stopPolling();
 			onWarningBadgeUpdate = null;
+			// Reset module-level state for clean re-creation (e.g., HMR)
+			mutationLog.length = 0;
+			warningLog.length = 0;
+			warningBadgeCount = 0;
 			host.remove();
 		},
 	};
