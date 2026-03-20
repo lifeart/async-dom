@@ -277,12 +277,11 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			});
 		}
 
-		// Seed structural nodes
-		if (rendererRoot) {
-			appNodeCache.set(BODY_NODE_ID, rendererRoot.body as unknown as Node);
-			appNodeCache.set(HEAD_NODE_ID, rendererRoot.head as unknown as Node);
-			appNodeCache.set(HTML_NODE_ID, rendererRoot.html);
-		}
+		// Seed structural nodes (always — without these, worker mutations targeting body/head/html are silently dropped)
+		const root = appRenderer.getRoot();
+		appNodeCache.set(BODY_NODE_ID, root.body as unknown as Node);
+		appNodeCache.set(HEAD_NODE_ID, root.head as unknown as Node);
+		appNodeCache.set(HTML_NODE_ID, root.html);
 
 		// Seed document node for document-level event listeners
 		appNodeCache.set(DOCUMENT_NODE_ID, document as unknown as Node);
