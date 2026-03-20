@@ -362,6 +362,112 @@ describe("DomRenderer", () => {
 		});
 	});
 
+	describe("node removal cleanup", () => {
+		it("removeNode cleans up descendants from cache", () => {
+			const parentId = createNodeId();
+			const childId = createNodeId();
+			const grandchildId = createNodeId();
+
+			renderer.apply({ action: "createNode", id: parentId, tag: "div" });
+			renderer.apply({ action: "createNode", id: childId, tag: "span" });
+			renderer.apply({ action: "createNode", id: grandchildId, tag: "b" });
+
+			renderer.apply({ action: "bodyAppendChild", id: parentId });
+			renderer.apply({ action: "appendChild", id: parentId, childId });
+			renderer.apply({ action: "appendChild", id: childId, childId: grandchildId });
+
+			expect(renderer.getNode(parentId)).toBeTruthy();
+			expect(renderer.getNode(childId)).toBeTruthy();
+			expect(renderer.getNode(grandchildId)).toBeTruthy();
+
+			renderer.apply({ action: "removeNode", id: parentId });
+
+			expect(renderer.getNode(parentId)).toBeNull();
+			expect(renderer.getNode(childId)).toBeNull();
+			expect(renderer.getNode(grandchildId)).toBeNull();
+		});
+
+		it("removeChild cleans up descendants from cache", () => {
+			const parentId = createNodeId();
+			const childId = createNodeId();
+			const grandchildId = createNodeId();
+
+			renderer.apply({ action: "createNode", id: parentId, tag: "div" });
+			renderer.apply({ action: "createNode", id: childId, tag: "span" });
+			renderer.apply({ action: "createNode", id: grandchildId, tag: "b" });
+
+			renderer.apply({ action: "bodyAppendChild", id: parentId });
+			renderer.apply({ action: "appendChild", id: parentId, childId });
+			renderer.apply({ action: "appendChild", id: childId, childId: grandchildId });
+
+			renderer.apply({ action: "removeChild", id: parentId, childId });
+
+			// Child and grandchild should be cleaned from cache
+			expect(renderer.getNode(childId)).toBeNull();
+			expect(renderer.getNode(grandchildId)).toBeNull();
+			// Parent should remain
+			expect(renderer.getNode(parentId)).toBeTruthy();
+		});
+
+		it("removeChild notifies onNodeRemoved for descendants", () => {
+			const removedIds: NodeId[] = [];
+			renderer.onNodeRemoved = (id) => removedIds.push(id);
+
+			const parentId = createNodeId();
+			const childId = createNodeId();
+			const grandchildId = createNodeId();
+
+			renderer.apply({ action: "createNode", id: parentId, tag: "div" });
+			renderer.apply({ action: "createNode", id: childId, tag: "span" });
+			renderer.apply({ action: "createNode", id: grandchildId, tag: "b" });
+
+			renderer.apply({ action: "bodyAppendChild", id: parentId });
+			renderer.apply({ action: "appendChild", id: parentId, childId });
+			renderer.apply({ action: "appendChild", id: childId, childId: grandchildId });
+
+			renderer.apply({ action: "removeChild", id: parentId, childId });
+
+			expect(removedIds).toContain(childId);
+			expect(removedIds).toContain(grandchildId);
+		});
+
+		it("removeNode cleans up text node children from cache", () => {
+			const parentId = createNodeId();
+			const textId = createNodeId();
+
+			renderer.apply({ action: "createNode", id: parentId, tag: "div" });
+			renderer.apply({ action: "createNode", id: textId, tag: "#text", textContent: "hello" });
+
+			renderer.apply({ action: "bodyAppendChild", id: parentId });
+			renderer.apply({ action: "appendChild", id: parentId, childId: textId });
+
+			expect(renderer.getNode(textId)).toBeTruthy();
+
+			renderer.apply({ action: "removeNode", id: parentId });
+
+			expect(renderer.getNode(textId)).toBeNull();
+		});
+
+		it("removeChild cleans up text node children from cache", () => {
+			const parentId = createNodeId();
+			const childId = createNodeId();
+			const textId = createNodeId();
+
+			renderer.apply({ action: "createNode", id: parentId, tag: "div" });
+			renderer.apply({ action: "createNode", id: childId, tag: "span" });
+			renderer.apply({ action: "createNode", id: textId, tag: "#text", textContent: "hello" });
+
+			renderer.apply({ action: "bodyAppendChild", id: parentId });
+			renderer.apply({ action: "appendChild", id: parentId, childId });
+			renderer.apply({ action: "appendChild", id: childId, childId: textId });
+
+			renderer.apply({ action: "removeChild", id: parentId, childId });
+
+			expect(renderer.getNode(childId)).toBeNull();
+			expect(renderer.getNode(textId)).toBeNull();
+		});
+	});
+
 	it("mutations on non-existent nodes do not throw", () => {
 		const fakeId = createNodeId();
 		expect(() => {

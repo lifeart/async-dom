@@ -389,9 +389,10 @@ export class DomRenderer {
 		const parent = this.nodeCache.get(parentId);
 		const child = this.nodeCache.get(childId);
 		if (parent && child?.parentNode) {
-			child.parentNode.removeChild(child);
+			// Detach listeners on the child and all its descendants
+			this._cleanupSubtreeListeners(child, childId);
 			this.nodeCache.delete(childId);
-			this.onNodeRemoved?.(childId);
+			child.parentNode.removeChild(child);
 		}
 	}
 
@@ -537,15 +538,13 @@ export class DomRenderer {
 	 */
 	private _cleanupSubtreeListeners(node: Node, id: NodeId): void {
 		this.onNodeRemoved?.(id);
-		if ("children" in node) {
-			const el = node as Element;
-			for (let i = 0; i < el.children.length; i++) {
-				const child = el.children[i];
-				const childId = this.nodeCache.getId(child);
-				if (childId) {
-					this._cleanupSubtreeListeners(child, childId);
-					this.nodeCache.delete(childId);
-				}
+		const children = node.childNodes;
+		for (let i = 0; i < children.length; i++) {
+			const child = children[i];
+			const childId = this.nodeCache.getId(child);
+			if (childId) {
+				this._cleanupSubtreeListeners(child, childId);
+				this.nodeCache.delete(childId);
 			}
 		}
 	}
