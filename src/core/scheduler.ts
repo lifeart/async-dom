@@ -63,6 +63,11 @@ export class FrameScheduler {
 	private appCount = 0;
 	private appBudgets = new Map<AppId, number>();
 
+	// Health monitoring
+	private lastTickTime = 0;
+	private healthCheckTimer: ReturnType<typeof setTimeout> | null = null;
+	private queueOverflowWarned = false;
+
 	constructor(config: SchedulerConfig = {}) {
 		this.frameBudgetMs = config.frameBudgetMs ?? DEFAULT_FRAME_BUDGET_MS;
 		this.enableViewportCulling = config.enableViewportCulling ?? true;
@@ -82,13 +87,39 @@ export class FrameScheduler {
 			this.uidCounter++;
 			this.queue.push({ mutation, priority, uid: this.uidCounter, appId });
 		}
+
+		// Always warn on queue overflow — this is always a bug
+		if (this.queue.length > 10_000 && !this.queueOverflowWarned) {
+			this.queueOverflowWarned = true;
+			console.warn(
+				`[async-dom] Scheduler queue overflow: ${this.queue.length} pending mutations. ` +
+					"Possible causes: tab hidden, applier not set, or mutations arriving faster than processing.",
+			);
+		}
+		if (this.queue.length <= 10_000) {
+			this.queueOverflowWarned = false;
+		}
 	}
 
 	start(): void {
 		if (this.running) return;
 		this.running = true;
+		this.lastTickTime = 0;
 		this.setupScrollListener();
 		this.scheduleFrame();
+
+		// Health check: warn if tick doesn't fire within 1 second
+		this.healthCheckTimer = setTimeout(() => {
+			if (this.running && this.lastTickTime === 0) {
+				console.warn(
+					"[async-dom] Scheduler started but tick() has not fired after 1 second. " +
+						"This usually means the tab is hidden (rAF does not fire in background tabs). " +
+						`Queue has ${this.queue.length} pending mutations.`,
+				);
+			}
+		}, 1000);
+
+		console.debug("[async-dom] Scheduler started");
 	}
 
 	private scheduleFrame(): void {
@@ -103,6 +134,10 @@ export class FrameScheduler {
 
 	stop(): void {
 		this.running = false;
+		if (this.healthCheckTimer) {
+			clearTimeout(this.healthCheckTimer);
+			this.healthCheckTimer = null;
+		}
 		if (this.rafId) {
 			cancelAnimationFrame(this.rafId);
 			this.rafId = 0;
@@ -133,9 +168,28 @@ export class FrameScheduler {
 		return this.queue.length;
 	}
 
+	getStats(): {
+		pending: number;
+		frameId: number;
+		lastFrameTimeMs: number;
+		lastFrameActions: number;
+		isRunning: boolean;
+		lastTickTime: number;
+	} {
+		return {
+			pending: this.queue.length,
+			frameId: this.frameId,
+			lastFrameTimeMs: this.timePerLastFrame,
+			lastFrameActions: this.totalActionsLastFrame,
+			isRunning: this.running,
+			lastTickTime: this.lastTickTime,
+		};
+	}
+
 	private tick(_timestamp: number): void {
 		if (!this.running) return;
 
+		this.lastTickTime = performance.now();
 		const start = performance.now();
 		this.frameId++;
 		this.calcViewportSize();

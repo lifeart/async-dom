@@ -40,7 +40,6 @@ describe("createWorkerDom", () => {
 	it("window.history.pushState emits mutation", () => {
 		const transport = createMockTransport();
 		const { window: win, document: doc } = createWorkerDom({ transport });
-		// Clear any init messages
 		transport.sent.length = 0;
 
 		win.history.pushState({ page: 1 }, "title", "/new-url");

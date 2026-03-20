@@ -319,11 +319,20 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				scheduler.setAppCount(renderers.size);
 			};
 
+			console.debug(
+				"[async-dom] App",
+				appId,
+				"transport ready, readyState:",
+				appTransport.readyState,
+			);
+
 			appTransport.onError = (error: Error) => {
+				console.error("[async-dom] App", appId, "worker error:", error.message);
 				onError?.({ message: error.message, stack: error.stack, name: error.name }, appId);
 			};
 
 			appTransport.onClose = () => {
+				console.warn("[async-dom] App", appId, "worker disconnected, cleaning up");
 				cleanupDeadApp();
 			};
 
@@ -409,6 +418,8 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		(globalThis as Record<string, unknown>).__ASYNC_DOM_DEVTOOLS__ = {
 			scheduler: {
 				pending: () => scheduler.pendingCount,
+				stats: () => scheduler.getStats(),
+				flush: () => scheduler.flush(),
 			},
 			findRealNode: (nodeId: number) => {
 				for (const r of renderers.values()) {
@@ -418,8 +429,21 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				return null;
 			},
 			apps: () => [...renderers.keys()],
+			renderers: () => {
+				const info: Record<string, unknown> = {};
+				for (const [appId, r] of renderers) {
+					info[String(appId)] = { root: r.getRoot() };
+				}
+				return info;
+			},
 		};
 	}
+
+	console.debug("[async-dom] Initialized", {
+		apps: config.worker ? 1 : 0,
+		debug: !!config.debug,
+		scheduler: config.scheduler ?? "default",
+	});
 
 	// Visibility change forwarding
 	const visibilityHandler = () => {

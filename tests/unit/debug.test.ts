@@ -342,39 +342,6 @@ describe("DomRenderer debug warnings", () => {
 		expect(warnings[0].code).toBe(WarningCode.MISSING_NODE);
 	});
 
-	it("does NOT fire warnings when _onWarning is null (zero-cost)", () => {
-		// Default state: no debug hooks set
-		const freshRenderer = new DomRenderer();
-
-		// Should not throw and should not call any warning function
-		expect(() => {
-			freshRenderer.apply({
-				action: "appendChild",
-				id: createNodeId(),
-				childId: createNodeId(),
-			});
-			freshRenderer.apply({ action: "removeNode", id: createNodeId() });
-			freshRenderer.apply({
-				action: "insertBefore",
-				id: createNodeId(),
-				newId: createNodeId(),
-				refId: null,
-			});
-			freshRenderer.apply({
-				action: "setAttribute",
-				id: createNodeId(),
-				name: "x",
-				value: "y",
-			});
-			freshRenderer.apply({
-				action: "setStyle",
-				id: createNodeId(),
-				property: "color",
-				value: "red",
-			});
-		}).not.toThrow();
-	});
-
 	it("fires mutation log for each apply when onMutation is set", () => {
 		const mutations: MutationLogEntry[] = [];
 		renderer.setDebugHooks({

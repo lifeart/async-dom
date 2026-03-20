@@ -302,9 +302,11 @@ export class DomRenderer {
 		const parent = this.nodeCache.get(parentId);
 		const child = this.nodeCache.get(childId);
 		if (!parent || !child) {
+			const msg = `appendChild: ${!parent ? "parent" : "child"} not found`;
+			console.warn(`[async-dom] ${msg}`, { parentId, childId });
 			this._onWarning?.({
 				code: WarningCode.MISSING_NODE,
-				message: `appendChild: ${!parent ? "parent" : "child"} not found`,
+				message: msg,
 				context: { parentId, childId },
 				timestamp: performance.now(),
 			});
@@ -316,9 +318,11 @@ export class DomRenderer {
 	private removeNode(id: NodeId): void {
 		const node = this.nodeCache.get(id);
 		if (!node) {
+			const msg = "removeNode: node not found";
+			console.warn(`[async-dom] ${msg}`, { id });
 			this._onWarning?.({
 				code: WarningCode.MISSING_NODE,
-				message: "removeNode: node not found",
+				message: msg,
 				context: { id },
 				timestamp: performance.now(),
 			});
@@ -349,9 +353,11 @@ export class DomRenderer {
 		const parent = this.nodeCache.get(parentId);
 		const newEl = this.nodeCache.get(newId);
 		if (!parent || !newEl) {
+			const msg = `insertBefore: ${!parent ? "parent" : "newNode"} not found`;
+			console.warn(`[async-dom] ${msg}`, { parentId, newId, refId });
 			this._onWarning?.({
 				code: WarningCode.MISSING_NODE,
-				message: `insertBefore: ${!parent ? "parent" : "newNode"} not found`,
+				message: msg,
 				context: { parentId, newId, refId },
 				timestamp: performance.now(),
 			});
@@ -365,9 +371,11 @@ export class DomRenderer {
 	private setAttribute(id: NodeId, name: string, value: string): void {
 		const node = this.nodeCache.get(id) as Element | null;
 		if (!node || !("setAttribute" in node)) {
+			const msg = "setAttribute: node not found";
+			console.warn(`[async-dom] ${msg}`, { id, name, value });
 			this._onWarning?.({
 				code: WarningCode.MISSING_NODE,
-				message: "setAttribute: node not found",
+				message: msg,
 				context: { id, name, value },
 				timestamp: performance.now(),
 			});
@@ -397,9 +405,11 @@ export class DomRenderer {
 	private setStyle(id: NodeId, property: string, value: string): void {
 		const node = this.nodeCache.get(id) as HTMLElement | null;
 		if (!node?.style) {
+			const msg = "setStyle: node not found";
+			console.warn(`[async-dom] ${msg}`, { id, property, value });
 			this._onWarning?.({
 				code: WarningCode.MISSING_NODE,
-				message: "setStyle: node not found",
+				message: msg,
 				context: { id, property, value },
 				timestamp: performance.now(),
 			});

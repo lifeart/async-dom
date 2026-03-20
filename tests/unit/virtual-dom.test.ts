@@ -366,7 +366,6 @@ describe("VirtualElement edge cases", () => {
 		expect(parent1.children).toHaveLength(1);
 		expect(child.parentNode).toBe(parent1);
 
-		// Move child to parent2
 		parent2.appendChild(child);
 		expect(parent1.children).toHaveLength(0);
 		expect(parent2.children).toHaveLength(1);

@@ -301,6 +301,8 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 			tree: () => doc.toJSON(),
 			findNode: (id: string) => doc.getElementById(id) ?? doc.querySelector(`[id="${id}"]`),
 			stats: () => doc.collector.getStats(),
+			mutations: () => ({ pending: doc.collector.pendingCount }),
+			flush: () => doc.collector.flushSync(),
 		};
 	}
 

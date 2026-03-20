@@ -221,8 +221,6 @@ describe("DomRenderer", () => {
 
 		const node = renderer.getNode(id) as HTMLElement;
 		expect(node.parentNode).toBe(document.head);
-
-		// Cleanup
 		node.remove();
 	});
 
@@ -232,7 +230,6 @@ describe("DomRenderer", () => {
 		renderer.apply({ action: "bodyAppendChild", id });
 		renderer.apply({ action: "setAttribute", id, name: "id", value: "new-id-alias" });
 
-		// The node should now be accessible via the new id alias
 		const node = renderer.getNode("new-id-alias" as unknown as NodeId);
 		expect(node).toBeTruthy();
 		expect(node).toBe(renderer.getNode(id));

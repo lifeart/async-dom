@@ -90,21 +90,13 @@ describe("Per-app DomRenderer isolation", () => {
 	it("App A's removeNode mutation doesn't affect App B's nodes", () => {
 		const id = createNodeId();
 
-		// Both apps create a node with the same ID
 		rendererA.apply({ action: "createNode", id, tag: "div" });
 		rendererB.apply({ action: "createNode", id, tag: "span" });
-
-		// Append both to the body so they're in the DOM
 		rendererA.apply({ action: "bodyAppendChild", id });
 		rendererB.apply({ action: "bodyAppendChild", id });
 
-		// App A removes its node
 		rendererA.apply({ action: "removeNode", id });
-
-		// App A's node is gone from its cache
 		expect(rendererA.getNode(id)).toBeNull();
-
-		// App B's node is still in its cache
 		expect(rendererB.getNode(id)).toBeInstanceOf(HTMLSpanElement);
 	});
 
@@ -112,22 +104,14 @@ describe("Per-app DomRenderer isolation", () => {
 		const parentId = createNodeId();
 		const childIdA = createNodeId();
 
-		// Only App B has the parent
 		rendererB.apply({ action: "createNode", id: parentId, tag: "div" });
 		rendererB.apply({ action: "bodyAppendChild", id: parentId });
-
-		// App A creates a child
 		rendererA.apply({ action: "createNode", id: childIdA, tag: "span" });
-
-		// App A tries to append its child to a parent it doesn't own
-		// Since rendererA's cache doesn't have parentId, this is a no-op (parent is null)
 		rendererA.apply({ action: "appendChild", id: parentId, childId: childIdA });
 
-		// B's parent should have no children from A
 		const parentNode = rendererB.getNode(parentId) as HTMLElement;
 		expect(parentNode.children).toHaveLength(0);
 
-		// The child should NOT be attached anywhere in the DOM (no body fallback)
 		const childNode = rendererA.getNode(childIdA) as HTMLElement;
 		expect(childNode.parentNode).toBeNull();
 		expect(document.body.contains(childNode)).toBe(false);
@@ -141,13 +125,11 @@ describe("Per-app DomRenderer isolation", () => {
 		rendererA.apply({ action: "createNode", id: id2, tag: "p" });
 		rendererB.apply({ action: "createNode", id: id1, tag: "span" });
 
-		// Renderer A has 2 nodes, renderer B has 1
 		expect(rendererA.getNode(id1)).toBeInstanceOf(HTMLDivElement);
 		expect(rendererA.getNode(id2)).toBeInstanceOf(HTMLParagraphElement);
 		expect(rendererB.getNode(id1)).toBeInstanceOf(HTMLSpanElement);
 		expect(rendererB.getNode(id2)).toBeNull();
 
-		// Clear renderer A — renderer B is unaffected
 		rendererA.clear();
 		expect(rendererA.getNode(id1)).toBeNull();
 		expect(rendererB.getNode(id1)).toBeInstanceOf(HTMLSpanElement);
@@ -220,10 +202,7 @@ describe("Renderer permissions", () => {
 
 	it("scrollTo is blocked when allowScroll is false", () => {
 		const renderer = new DomRenderer(undefined, { allowScroll: false });
-		// Should not throw, just be a no-op
-		expect(() => {
-			renderer.apply({ action: "scrollTo", x: 0, y: 100 });
-		}).not.toThrow();
+		renderer.apply({ action: "scrollTo", x: 0, y: 100 });
 	});
 
 	it("appendChild with unknown parent is a no-op (no body fallback)", () => {
