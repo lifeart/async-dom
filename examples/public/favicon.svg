@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="#0a0e17"/>
+  <g fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Worker: left bracket -->
+    <path d="M8 8l-3 8 3 8"/>
+    <!-- Main thread: right bracket -->
+    <path d="M24 8l3 8-3 8"/>
+    <!-- Arrow: worker to main -->
+    <path d="M12 16h8" stroke-dasharray="2 2.5"/>
+    <path d="M18 13l3 3-3 3"/>
+  </g>
+</svg>
