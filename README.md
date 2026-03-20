@@ -177,6 +177,34 @@ __ASYNC_DOM_DEVTOOLS__.flush()              // Force-send pending mutations
 
 A standalone Chrome DevTools extension is available in [`chrome-extension/`](./chrome-extension). Load it as an unpacked extension for a dedicated DevTools panel with tree view, performance charts, and mutation log.
 
+## Sandbox Mode
+
+Run third-party scripts that access bare `document`/`window` globals without modification:
+
+```ts
+// Mode 1: Patch worker globals — bare `document` resolves to virtual DOM
+const { document, window } = createWorkerDom({ sandbox: "global" });
+// Now self.document === document, self.window === window
+// Third-party scripts "just work"
+
+// Mode 2: Sandboxed eval — Proxy + with for full variable interception
+const { window } = createWorkerDom({ sandbox: "eval" });
+window.eval(`
+  var div = document.createElement("div");
+  div.textContent = "Created by third-party script";
+  document.body.appendChild(div);
+`);
+
+// Mode 3: Both modes enabled
+const { document, window } = createWorkerDom({ sandbox: true });
+```
+
+| Mode | Bare `document` works | `window.eval()` sandbox | Use case |
+| ---- | --------------------- | ----------------------- | -------- |
+| `"global"` | Yes (patches `self`) | No | Framework code that uses bare globals |
+| `"eval"` | No | Yes (Proxy + with) | Third-party analytics/ads scripts |
+| `true` | Yes | Yes | Maximum compatibility |
+
 ## Architecture
 
 ```

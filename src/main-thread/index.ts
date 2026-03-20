@@ -285,7 +285,7 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 
 	// If a worker was provided in config, add it as the first app
 	if (config.worker) {
-		addAppInternal(config.worker);
+		addAppInternal(config.worker, config.target);
 	}
 
 	function addAppInternal(

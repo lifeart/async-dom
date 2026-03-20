@@ -18,6 +18,7 @@ export interface WorkerDomConfig {
 	appId?: AppId;
 	transport?: Transport;
 	debug?: DebugOptions;
+	sandbox?: boolean | "global" | "eval";
 }
 
 export interface WorkerDomResult {
@@ -79,6 +80,7 @@ export interface WorkerWindow {
 		removeAllRanges: () => void;
 	};
 	dispatchEvent: (event: unknown) => boolean;
+	eval: (code: string) => unknown;
 }
 
 interface WorkerLocation {
@@ -416,6 +418,9 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 			doc.dispatchEvent("", event);
 			return true;
 		},
+		eval: (_code: string): unknown => {
+			throw new Error("sandbox eval is not enabled — set sandbox: true or sandbox: 'eval'");
+		},
 	};
 
 	// Override innerWidth/innerHeight with sync-channel-aware getters
@@ -447,6 +452,75 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 			configurable: true,
 		},
 	});
+
+	// --- Sandbox modes ---
+	const sandboxMode = config?.sandbox;
+
+	if (sandboxMode === "eval" || sandboxMode === true) {
+		win.eval = (code: string): unknown => {
+			const sandbox = new Proxy(win as unknown as Record<string | symbol, unknown>, {
+				has() {
+					return true;
+				},
+				get(target, prop) {
+					if (prop === Symbol.unscopables) return undefined;
+					if (prop in target) return target[prop];
+					// Fall through to real worker globals for builtins
+					if (prop in self) return (self as unknown as Record<string | symbol, unknown>)[prop];
+					return undefined;
+				},
+				set(target, prop, value) {
+					target[prop] = value;
+					return true;
+				},
+			});
+
+			// Use Function constructor to create a non-strict scope
+			// The with(window) makes all bare lookups go through the proxy
+			const fn = new Function(
+				"window",
+				"self",
+				"globalThis",
+				"document",
+				`with(window) {\n\t\t\t\treturn (function() { ${code} }).call(window);\n\t\t\t}`,
+			);
+			return fn(sandbox, sandbox, sandbox, doc);
+		};
+	}
+
+	if (sandboxMode === "global" || sandboxMode === true) {
+		const workerGlobal = self as unknown as Record<string, unknown>;
+
+		// Direct assignments for regular properties
+		workerGlobal.document = doc;
+		workerGlobal.window = win;
+		workerGlobal.location = win.location;
+		workerGlobal.history = win.history;
+		workerGlobal.navigator = win.navigator;
+		workerGlobal.screen = win.screen;
+		workerGlobal.localStorage = win.localStorage;
+		workerGlobal.getComputedStyle = win.getComputedStyle.bind(win);
+		workerGlobal.requestAnimationFrame = win.requestAnimationFrame.bind(win);
+		workerGlobal.cancelAnimationFrame = win.cancelAnimationFrame.bind(win);
+		workerGlobal.scrollTo = win.scrollTo.bind(win);
+		workerGlobal.matchMedia = win.matchMedia;
+		workerGlobal.getSelection = win.getSelection;
+		workerGlobal.dispatchEvent = win.dispatchEvent;
+		workerGlobal.MutationObserver = win.MutationObserver;
+		workerGlobal.ResizeObserver = win.ResizeObserver;
+		workerGlobal.IntersectionObserver = win.IntersectionObserver;
+		workerGlobal.Event = win.Event;
+		workerGlobal.CustomEvent = win.CustomEvent;
+		workerGlobal.Node = win.Node;
+		workerGlobal.HTMLElement = win.HTMLElement;
+		workerGlobal.devicePixelRatio = win.devicePixelRatio;
+
+		// Copy getter/setter descriptors for dynamic properties
+		const innerWidthDesc = Object.getOwnPropertyDescriptor(win, "innerWidth");
+		const innerHeightDesc = Object.getOwnPropertyDescriptor(win, "innerHeight");
+		if (innerWidthDesc) Object.defineProperty(workerGlobal, "innerWidth", innerWidthDesc);
+		if (innerHeightDesc) Object.defineProperty(workerGlobal, "innerHeight", innerHeightDesc);
+	}
 
 	doc._defaultView = win;
 
