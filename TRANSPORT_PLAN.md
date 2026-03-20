@@ -485,12 +485,158 @@ Phases 2, 2b, 3 can all proceed in parallel after Phase 1.
 
 ---
 
+## Deep Dive: PlatformHost Audit
+
+### Minimal PlatformHost Interface
+
+Only **3 things** need platform abstraction. Everything else (performance, setTimeout, URL, btoa, console, fetch, queueMicrotask) is globally available in Node.js 18+.
+
+```ts
+interface PlatformHost {
+  navigator: {
+    userAgent: string;
+    language: string;
+    languages: readonly string[];
+    hardwareConcurrency: number;
+  };
+  installErrorHandlers(
+    onError: (message: string, error?: Error, filename?: string, lineno?: number, colno?: number) => void,
+    onUnhandledRejection: (reason: unknown) => void,
+  ): void;
+  onBeforeUnload(callback: () => void): void;
+}
+```
+
+### P0 Crash Points in `worker-thread/index.ts`
+
+| Line | Global | Issue |
+|------|--------|-------|
+| 439 | `self.navigator` | Unconditional read — crashes in Node.js |
+| 195-228 | `self` cast to `workerScope` | Sets `.onerror`/`.onunhandledrejection` — crashes |
+| 271-273 | `self.addEventListener("beforeunload")` | `self` undefined in Node.js |
+| 517 | `self` in Proxy fallback | Sandbox eval mode |
+| 540-571 | `self` cast to `workerGlobal` | Sandbox global mode — mutates `self` |
+
+### VirtualDocument.destroy() — Complete Cleanup List
+
+| What | Where | Impact if not cleaned |
+|------|-------|-----------------------|
+| `_ids` Map | document.ts:42 | Retains element refs |
+| `_nodeIdToElement` Map | document.ts:43 | Primary memory leak source |
+| `_listenerMap` Map | document.ts:44 | Retains closures |
+| `_listenerToElement` Map | document.ts:45 | Retains element refs |
+| `perfEntriesInterval` | index.ts:243 | **Keeps Node.js event loop alive forever** |
+| `workerScope.onerror` | index.ts:208 | Closure retains transport/appId |
+| `transport.onMessage` handler | index.ts:129 | Closure retains doc/transport/appId |
+| `_syncChannel` | element.ts | Holds SharedArrayBuffer ref |
+| `MutationCollector.queue` | mutation-collector.ts:18 | Pending mutations never flushed |
+
+### Module-Level Globals (Shared Across Instances)
+
+| Global | File:Line | Concern |
+|--------|-----------|---------|
+| `_nodeIdCounter` | protocol.ts:18 | Shared counter, monotonically increasing |
+| `listenerCounter` | element.ts:19 | Shared across all VirtualDocuments |
+| `kebabCache` | style-proxy.ts:5 | Shared Map, bounded by CSS property count |
+
+---
+
+## Deep Dive: MutationLog & Replay
+
+### DomMutation Actions — Replay Safety Matrix
+
+| Action | Idempotent | Safe to Replay | Notes |
+|--------|-----------|---------------|-------|
+| `createNode` | Yes | Yes | Has `nodeCache.has(id)` guard |
+| `createComment` | Yes | Yes | Same guard |
+| `appendChild` | No | Conditional | Re-applying moves node (DOM spec) |
+| `removeNode` | Quasi | Yes | No-op if missing |
+| `removeChild` | Quasi | Yes | No-op if missing |
+| `insertBefore` | No | Conditional | Double-apply reorders siblings |
+| `setAttribute` | Yes | Yes | Last-write-wins |
+| `removeAttribute` | Yes | Yes | No-op if absent |
+| `setStyle` | Yes | Yes | Last-write-wins |
+| `setProperty` | Yes | Yes | Last-write-wins |
+| `setTextContent` | Yes | Yes | Last-write-wins |
+| `setClassName` | Yes | Yes | Last-write-wins |
+| `setHTML` | Yes | Yes | innerHTML replacement |
+| **`addEventListener`** | **NO** | **DANGEROUS** | **Creates duplicate listeners** |
+| `configureEvent` | Yes | Yes | Overwrites config |
+| `removeEventListener` | Quasi | Yes | No-op if not found |
+| `headAppendChild` | No | Conditional | |
+| `bodyAppendChild` | No | Conditional | |
+| **`pushState`** | **NO** | **DANGEROUS** | **Creates duplicate history entries** |
+| `replaceState` | Yes | Yes | Overwrites current |
+| `scrollTo` | Yes | Yes | Last-write-wins |
+| **`insertAdjacentHTML`** | **NO** | **DANGEROUS** | **Inserts duplicate content** |
+| **`callMethod`** | **NO** | **DANGEROUS** | **Re-executes side effects** |
+
+### The Duplicate Listener Bug
+
+`EventBridge.attach()` does NOT check for existing `listenerId`. Replaying `addEventListener` mutations attaches duplicate real DOM listeners. **Every user event fires twice.**
+
+**Required fix**: Make `EventBridge.attach()` idempotent:
+```ts
+attach(nodeId, eventName, listenerId) {
+  // If this listener already exists, detach old one first
+  const existing = this.listeners.get(listenerId);
+  if (existing) {
+    existing.controller.abort();
+  }
+  // ... proceed with attach
+}
+```
+
+### `toJSON()` Snapshot Gaps
+
+`VirtualDocument.toJSON()` exists (document.ts:493) but does NOT capture:
+- Event listeners (no listener IDs or event names)
+- Inline styles set via `setStyle` (unless reflected as attributes)
+- Properties set via `setProperty` (value, checked, etc.)
+- History state
+- Scroll position
+
+**Compaction must separately track**: active listeners from `_listenerMap`/`_listenerToElement`, and synthesize `addEventListener` mutations.
+
+### Compaction Strategy
+
+**Trigger**: Hybrid — after 5,000 mutations OR on client connect if >1,000 mutations since last compaction.
+
+**Algorithm**:
+1. Call `doc.toJSON()` — depth-first tree snapshot
+2. Record current mutation log index
+3. Convert tree to synthetic mutations: `createNode` → `setAttribute` → `appendChild` (depth-first)
+4. Synthesize `addEventListener` mutations from active listener registries
+5. Replace `log[0..index]` with synthetic mutations, keep `log[index+1..]` intact
+
+**Cost**: <5ms for typical apps (1,000 nodes). Schedule during idle time for large apps.
+
+**Memory**: ~200-300 bytes per mutation in V8. 10,000 mutations ≈ 2-3 MB.
+
+### Existing Replay Infrastructure
+
+`debug/replay.ts` provides a cursor (`createReplayState`, `replayStep`, `replaySeek`, `replayReset`) but:
+- Operates on `MutationLogEntry` (debug wrapper), not raw `DomMutation[]`
+- No renderer integration (caller feeds mutations)
+- No compaction concept
+- No filtering of non-idempotent actions
+
+**Reusable for**: stepping/seeking logic. **Not reusable for**: production replay pipeline.
+
+---
+
 ## Expert Review Notes
 
-This plan incorporates feedback from three domain expert reviews:
+This plan incorporates feedback from three domain expert reviews and two deep-dive technical audits:
 
+### Expert Reviews
 1. **WebRTC/Networking Expert**: MessageChannel handshake race conditions, DataChannel backpressure (`bufferedAmount`), ICE restart handling, message size limits (256KB SCTP), protocol-level `ack` for flow control.
 
 2. **Node.js Server Architecture Expert**: P0 crashers (`self.navigator`, error handlers), PlatformHost abstraction, VirtualDocument.destroy(), backpressure, connection limits, tiered concurrency (single-process → cluster → worker_threads).
 
 3. **Browser API/Security Expert**: SharedWorker as preferred Phase 2 (no popup blockers, no tab lifecycle issues), BroadcastChannel for cross-tab handshake (COOP-safe), `DataCloneError` handling for SAB transfer, AppContext pattern for refactoring, Page Lifecycle API for tab freeze/resume.
+
+### Deep Dive Audits
+4. **PlatformHost Audit**: Complete inventory of all browser globals in worker-thread/ (40+ references across 5 files). Only `navigator`, error handlers, and `beforeunload` need abstraction. Full VirtualDocument.destroy() cleanup list. Module-level global leaks identified.
+
+5. **MutationLog & Replay Audit**: All 23 mutation action types classified for replay safety. 4 dangerous actions identified (addEventListener, pushState, insertAdjacentHTML, callMethod). Duplicate listener bug in EventBridge.attach() documented. toJSON() snapshot gaps analyzed. Compaction algorithm specified with cost estimates.
