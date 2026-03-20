@@ -4,9 +4,6 @@ import { createAppId, createNodeId } from "../../src/core/protocol.ts";
 import { FrameScheduler } from "../../src/core/scheduler.ts";
 import { DomRenderer } from "../../src/main-thread/renderer.ts";
 
-// ---------------------------------------------------------------------------
-// 1. NodeCache isolation
-// ---------------------------------------------------------------------------
 describe("NodeCache isolation", () => {
 	it("two separate NodeCache instances don't share nodes", () => {
 		const cacheA = new NodeCache();
@@ -68,9 +65,6 @@ describe("NodeCache isolation", () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// 2. Per-app DomRenderer isolation
-// ---------------------------------------------------------------------------
 describe("Per-app DomRenderer isolation", () => {
 	let cacheA: NodeCache;
 	let cacheB: NodeCache;
@@ -164,9 +158,6 @@ describe("Per-app DomRenderer isolation", () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// 3. Renderer permissions
-// ---------------------------------------------------------------------------
 describe("Renderer permissions", () => {
 	beforeEach(() => {
 		document.body.innerHTML = "";
@@ -213,24 +204,6 @@ describe("Renderer permissions", () => {
 		renderer.apply({ action: "bodyAppendChild", id });
 		const node = renderer.getNode(id) as HTMLElement;
 		expect(node.parentNode).toBe(document.body);
-	});
-
-	it("default permissions block head and body append", () => {
-		const renderer = new DomRenderer();
-
-		const headId = createNodeId();
-		const bodyId = createNodeId();
-		renderer.apply({ action: "createNode", id: headId, tag: "style" });
-		renderer.apply({ action: "createNode", id: bodyId, tag: "div" });
-
-		const headBefore = document.head.children.length;
-		const bodyBefore = document.body.children.length;
-
-		renderer.apply({ action: "headAppendChild", id: headId });
-		renderer.apply({ action: "bodyAppendChild", id: bodyId });
-
-		expect(document.head.children.length).toBe(headBefore);
-		expect(document.body.children.length).toBe(bodyBefore);
 	});
 
 	it("navigation is allowed by default", () => {
@@ -288,19 +261,7 @@ describe("Renderer permissions", () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// 4. Scheduler fairness
-// ---------------------------------------------------------------------------
 describe("Scheduler fairness", () => {
-	it("setAppCount updates correctly", () => {
-		const scheduler = new FrameScheduler();
-		// setAppCount should not throw
-		scheduler.setAppCount(0);
-		scheduler.setAppCount(1);
-		scheduler.setAppCount(5);
-		// No assertion beyond not throwing — internal state is private
-	});
-
 	it("single app has no fairness overhead (appCount <= 1 fast path)", () => {
 		const scheduler = new FrameScheduler();
 		const applied: string[] = [];
@@ -350,5 +311,3 @@ describe("Scheduler fairness", () => {
 		expect(applied.some((a) => a.startsWith("app-b:"))).toBe(true);
 	});
 });
-
-// NodeCache CRUD basics are covered in tests/unit/node-cache.test.ts

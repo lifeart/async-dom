@@ -30,7 +30,6 @@ describe("MutationCollector", () => {
 		expect(collector.pendingCount).toBe(2);
 		expect(transport.sent).toHaveLength(0);
 
-		// Wait for microtask
 		await Promise.resolve();
 
 		expect(transport.sent).toHaveLength(1);
@@ -87,10 +86,7 @@ describe("MutationCollector", () => {
 		collector.add({ action: "createNode", id: createNodeId(), tag: "div" });
 		collector.flushSync();
 
-		// The microtask scheduled by add() should find an empty queue
 		await Promise.resolve();
-
-		// Only one message was sent (from flushSync), not two
 		expect(transport.sent).toHaveLength(1);
 	});
 

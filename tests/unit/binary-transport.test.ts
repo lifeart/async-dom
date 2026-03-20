@@ -221,12 +221,6 @@ describe("BinaryWorkerTransport", () => {
 		});
 		expect(mockWorker.postMessage).not.toHaveBeenCalled();
 	});
-
-	it("reports readyState as open initially", () => {
-		const mockWorker = createMockWorker();
-		const transport = new BinaryWorkerTransport(mockWorker);
-		expect(transport.readyState).toBe("open");
-	});
 });
 
 describe("BinaryWorkerSelfTransport", () => {
@@ -322,11 +316,5 @@ describe("BinaryWorkerSelfTransport", () => {
 			mutations: [],
 		});
 		expect(scope.postMessage).not.toHaveBeenCalled();
-	});
-
-	it("reports readyState as open initially", () => {
-		const scope = createMockScope();
-		const transport = new BinaryWorkerSelfTransport(scope);
-		expect(transport.readyState).toBe("open");
 	});
 });

@@ -97,7 +97,6 @@ describe("Multiple onMessage handlers (I7)", () => {
 				mutations: [],
 			};
 
-			// Simulate a plain object message (non-ArrayBuffer)
 			capturedOnMessage?.({ data: msg } as MessageEvent);
 
 			expect(received1).toHaveLength(1);

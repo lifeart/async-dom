@@ -28,7 +28,6 @@ describe("Shadow DOM Support", () => {
 			const bodyId = createNodeId();
 			renderer.apply({ action: "createNode", id: bodyId, tag: "BODY" });
 
-			// BODY should map to shadow root, not document.body
 			expect(cache.get(bodyId)).toBe(shadow);
 		});
 
@@ -90,16 +89,13 @@ describe("Shadow DOM Support", () => {
 				},
 			);
 
-			// Seed body
 			const bodyId = createNodeId();
 			renderer.apply({ action: "createNode", id: bodyId, tag: "BODY" });
 
-			// Create and append a child
 			const childId = createNodeId();
 			renderer.apply({ action: "createNode", id: childId, tag: "div" });
 			renderer.apply({ action: "appendChild", id: bodyId, childId });
 
-			// Child should be inside shadow root
 			expect(shadow.children).toHaveLength(1);
 			expect(shadow.children[0].tagName).toBe("DIV");
 		});
@@ -124,11 +120,8 @@ describe("Shadow DOM Support", () => {
 			renderer.apply({ action: "createNode", id: styleId, tag: "style" });
 			renderer.apply({ action: "headAppendChild", id: styleId });
 
-			// Style should be in shadow root, not document.head
 			const styleNode = cache.get(styleId) as HTMLStyleElement;
 			expect(styleNode.parentNode).toBe(shadow);
-
-			// Style should NOT be in document.head
 			expect(Array.from(document.head.children)).not.toContain(styleNode);
 		});
 
@@ -178,7 +171,6 @@ describe("Shadow DOM Support", () => {
 				{ body: shadow2, head: shadow2, html: host2 },
 			);
 
-			// App 1 adds a style
 			const styleId = createNodeId();
 			renderer1.apply({ action: "createNode", id: styleId, tag: "style" });
 			renderer1.apply({ action: "headAppendChild", id: styleId });

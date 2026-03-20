@@ -52,7 +52,6 @@ describe("WorkerTransport", () => {
 			mutations: [],
 		};
 
-		// Simulate incoming message
 		capturedOnMessage?.({ data: msg } as MessageEvent);
 
 		expect(received).toHaveLength(1);

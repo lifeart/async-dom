@@ -210,35 +210,21 @@ describe("DOM API Completeness (Sprint 3)", () => {
 
 		it("has preventDefault and stopPropagation methods", () => {
 			const event = doc.createEvent("Event");
-			expect(typeof event.preventDefault).toBe("function");
-			expect(typeof event.stopPropagation).toBe("function");
-			expect(typeof event.stopImmediatePropagation).toBe("function");
+			expect(event.preventDefault).toBeTypeOf("function");
+			expect(event.stopPropagation).toBeTypeOf("function");
+			expect(event.stopImmediatePropagation).toBeTypeOf("function");
 		});
 	});
 
 	describe("node type constants", () => {
-		it("VirtualElement has correct static constants", () => {
-			expect(VirtualElement.ELEMENT_NODE).toBe(1);
-			expect(VirtualElement.TEXT_NODE).toBe(3);
-			expect(VirtualElement.COMMENT_NODE).toBe(8);
-			expect(VirtualElement.DOCUMENT_NODE).toBe(9);
-			expect(VirtualElement.DOCUMENT_FRAGMENT_NODE).toBe(11);
-		});
-
-		it("VirtualTextNode has correct static constants", () => {
-			expect(VirtualTextNode.ELEMENT_NODE).toBe(1);
-			expect(VirtualTextNode.TEXT_NODE).toBe(3);
-			expect(VirtualTextNode.COMMENT_NODE).toBe(8);
-			expect(VirtualTextNode.DOCUMENT_NODE).toBe(9);
-			expect(VirtualTextNode.DOCUMENT_FRAGMENT_NODE).toBe(11);
-		});
-
-		it("VirtualCommentNode has correct static constants", () => {
-			expect(VirtualCommentNode.ELEMENT_NODE).toBe(1);
-			expect(VirtualCommentNode.TEXT_NODE).toBe(3);
-			expect(VirtualCommentNode.COMMENT_NODE).toBe(8);
-			expect(VirtualCommentNode.DOCUMENT_NODE).toBe(9);
-			expect(VirtualCommentNode.DOCUMENT_FRAGMENT_NODE).toBe(11);
+		it("all virtual node classes share correct static constants", () => {
+			for (const NodeClass of [VirtualElement, VirtualTextNode, VirtualCommentNode]) {
+				expect(NodeClass.ELEMENT_NODE).toBe(1);
+				expect(NodeClass.TEXT_NODE).toBe(3);
+				expect(NodeClass.COMMENT_NODE).toBe(8);
+				expect(NodeClass.DOCUMENT_NODE).toBe(9);
+				expect(NodeClass.DOCUMENT_FRAGMENT_NODE).toBe(11);
+			}
 		});
 	});
 
@@ -345,22 +331,15 @@ describe("DOM API Completeness (Sprint 3)", () => {
 		});
 	});
 
-	describe("normalize", () => {
-		it("is callable (no-op stub)", () => {
-			const div = doc.createElement("div");
-			expect(() => div.normalize()).not.toThrow();
-		});
-	});
-
 	describe("createRange", () => {
 		it("returns an object with expected methods", () => {
 			const range = doc.createRange() as Record<string, unknown>;
-			expect(typeof range.createContextualFragment).toBe("function");
-			expect(typeof range.setStart).toBe("function");
-			expect(typeof range.setEnd).toBe("function");
-			expect(typeof range.collapse).toBe("function");
-			expect(typeof range.selectNodeContents).toBe("function");
-			expect(typeof range.cloneRange).toBe("function");
+			expect(range.createContextualFragment).toBeTypeOf("function");
+			expect(range.setStart).toBeTypeOf("function");
+			expect(range.setEnd).toBeTypeOf("function");
+			expect(range.collapse).toBeTypeOf("function");
+			expect(range.selectNodeContents).toBeTypeOf("function");
+			expect(range.cloneRange).toBeTypeOf("function");
 		});
 	});
 

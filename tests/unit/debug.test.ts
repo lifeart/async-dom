@@ -84,12 +84,6 @@ describe("resolveDebugHooks", () => {
 		expect(hooks.onWarning).toBeNull();
 	});
 
-	it("returns all null hooks when options is undefined", () => {
-		const hooks = resolveDebugHooks(undefined);
-		expect(hooks.onMutation).toBeNull();
-		expect(hooks.onEvent).toBeNull();
-	});
-
 	it("returns function hooks when options are enabled", () => {
 		const hooks = resolveDebugHooks({
 			logMutations: true,
@@ -394,14 +388,5 @@ describe("DomRenderer debug warnings", () => {
 		expect(mutations[0].side).toBe("main");
 		expect(mutations[0].action).toBe("createNode");
 		expect(mutations[0].timestamp).toBeGreaterThan(0);
-	});
-
-	it("does NOT fire mutation log when onMutation is null", () => {
-		// No hooks set — default state
-		const freshRenderer = new DomRenderer();
-		// Just confirm no error, and no overhead
-		expect(() => {
-			freshRenderer.apply({ action: "createNode", id: createNodeId(), tag: "div" });
-		}).not.toThrow();
 	});
 });

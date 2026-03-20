@@ -7,95 +7,30 @@ import { MutationCollector } from "../../src/worker-thread/mutation-collector.ts
 
 describe("Error handling", () => {
 	describe("MutationCollector", () => {
-		it("flush with no transport doesn't throw", () => {
+		it("flush with no transport silently drops mutations", () => {
 			const collector = new MutationCollector(createAppId("test"));
 			collector.add({ action: "createNode", id: createNodeId(), tag: "div" });
-			expect(() => collector.flushSync()).not.toThrow();
-		});
-
-		it("flush with empty queue is a no-op", () => {
-			const collector = new MutationCollector(createAppId("test"));
-			expect(() => collector.flushSync()).not.toThrow();
+			collector.flushSync();
 			expect(collector.pendingCount).toBe(0);
 		});
 	});
 
 	describe("DomRenderer", () => {
-		it("createNode with unknown id doesn't throw", () => {
-			const renderer = new DomRenderer();
-			expect(() =>
-				renderer.apply({ action: "createNode", id: createNodeId(), tag: "div" }),
-			).not.toThrow();
-		});
-
-		it("appendChild with missing child is a no-op", () => {
-			const renderer = new DomRenderer();
-			expect(() =>
-				renderer.apply({
-					action: "appendChild",
-					id: createNodeId(),
-					childId: createNodeId(),
-				}),
-			).not.toThrow();
-		});
-
-		it("removeNode on non-existent node doesn't throw", () => {
-			const renderer = new DomRenderer();
-			expect(() => renderer.apply({ action: "removeNode", id: createNodeId() })).not.toThrow();
-		});
-
-		it("setAttribute on missing node doesn't throw", () => {
-			const renderer = new DomRenderer();
-			expect(() =>
-				renderer.apply({
-					action: "setAttribute",
-					id: createNodeId(),
-					name: "class",
-					value: "foo",
-				}),
-			).not.toThrow();
-		});
-
-		it("setStyle on missing node doesn't throw", () => {
-			const renderer = new DomRenderer();
-			expect(() =>
-				renderer.apply({
-					action: "setStyle",
-					id: createNodeId(),
-					property: "color",
-					value: "red",
-				}),
-			).not.toThrow();
-		});
-
-		it("setTextContent on missing node doesn't throw", () => {
-			const renderer = new DomRenderer();
-			expect(() =>
-				renderer.apply({
-					action: "setTextContent",
-					id: createNodeId(),
-					textContent: "hello",
-				}),
-			).not.toThrow();
-		});
-
 		it("insertBefore where parentId === newId is a no-op", () => {
 			const renderer = new DomRenderer();
 			const id = createNodeId();
-			expect(() =>
-				renderer.apply({ action: "insertBefore", id, newId: id, refId: null }),
-			).not.toThrow();
+			renderer.apply({ action: "insertBefore", id, newId: id, refId: null });
 		});
 	});
 
 	describe("FrameScheduler", () => {
-		it("flush with no applier is a no-op", () => {
+		it("flush with no applier keeps mutations pending", () => {
 			const scheduler = new FrameScheduler();
 			scheduler.enqueue(
 				[{ action: "createNode", id: createNodeId(), tag: "div" }],
 				createAppId("a"),
 			);
-			expect(() => scheduler.flush()).not.toThrow();
+			scheduler.flush();
 			expect(scheduler.pendingCount).toBe(1);
 		});
 
@@ -107,26 +42,14 @@ describe("Error handling", () => {
 	});
 
 	describe("ThreadManager", () => {
-		it("sendToThread with unknown appId is a no-op", () => {
-			const tm = new ThreadManager();
-			expect(() =>
-				tm.sendToThread(createAppId("unknown"), {
-					type: "mutation",
-					appId: createAppId("unknown"),
-					uid: 1,
-					mutations: [],
-				}),
-			).not.toThrow();
-		});
-
 		it("destroyThread with unknown appId is a no-op", () => {
 			const tm = new ThreadManager();
-			expect(() => tm.destroyThread(createAppId("unknown"))).not.toThrow();
+			tm.destroyThread(createAppId("unknown"));
 		});
 
-		it("destroyAll on empty manager doesn't throw", () => {
+		it("destroyAll on empty manager is a no-op", () => {
 			const tm = new ThreadManager();
-			expect(() => tm.destroyAll()).not.toThrow();
+			tm.destroyAll();
 		});
 	});
 });

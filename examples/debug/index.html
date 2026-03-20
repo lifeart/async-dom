@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>async-dom Debug Mode</title>
+  <script src="coi-serviceworker.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; display: flex; }
+    #app { flex: 1; padding: 20px; }
+    #panel {
+      width: 360px; background: #1e1e1e; color: #d4d4d4;
+      padding: 16px; overflow-y: auto; height: 100vh;
+      font-family: "SF Mono", "Fira Code", monospace; font-size: 12px;
+    }
+    #panel h3 { color: #569cd6; margin: 0 0 12px; font-size: 14px; }
+    #panel button {
+      background: #333; color: #d4d4d4; border: 1px solid #555;
+      padding: 6px 12px; cursor: pointer; border-radius: 4px;
+      margin-right: 6px; margin-bottom: 8px; font-size: 12px;
+    }
+    #panel button:hover { background: #444; }
+    #log {
+      white-space: pre-wrap; word-break: break-all;
+      max-height: calc(100vh - 140px); overflow-y: auto;
+      background: #111; padding: 8px; border-radius: 4px;
+      margin-top: 12px; line-height: 1.6;
+    }
+    .log-mut { color: #dcdcaa; }
+    .log-warn { color: #ce9178; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="panel">
+    <h3>async-dom Debug Panel</h3>
+    <button id="btn-stats">Dump Stats</button>
+    <button id="btn-tree">Dump Tree</button>
+    <button id="btn-apps">List Apps</button>
+    <button id="btn-clear">Clear Log</button>
+    <div id="log"></div>
+  </div>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

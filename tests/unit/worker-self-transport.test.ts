@@ -40,7 +40,6 @@ describe("WorkerSelfTransport", () => {
 			mutations: [],
 		};
 
-		// Simulate incoming message via scope.onmessage
 		scope.onmessage?.({ data: msg } as MessageEvent);
 
 		expect(received).toHaveLength(1);

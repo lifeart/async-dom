@@ -20,21 +20,13 @@ function createMockTransport(): Transport & { sent: Message[] } {
 }
 
 describe("createWorkerDom", () => {
-	it("returns document and window", () => {
-		const transport = createMockTransport();
-		const result = createWorkerDom({ transport });
-		expect(result.document).toBeDefined();
-		expect(result.window).toBeDefined();
-	});
-
 	it("document is a VirtualDocument with body and head", () => {
 		const transport = createMockTransport();
-		const { document: doc } = createWorkerDom({ transport });
+		const { document: doc, window: win } = createWorkerDom({ transport });
 		expect(doc).toBeInstanceOf(VirtualDocument);
-		expect(doc.body).toBeDefined();
 		expect(doc.body.tagName).toBe("BODY");
-		expect(doc.head).toBeDefined();
 		expect(doc.head.tagName).toBe("HEAD");
+		expect(win).toBeTruthy();
 	});
 
 	it("window.location has default values", () => {

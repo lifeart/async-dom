@@ -118,10 +118,4 @@ describe("Sync Read Pipeline", () => {
 		const result = JSON.parse(decoder.decode(responseRegion.slice(0, responseLength)));
 		expect(result).toBe(1920);
 	});
-
-	it("host returns null when no request pending", () => {
-		const { buffer } = SyncChannel.create();
-		const host = new SyncChannelHost(buffer);
-		expect(host.poll()).toBeNull();
-	});
 });

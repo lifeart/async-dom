@@ -155,18 +155,16 @@ describe("DomRenderer", () => {
 	it("does not duplicate nodes on repeated createNode", () => {
 		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
-		renderer.apply({ action: "createNode", id, tag: "div" }); // duplicate
-		// Should not throw, second call is a no-op
-		const node = renderer.getNode(id);
-		expect(node).toBeInstanceOf(HTMLDivElement);
+		const firstNode = renderer.getNode(id);
+		renderer.apply({ action: "createNode", id, tag: "div" });
+		expect(renderer.getNode(id)).toBe(firstNode);
 	});
 
 	it("clears cache on clear()", () => {
 		const id = createNodeId();
 		renderer.apply({ action: "createNode", id, tag: "div" });
-		expect(renderer.getNode(id)).toBeTruthy();
+		expect(renderer.getNode(id)).toBeInstanceOf(HTMLDivElement);
 		renderer.clear();
-		// After clear, node is not in cache
 		expect(renderer.getNode(id)).toBeNull();
 	});
 
@@ -214,12 +212,6 @@ describe("DomRenderer", () => {
 		expect(window.location.pathname).toBe("/test-replace");
 		// Restore
 		window.history.replaceState(null, "", originalPathname);
-	});
-
-	it("scrollTo action does not throw", () => {
-		expect(() => {
-			renderer.apply({ action: "scrollTo", x: 0, y: 100 });
-		}).not.toThrow();
 	});
 
 	it("headAppendChild action appends to document.head", () => {

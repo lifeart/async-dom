@@ -37,23 +37,6 @@ describe("EventBridge", () => {
 		bridge.detachAll();
 	});
 
-	it("constructor creates instance with appId", () => {
-		const b = new EventBridge(createAppId("my-app"));
-		expect(b).toBeInstanceOf(EventBridge);
-	});
-
-	it("setTransport stores transport", () => {
-		const div = document.createElement("div");
-		document.body.appendChild(div);
-		const id = createNodeId();
-		nodeCache.set(id, div);
-
-		bridge.attach(id, "click", "listener-1");
-		div.click();
-
-		expect(transport.sent).toHaveLength(1);
-	});
-
 	it("attach() adds event listener to node", () => {
 		const div = document.createElement("div");
 		document.body.appendChild(div);

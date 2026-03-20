@@ -130,7 +130,6 @@ describe("createComlinkEndpoint", () => {
 		expect(fnListener).toHaveBeenCalledTimes(1);
 		expect(objListener.handleEvent).toHaveBeenCalledTimes(1);
 
-		// Both receive MessageEvent with correct data
 		const fnArg = fnListener.mock.calls[0][0] as MessageEvent;
 		const objArg = objListener.handleEvent.mock.calls[0][0] as MessageEvent;
 		expect(fnArg.data).toEqual(msg);
