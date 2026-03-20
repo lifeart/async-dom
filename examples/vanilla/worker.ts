@@ -31,7 +31,7 @@ document.body.setAttribute(
 
 for (let i = 0; i < NODE_COUNT; i++) {
 	const node = document.createElement("div");
-	document.registerElement(`node-${i}`, node);
+	node.setAttribute("id", `node-${i}`);
 
 	node.setAttribute(
 		"style",
