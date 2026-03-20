@@ -9,6 +9,40 @@ const WarningCode = {
 	WORKER_ERROR: "WORKER_ERROR",
 	WORKER_UNHANDLED_REJECTION: "WORKER_UNHANDLED_REJECTION"
 };
+const WarningDescriptions = {
+	ASYNC_DOM_MISSING_NODE: {
+		description: "A DOM mutation referenced a node ID that doesn't exist in the node cache.",
+		suggestion: "Ensure nodes are created before being referenced. Check for race conditions between create and update mutations."
+	},
+	ASYNC_DOM_SYNC_TIMEOUT: {
+		description: "A synchronous read (getBoundingClientRect, computedStyle) timed out waiting for the main thread response.",
+		suggestion: "Reduce sync read frequency, increase timeout, or use cached values when possible."
+	},
+	ASYNC_DOM_LISTENER_NOT_FOUND: {
+		description: "An event was received for a listener ID that is not registered.",
+		suggestion: "This may indicate a timing issue where a listener was removed before its event was processed."
+	},
+	ASYNC_DOM_EVENT_ATTACH_FAILED: {
+		description: "Failed to attach an event listener to a DOM node.",
+		suggestion: "Verify the target node exists in the DOM when the listener is being attached."
+	},
+	ASYNC_DOM_TRANSPORT_NOT_OPEN: {
+		description: "Attempted to send a message through a closed or connecting transport.",
+		suggestion: "Ensure the transport connection is established before sending mutations."
+	},
+	ASYNC_DOM_BLOCKED_PROPERTY: {
+		description: "A setProperty call was blocked because the property is not in the allowed list.",
+		suggestion: "Add the property to additionalAllowedProperties in the renderer permissions if it's safe."
+	},
+	WORKER_ERROR: {
+		description: "An unhandled error occurred in the worker thread.",
+		suggestion: "Check the stack trace for the error source. Add error handling in your worker code."
+	},
+	WORKER_UNHANDLED_REJECTION: {
+		description: "An unhandled promise rejection occurred in the worker thread.",
+		suggestion: "Add .catch() handlers to promises or use try/catch with async/await in your worker code."
+	}
+};
 const defaultLogger = {
 	warning(entry) {
 		console.warn(`[async-dom] ${entry.code}: ${entry.message}`, entry.context);
@@ -56,6 +90,53 @@ var DebugStats = class {
 		this.eventsDispatched = 0;
 		this.syncReadRequests = 0;
 		this.syncReadTimeouts = 0;
+	}
+};
+/**
+* Mutation-to-event correlation index (Feature 19: "Why Was This Node Updated?").
+*
+* Indexes mutations by nodeId and links them to their batch and causal event,
+* allowing reverse lookups: given a nodeId, find why it was updated.
+*/
+var MutationEventCorrelation = class {
+	/** Map from nodeId -> list of { batchUid, action, timestamp, causalEvent } */
+	nodeIndex = /* @__PURE__ */ new Map();
+	maxEntriesPerNode = 20;
+	batchEventMap = /* @__PURE__ */ new Map();
+	/** Register a batch's causal event for later correlation. */
+	registerBatchEvent(batchUid, causalEvent) {
+		this.batchEventMap.set(batchUid, causalEvent);
+		if (this.batchEventMap.size > 500) {
+			const firstKey = this.batchEventMap.keys().next().value;
+			if (firstKey !== void 0) this.batchEventMap.delete(firstKey);
+		}
+	}
+	/** Index a mutation entry for a specific node. */
+	indexMutation(entry) {
+		const nodeId = entry.mutation.id;
+		if (nodeId == null) return;
+		const causalEvent = entry.batchUid != null ? this.batchEventMap.get(entry.batchUid) ?? null : null;
+		let list = this.nodeIndex.get(nodeId);
+		if (!list) {
+			list = [];
+			this.nodeIndex.set(nodeId, list);
+		}
+		list.push({
+			batchUid: entry.batchUid,
+			action: entry.action,
+			timestamp: entry.timestamp,
+			causalEvent
+		});
+		if (list.length > this.maxEntriesPerNode) list.shift();
+	}
+	/** Look up the chain: mutation -> batch -> event for a given nodeId. */
+	getWhyUpdated(nodeId) {
+		return this.nodeIndex.get(nodeId) ?? [];
+	}
+	/** Clear all data. */
+	clear() {
+		this.nodeIndex.clear();
+		this.batchEventMap.clear();
 	}
 };
 function resolveDebugHooks(options) {
@@ -329,6 +410,12 @@ Object.defineProperty(exports, "HTML_NODE_ID", {
 		return HTML_NODE_ID;
 	}
 });
+Object.defineProperty(exports, "MutationEventCorrelation", {
+	enumerable: true,
+	get: function() {
+		return MutationEventCorrelation;
+	}
+});
 Object.defineProperty(exports, "QueryType", {
 	enumerable: true,
 	get: function() {
@@ -351,6 +438,12 @@ Object.defineProperty(exports, "WarningCode", {
 	enumerable: true,
 	get: function() {
 		return WarningCode;
+	}
+});
+Object.defineProperty(exports, "WarningDescriptions", {
+	enumerable: true,
+	get: function() {
+		return WarningDescriptions;
 	}
 });
 Object.defineProperty(exports, "createAppId", {

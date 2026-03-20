@@ -16,6 +16,8 @@ export default defineConfig({
 				"multi-app": resolve(__dirname, "examples/multi-app/index.html"),
 				debug: resolve(__dirname, "examples/debug/index.html"),
 				"audio-player": resolve(__dirname, "examples/audio-player/index.html"),
+				"react-mandelbrot": resolve(__dirname, "examples/react-mandelbrot/index.html"),
+				"vue-gameoflife": resolve(__dirname, "examples/vue-gameoflife/index.html"),
 			},
 		},
 	},

@@ -1,4 +1,4 @@
-import { o as DomMutation } from "./base.js";
+import { s as DomMutation } from "./base.js";
 
 //#region src/core/debug.d.ts
 interface DebugOptions {
@@ -31,6 +31,9 @@ interface EventLogEntry {
   listenerId: string;
   targetId: string | null;
   timestamp: number;
+  transportMs?: number;
+  dispatchMs?: number;
+  mutationCount?: number;
 }
 interface SyncReadLogEntry {
   queryType: number;
@@ -74,6 +77,12 @@ declare class DebugStats {
   snapshot(): Record<string, number>;
   reset(): void;
 }
+/**
+ * Mutation-to-event correlation index (Feature 19: "Why Was This Node Updated?").
+ *
+ * Indexes mutations by nodeId and links them to their batch and causal event,
+ * allowing reverse lookups: given a nodeId, find why it was updated.
+ */
 //#endregion
 export { MutationLogEntry as a, WarningCode as c, EventLogEntry as i, WarningLogEntry as l, DebugOptions as n, SchedulerLogEntry as o, DebugStats as r, SyncReadLogEntry as s, DebugLogger as t };
 //# sourceMappingURL=debug.d.ts.map

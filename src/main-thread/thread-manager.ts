@@ -1,6 +1,7 @@
 import type { AppId, Message } from "../core/protocol.ts";
 import { createAppId } from "../core/protocol.ts";
 import type { Transport } from "../transport/base.ts";
+import { BinaryWorkerTransport } from "../transport/binary-worker-transport.ts";
 import { WorkerTransport } from "../transport/worker-transport.ts";
 import { WebSocketTransport, type WebSocketTransportOptions } from "../transport/ws-transport.ts";
 
@@ -29,7 +30,13 @@ export class ThreadManager {
 
 	createWorkerThread(config: WorkerConfig): AppId {
 		const appId = generateAppId();
-		const transport = config.transport ?? new WorkerTransport(config.worker);
+		const useBinary =
+			typeof __ASYNC_DOM_BINARY__ !== "undefined" && __ASYNC_DOM_BINARY__;
+		const transport =
+			config.transport ??
+			(useBinary
+				? new BinaryWorkerTransport(config.worker)
+				: new WorkerTransport(config.worker));
 
 		transport.onMessage((message) => {
 			this.notifyHandlers(appId, message);

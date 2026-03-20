@@ -1,5 +1,5 @@
 Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
-const require_binary_worker_transport = require("./binary-worker-transport.cjs");
+const require_ws_transport = require("./ws-transport.cjs");
 const require_worker_transport = require("./worker-transport.cjs");
 //#region src/transport/comlink-adapter.ts
 function createComlinkEndpoint(transport) {
@@ -22,13 +22,13 @@ function createComlinkEndpoint(transport) {
 	};
 }
 //#endregion
-exports.BinaryWorkerSelfTransport = require_binary_worker_transport.BinaryWorkerSelfTransport;
-exports.BinaryWorkerTransport = require_binary_worker_transport.BinaryWorkerTransport;
-exports.WebSocketTransport = require_binary_worker_transport.WebSocketTransport;
+exports.BinaryWorkerSelfTransport = require_ws_transport.BinaryWorkerSelfTransport;
+exports.BinaryWorkerTransport = require_ws_transport.BinaryWorkerTransport;
+exports.WebSocketTransport = require_ws_transport.WebSocketTransport;
 exports.WorkerSelfTransport = require_worker_transport.WorkerSelfTransport;
 exports.WorkerTransport = require_worker_transport.WorkerTransport;
 exports.createComlinkEndpoint = createComlinkEndpoint;
-exports.decodeBinaryMessage = require_binary_worker_transport.decodeBinaryMessage;
-exports.encodeBinaryMessage = require_binary_worker_transport.encodeBinaryMessage;
+exports.decodeBinaryMessage = require_ws_transport.decodeBinaryMessage;
+exports.encodeBinaryMessage = require_ws_transport.encodeBinaryMessage;
 
 //# sourceMappingURL=transport.cjs.map

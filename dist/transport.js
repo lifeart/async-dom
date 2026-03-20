@@ -1,4 +1,4 @@
-import { a as WebSocketTransport, i as encodeBinaryMessage, n as BinaryWorkerTransport, r as decodeBinaryMessage, t as BinaryWorkerSelfTransport } from "./binary-worker-transport.js";
+import { a as encodeBinaryMessage, i as decodeBinaryMessage, n as BinaryWorkerSelfTransport, r as BinaryWorkerTransport, t as WebSocketTransport } from "./ws-transport.js";
 import { n as WorkerTransport, t as WorkerSelfTransport } from "./worker-transport.js";
 //#region src/transport/comlink-adapter.ts
 function createComlinkEndpoint(transport) {

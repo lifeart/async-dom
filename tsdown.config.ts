@@ -5,6 +5,11 @@ export default defineConfig({
 		index: "src/index.ts",
 		worker: "src/worker-thread/index.ts",
 		transport: "src/transport/index.ts",
+		"vite-plugin": "src/vite-plugin/index.ts",
+		react: "src/react/index.ts",
+		vue: "src/vue/index.ts",
+		svelte: "src/svelte/index.ts",
+		cli: "src/cli/index.ts",
 	},
 	format: ["esm", "cjs"],
 	dts: true,
@@ -14,4 +19,5 @@ export default defineConfig({
 	target: "es2022",
 	outDir: "dist",
 	hash: false,
+	external: ["react", "react-dom", "vue", "svelte", "vite"],
 });

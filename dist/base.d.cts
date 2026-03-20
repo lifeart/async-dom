@@ -123,6 +123,11 @@ type DomMutation = {
   action: "removeEventListener";
   id: NodeId;
   listenerId: string;
+} | {
+  action: "callMethod";
+  id: NodeId;
+  method: string;
+  args: unknown[];
 };
 type MutationAction = DomMutation["action"];
 type Priority = "high" | "normal" | "low";
@@ -132,6 +137,13 @@ interface MutationMessage {
   uid: number;
   mutations: DomMutation[];
   priority?: Priority;
+  sentAt?: number;
+  /** Causal event that triggered this batch (Feature 15: Causality Graph). */
+  causalEvent?: {
+    eventType: string;
+    listenerId: string;
+    timestamp: number;
+  };
 }
 interface SerializedEvent {
   type: string;
@@ -171,6 +183,11 @@ interface SerializedEvent {
   value?: string;
   checked?: boolean;
   selectedIndex?: number;
+  currentTime?: number;
+  duration?: number;
+  paused?: boolean;
+  ended?: boolean;
+  readyState?: number;
 }
 interface EventMessage {
   type: "event";
@@ -233,11 +250,35 @@ type SystemMessage = {
   type: "debugResult";
   query: string;
   result: unknown;
+} | {
+  type: "eventTimingResult";
+  listenerId: string;
+  eventType: string;
+  dispatchMs: number;
+  mutationCount: number;
+  transportMs: number;
+} | {
+  type: "perfEntries";
+  appId: AppId;
+  entries: PerfEntryData[];
 };
+/** Serialized performance entry sent from worker to main thread (Feature 16). */
+interface PerfEntryData {
+  name: string;
+  startTime: number;
+  duration: number;
+  entryType: string;
+}
 type Message = MutationMessage | EventMessage | SystemMessage;
 //#endregion
 //#region src/transport/base.d.ts
 type TransportReadyState = "connecting" | "open" | "closed";
+interface TransportStats {
+  messageCount: number;
+  totalBytes: number;
+  largestMessageBytes: number;
+  lastMessageBytes: number;
+}
 interface Transport {
   send(message: Message): void;
   onMessage(handler: (message: Message) => void): void;
@@ -245,9 +286,11 @@ interface Transport {
   readonly readyState: TransportReadyState;
   onError?: (error: Error) => void;
   onClose?: () => void;
+  getStats?(): TransportStats;
+  enableStats?(enabled: boolean): void;
 }
 //# sourceMappingURL=base.d.ts.map
 
 //#endregion
-export { SerializedEvent as _, DOCUMENT_NODE_ID as a, createAppId as b, HEAD_NODE_ID as c, Message as d, MutationAction as f, SerializedError as g, Priority as h, BODY_NODE_ID as i, HTML_NODE_ID as l, NodeId as m, TransportReadyState as n, DomMutation as o, MutationMessage as p, AppId as r, EventMessage as s, Transport as t, InsertPosition as u, SerializedLocation as v, createNodeId as x, SystemMessage as y };
+export { createNodeId as S, SerializedError as _, BODY_NODE_ID as a, SystemMessage as b, EventMessage as c, InsertPosition as d, Message as f, Priority as g, NodeId as h, AppId as i, HEAD_NODE_ID as l, MutationMessage as m, TransportReadyState as n, DOCUMENT_NODE_ID as o, MutationAction as p, TransportStats as r, DomMutation as s, Transport as t, HTML_NODE_ID as u, SerializedEvent as v, createAppId as x, SerializedLocation as y };
 //# sourceMappingURL=base.d.cts.map

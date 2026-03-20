@@ -18,6 +18,25 @@
       "types": "./dist/transport.d.ts",
       "import": "./dist/transport.js",
       "require": "./dist/transport.cjs"
+    },
+    "./vite-plugin": {
+      "types": "./dist/vite-plugin.d.ts",
+      "import": "./dist/vite-plugin.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js",
+      "require": "./dist/react.cjs"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "import": "./dist/vue.js",
+      "require": "./dist/vue.cjs"
+    },
+    "./svelte": {
+      "types": "./dist/svelte.d.ts",
+      "import": "./dist/svelte.js",
+      "require": "./dist/svelte.cjs"
     }
   },
   "main": "./dist/index.cjs",
@@ -28,8 +47,11 @@
     "LICENSE"
   ],
   "sideEffects": false,
+  "bin": {
+    "async-dom": "./dist/cli.js"
+  },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && node -e \"const fs=require('fs');const f='dist/cli.js';fs.writeFileSync(f,'#!/usr/bin/env node\\n'+fs.readFileSync(f));fs.chmodSync(f,0o755)\"",
     "dev": "vite",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -61,18 +83,47 @@
   "homepage": "https://github.com/lifeart/async-dom#readme",
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
+    "@testing-library/react": "^16.0.0",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@vitest/web-worker": "^4.0.0",
+    "@vue/test-utils": "^2.4.0",
     "jsdom": "^29.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "svelte": "^5.0.0",
     "tsdown": "^0.12.0",
     "typescript": "^5.8.0",
     "vite": "^6.0.0",
-    "vitest": "^4.0.0"
+    "vitest": "^4.0.0",
+    "vue": "^3.5.0"
   },
   "peerDependencies": {
-    "comlink": "^4.0.0"
+    "comlink": "^4.0.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "svelte": "^4.0.0 || ^5.0.0",
+    "vite": "^5.0.0 || ^6.0.0",
+    "vue": "^3.3.0"
   },
   "peerDependenciesMeta": {
     "comlink": {
+      "optional": true
+    },
+    "vite": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "svelte": {
       "optional": true
     }
   },

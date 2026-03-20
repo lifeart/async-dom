@@ -1,6 +1,6 @@
-import { _ as SerializedEvent, a as DOCUMENT_NODE_ID, b as createAppId, c as HEAD_NODE_ID, d as Message, f as MutationAction, g as SerializedError, h as Priority, i as BODY_NODE_ID, l as HTML_NODE_ID, m as NodeId, n as TransportReadyState, o as DomMutation, p as MutationMessage, r as AppId, s as EventMessage, t as Transport, v as SerializedLocation, x as createNodeId, y as SystemMessage } from "./base.cjs";
-import { a as MutationLogEntry, c as WarningCode, i as EventLogEntry, l as WarningLogEntry, n as DebugOptions, o as SchedulerLogEntry, r as DebugStats, s as SyncReadLogEntry, t as DebugLogger } from "./debug.cjs";
-import { a as decodeBinaryMessage, c as WebSocketTransportOptions, i as BinaryWorkerTransport, n as WorkerTransport, o as encodeBinaryMessage, r as BinaryWorkerSelfTransport, t as WorkerSelfTransport } from "./worker-transport.cjs";
+import { _ as SerializedError, f as Message, g as Priority, h as NodeId, i as AppId, s as DomMutation, t as Transport } from "./base.cjs";
+import { a as MutationLogEntry, l as WarningLogEntry, n as DebugOptions } from "./debug.cjs";
+import { c as WebSocketTransportOptions } from "./worker-transport.cjs";
 
 //#region src/core/html-sanitizer.d.ts
 
@@ -31,6 +31,11 @@ interface FrameLogEntry {
   totalMs: number;
   actionCount: number;
   timingBreakdown: Map<string, number>;
+  /** Feature 18: per-app mutation counts and deferred counts per frame */
+  perApp?: Map<string, {
+    mutations: number;
+    deferred: number;
+  }>;
 }
 type MutationApplier = (mutation: DomMutation, appId: AppId, batchUid?: number) => void;
 /**
@@ -69,6 +74,8 @@ declare class FrameScheduler {
   private healthCheckTimer;
   private queueOverflowWarned;
   private lastEnqueueTime;
+  private droppedFrameCount;
+  private lastWorkerToMainLatencyMs;
   private frameLog;
   constructor(config?: SchedulerConfig);
   setApplier(applier: MutationApplier): void;
@@ -80,6 +87,8 @@ declare class FrameScheduler {
   clearViewportCache(): void;
   flush(): void;
   get pendingCount(): number;
+  /** Record the cross-thread latency from a worker MutationMessage.sentAt */
+  recordWorkerLatency(sentAt: number): void;
   getStats(): {
     pending: number;
     frameId: number;
@@ -88,6 +97,8 @@ declare class FrameScheduler {
     isRunning: boolean;
     lastTickTime: number;
     enqueueToApplyMs: number;
+    droppedFrameCount: number;
+    workerToMainLatencyMs: number;
   };
   getFrameLog(): FrameLogEntry[];
   private tick;
@@ -119,8 +130,13 @@ declare class NodeCache {
 //#region src/main-thread/event-bridge.d.ts
 interface EventTraceEntry {
   eventType: string;
+  listenerId: string;
   serializeMs: number;
   timestamp: number;
+  sentAt: number;
+  transportMs?: number;
+  dispatchMs?: number;
+  mutationCount?: number;
 }
 /**
  * Bridges real DOM events on the main thread to the worker thread.
@@ -133,7 +149,14 @@ declare class EventBridge {
   private transport;
   private appId;
   private eventTraces;
+  private _onTimingResult;
   constructor(appId: AppId, nodeCache?: NodeCache);
+  /**
+   * Set a callback that is invoked whenever a trace entry is fully
+   * populated with worker timing data.  This allows callers (e.g. the
+   * devtools debug hooks) to emit EventLogEntry objects.
+   */
+  set onTimingResult(cb: ((trace: EventTraceEntry) => void) | null);
   setTransport(transport: Transport): void;
   setNodeCache(nodeCache: NodeCache): void;
   configureEvent(nodeId: NodeId, eventName: string, config: {
@@ -144,6 +167,17 @@ declare class EventBridge {
   detach(listenerId: string): void;
   detachByNodeId(nodeId: NodeId): void;
   getEventTraces(): EventTraceEntry[];
+  /**
+   * Update the most recent trace entry for a given listener with
+   * dispatch and mutation count timing from the worker.
+   * Transport time is computed on the main thread to avoid cross-origin
+   * timing issues between main thread and worker `performance.now()`.
+   */
+  updateTraceWithWorkerTiming(listenerId: string, dispatchMs: number, mutationCount: number): void;
+  getListenersForNode(nodeId: NodeId): Array<{
+    listenerId: string;
+    eventName: string;
+  }>;
   detachAll(): void;
   private _isPassiveForListener;
 }
@@ -203,6 +237,7 @@ declare class DomRenderer {
   private insertAdjacentHTML;
   private headAppendChild;
   private bodyAppendChild;
+  private callMethod;
   /**
    * Notify onNodeRemoved for a node and all its descendants.
    * This ensures EventBridge detaches listeners on the entire subtree.
@@ -271,5 +306,5 @@ interface AsyncDomInstance {
  */
 declare function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance;
 //#endregion
-export { type AppConfig, type AppId, type AsyncDomConfig, type AsyncDomInstance, BODY_NODE_ID, BinaryWorkerSelfTransport, BinaryWorkerTransport, DOCUMENT_NODE_ID, type DebugLogger, type DebugOptions, DebugStats, type DomMutation, DomRenderer, EventBridge, type EventLogEntry, type EventMessage, FrameScheduler, HEAD_NODE_ID, HTML_NODE_ID, type Message, type MutationAction, type MutationLogEntry, type MutationMessage, type NodeId, type Priority, type SchedulerConfig, type SchedulerLogEntry, type SerializedError, type SerializedEvent, type SerializedLocation, type SyncReadLogEntry, type SystemMessage, ThreadManager, type Transport, type TransportReadyState, WarningCode, type WarningLogEntry, type WebSocketConfig, type WorkerConfig, WorkerSelfTransport, WorkerTransport, createAppId, createAsyncDom, createNodeId, decodeBinaryMessage, encodeBinaryMessage, sanitizeHTML };
+export { ThreadManager as a, DomRenderer as c, SchedulerConfig as d, sanitizeHTML as f, createAsyncDom as i, EventBridge as l, AsyncDomConfig as n, WebSocketConfig as o, AsyncDomInstance as r, WorkerConfig as s, AppConfig as t, FrameScheduler as u };
 //# sourceMappingURL=index.d.cts.map

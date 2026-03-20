@@ -578,7 +578,11 @@ var VirtualElement = class VirtualElement {
 		for (const node of nodes) this.appendChild(node);
 	}
 	get textContent() {
-		return this._textContent;
+		if (this.childNodes.length === 0) return this._textContent;
+		let result = "";
+		for (const child of this.childNodes) if (child.nodeType === 3) result += child.nodeValue;
+		else if (child.nodeType === 1) result += child.textContent;
+		return result;
 	}
 	set textContent(value) {
 		this._textContent = value;
@@ -658,6 +662,42 @@ var VirtualElement = class VirtualElement {
 		if (state.value !== void 0) this._value = state.value;
 		if (state.checked !== void 0) this._checked = state.checked;
 		if (state.selectedIndex !== void 0) this._selectedIndex = state.selectedIndex;
+	}
+	_currentTime = 0;
+	_duration = 0;
+	_paused = true;
+	_ended = false;
+	_readyState = 0;
+	get currentTime() {
+		return this._currentTime;
+	}
+	set currentTime(v) {
+		this._currentTime = v;
+		this.collector.add({
+			action: "setProperty",
+			id: this._nodeId,
+			property: "currentTime",
+			value: v
+		});
+	}
+	get duration() {
+		return this._duration;
+	}
+	get paused() {
+		return this._paused;
+	}
+	get ended() {
+		return this._ended;
+	}
+	get readyState() {
+		return this._readyState;
+	}
+	_updateMediaState(state) {
+		if (state.currentTime !== void 0) this._currentTime = state.currentTime;
+		if (state.duration !== void 0) this._duration = state.duration;
+		if (state.paused !== void 0) this._paused = state.paused;
+		if (state.ended !== void 0) this._ended = state.ended;
+		if (state.readyState !== void 0) this._readyState = state.readyState;
 	}
 	get className() {
 		return this._classes.join(" ");
@@ -968,8 +1008,86 @@ var VirtualElement = class VirtualElement {
 		}
 		return null;
 	}
-	focus() {}
-	blur() {}
+	focus() {
+		this.collector.add({
+			action: "callMethod",
+			id: this._nodeId,
+			method: "focus",
+			args: []
+		});
+	}
+	blur() {
+		this.collector.add({
+			action: "callMethod",
+			id: this._nodeId,
+			method: "blur",
+			args: []
+		});
+	}
+	play() {
+		this.collector.add({
+			action: "callMethod",
+			id: this._nodeId,
+			method: "play",
+			args: []
+		});
+	}
+	pause() {
+		this.collector.add({
+			action: "callMethod",
+			id: this._nodeId,
+			method: "pause",
+			args: []
+		});
+	}
+	load() {
+		this.collector.add({
+			action: "callMethod",
+			id: this._nodeId,
+			method: "load",
+			args: []
+		});
+	}
+	click() {
+		this.collector.add({
+			action: "callMethod",
+			id: this._nodeId,
+			method: "click",
+			args: []
+		});
+	}
+	scrollIntoView(options) {
+		this.collector.add({
+			action: "callMethod",
+			id: this._nodeId,
+			method: "scrollIntoView",
+			args: options ? [options] : []
+		});
+	}
+	select() {
+		this.collector.add({
+			action: "callMethod",
+			id: this._nodeId,
+			method: "select",
+			args: []
+		});
+	}
+	showModal() {
+		this.collector.add({
+			action: "callMethod",
+			id: this._nodeId,
+			method: "showModal",
+			args: []
+		});
+	}
+	close() {
+		this.collector.add({
+			action: "callMethod",
+			id: this._nodeId,
+			method: "close",
+			args: []
+		});
+	}
 	getBoundingClientRect() {
 		const channel = this._ownerDocument?._syncChannel;
 		if (channel) {
@@ -1050,6 +1168,19 @@ var VirtualTextNode = class VirtualTextNode {
 	set textContent(value) {
 		this.nodeValue = value;
 	}
+	get nextSibling() {
+		if (!this.parentNode) return null;
+		const siblings = this.parentNode.childNodes;
+		return siblings[siblings.indexOf(this) + 1] ?? null;
+	}
+	get previousSibling() {
+		if (!this.parentNode) return null;
+		const siblings = this.parentNode.childNodes;
+		return siblings[siblings.indexOf(this) - 1] ?? null;
+	}
+	get childNodes() {
+		return [];
+	}
 	remove() {
 		if (this.parentNode) this.parentNode.childNodes = this.parentNode.childNodes.filter((c) => c !== this);
 		this.parentNode = null;
@@ -1094,6 +1225,19 @@ var VirtualCommentNode = class VirtualCommentNode {
 	get textContent() {
 		return this._nodeValue;
 	}
+	get nextSibling() {
+		if (!this.parentNode) return null;
+		const siblings = this.parentNode.childNodes;
+		return siblings[siblings.indexOf(this) + 1] ?? null;
+	}
+	get previousSibling() {
+		if (!this.parentNode) return null;
+		const siblings = this.parentNode.childNodes;
+		return siblings[siblings.indexOf(this) - 1] ?? null;
+	}
+	get childNodes() {
+		return [];
+	}
 	remove() {
 		if (this.parentNode) this.parentNode.childNodes = this.parentNode.childNodes.filter((c) => c !== this);
 		this.parentNode = null;
@@ -1111,15 +1255,14 @@ var VirtualClassList = class {
 	constructor(element) {
 		this.element = element;
 	}
-	add(name) {
+	add(...names) {
 		const classes = this.element.className.split(" ").filter(Boolean);
-		if (!classes.includes(name)) {
-			classes.push(name);
-			this.element.className = classes.join(" ");
-		}
+		for (const name of names) if (!classes.includes(name)) classes.push(name);
+		this.element.className = classes.join(" ");
 	}
-	remove(name) {
-		const classes = this.element.className.split(" ").filter((c) => c !== name && c !== "");
+	remove(...names) {
+		const nameSet = new Set(names);
+		const classes = this.element.className.split(" ").filter((c) => c !== "" && !nameSet.has(c));
 		this.element.className = classes.join(" ");
 	}
 	contains(name) {
@@ -1138,6 +1281,9 @@ var VirtualClassList = class {
 		}
 		this.add(name);
 		return true;
+	}
+	get length() {
+		return this.element.className.split(" ").filter(Boolean).length;
 	}
 };
 //#endregion
@@ -1187,6 +1333,13 @@ var VirtualEvent = class {
 		return this._stopImmediatePropagation;
 	}
 };
+var VirtualCustomEvent = class extends VirtualEvent {
+	detail;
+	constructor(type, init) {
+		super(type, init);
+		this.detail = init?.detail ?? null;
+	}
+};
 //#endregion
 //#region src/worker-thread/mutation-collector.ts
 const MAX_COALESCED_LOG = 50;
@@ -1207,6 +1360,12 @@ var MutationCollector = class {
 	};
 	_coalescedLog = [];
 	_perTypeCoalesced = /* @__PURE__ */ new Map();
+	/** Total mutations added (monotonically increasing counter for diff-based tracking). */
+	get totalAdded() {
+		return this._stats.added;
+	}
+	/** Feature 15: Current causal event tag for this flush cycle */
+	_causalEvent = null;
 	getStats() {
 		return { ...this._stats };
 	}
@@ -1220,6 +1379,14 @@ var MutationCollector = class {
 	}
 	constructor(appId) {
 		this.appId = appId;
+	}
+	/** Feature 15: Set the causal event for the current mutation cycle. */
+	setCausalEvent(event) {
+		this._causalEvent = event;
+	}
+	/** Feature 15: Get current causal event. */
+	getCausalEvent() {
+		return this._causalEvent;
 	}
 	enableCoalescing(enabled) {
 		this._coalesceEnabled = enabled;
@@ -1335,21 +1502,40 @@ var MutationCollector = class {
 			this.scheduled = false;
 			return;
 		}
+		const perfMarkName = `async-dom:flush:${this.appId}`;
+		if (typeof performance !== "undefined" && performance.mark) performance.mark(`${perfMarkName}:start`);
 		const rawLength = this.queue.length;
 		const batch = this._coalesceEnabled ? this.coalesce(this.queue.splice(0)) : this.queue.splice(0);
 		this.scheduled = false;
 		this._stats.coalesced += rawLength - batch.length;
 		this._stats.flushed += batch.length;
-		if (batch.length === 0) return;
+		if (batch.length === 0) {
+			this._causalEvent = null;
+			return;
+		}
 		this.uidCounter++;
-		if (this.transport?.readyState !== "open") return;
+		if (this.transport?.readyState !== "open") {
+			this._causalEvent = null;
+			return;
+		}
 		const message = {
 			type: "mutation",
 			appId: this.appId,
 			uid: this.uidCounter,
-			mutations: batch
+			mutations: batch,
+			sentAt: Date.now()
 		};
+		if (this._causalEvent) {
+			message.causalEvent = this._causalEvent;
+			this._causalEvent = null;
+		}
 		this.transport.send(message);
+		if (typeof performance !== "undefined" && performance.mark && performance.measure) {
+			performance.mark(`${perfMarkName}:end`);
+			try {
+				performance.measure(perfMarkName, `${perfMarkName}:start`, `${perfMarkName}:end`);
+			} catch {}
+		}
 	}
 	/** Force-flush all pending mutations immediately */
 	flushSync() {
@@ -1375,6 +1561,8 @@ var VirtualDocument = class {
 	collector;
 	_defaultView = null;
 	_syncChannel = null;
+	_title = "";
+	_cookie = "";
 	_ids = /* @__PURE__ */ new Map();
 	_nodeIdToElement = /* @__PURE__ */ new Map();
 	_listenerMap = /* @__PURE__ */ new Map();
@@ -1487,6 +1675,14 @@ var VirtualDocument = class {
 		if (evt.currentTarget != null && typeof evt.currentTarget !== "object") evt.currentTarget = this._resolveTarget(evt.currentTarget);
 		if (evt.relatedTarget != null && typeof evt.relatedTarget !== "object") evt.relatedTarget = this._resolveTarget(evt.relatedTarget);
 		const virtualEvent = new VirtualEvent(evt.type, evt);
+		const eventType = evt.type ?? "unknown";
+		this.collector.setCausalEvent({
+			eventType,
+			listenerId,
+			timestamp: Date.now()
+		});
+		const perfMarkName = `async-dom:event:${eventType}:${listenerId}`;
+		if (typeof performance !== "undefined" && performance.mark) performance.mark(`${perfMarkName}:start`);
 		const targetEl = virtualEvent.target;
 		if (targetEl && typeof targetEl === "object" && "_updateInputState" in targetEl) {
 			const inputState = {};
@@ -1495,9 +1691,19 @@ var VirtualDocument = class {
 			if (evt.selectedIndex !== void 0) inputState.selectedIndex = evt.selectedIndex;
 			if (Object.keys(inputState).length > 0) targetEl._updateInputState(inputState);
 		}
+		if (targetEl && typeof targetEl === "object") {
+			const mediaState = {};
+			if (evt.currentTime !== void 0) mediaState.currentTime = evt.currentTime;
+			if (evt.duration !== void 0) mediaState.duration = evt.duration;
+			if (evt.paused !== void 0) mediaState.paused = evt.paused;
+			if (evt.ended !== void 0) mediaState.ended = evt.ended;
+			if (evt.readyState !== void 0) mediaState.readyState = evt.readyState;
+			if (Object.keys(mediaState).length > 0 && "_updateMediaState" in targetEl) targetEl._updateMediaState(mediaState);
+		}
 		const docListener = this._listenerMap.get(listenerId);
 		if (docListener) {
 			docListener(virtualEvent);
+			this._finishEventPerf(perfMarkName);
 			return;
 		}
 		const targetElement = this._listenerToElement.get(listenerId) ?? null;
@@ -1513,6 +1719,16 @@ var VirtualDocument = class {
 					current = current.parentNode;
 				}
 			}
+		}
+		this._finishEventPerf(perfMarkName);
+	}
+	/** Feature 16: finish performance measurement for an event dispatch */
+	_finishEventPerf(perfMarkName) {
+		if (typeof performance !== "undefined" && performance.mark && performance.measure) {
+			performance.mark(`${perfMarkName}:end`);
+			try {
+				performance.measure(perfMarkName, `${perfMarkName}:start`, `${perfMarkName}:end`);
+			} catch {}
 		}
 	}
 	/**
@@ -1622,6 +1838,60 @@ var VirtualDocument = class {
 		const selector = className.split(/\s+/).filter(Boolean).map((c) => `.${c}`).join("");
 		return this.querySelectorAll(selector);
 	}
+	get title() {
+		return this._title;
+	}
+	set title(value) {
+		this._title = value;
+	}
+	get URL() {
+		return this._defaultView?.location?.href ?? "";
+	}
+	get location() {
+		return this._defaultView?.location ?? null;
+	}
+	get cookie() {
+		return this._cookie;
+	}
+	set cookie(value) {
+		this._cookie = value;
+	}
+	get readyState() {
+		return "complete";
+	}
+	get compatMode() {
+		return "CSS1Compat";
+	}
+	get characterSet() {
+		return "UTF-8";
+	}
+	get contentType() {
+		return "text/html";
+	}
+	get visibilityState() {
+		return "visible";
+	}
+	get hidden() {
+		return false;
+	}
+	get childNodes() {
+		return [this.documentElement];
+	}
+	get children() {
+		return [this.documentElement];
+	}
+	get firstChild() {
+		return this.documentElement;
+	}
+	contains(node) {
+		if (node === this) return true;
+		return this.documentElement.contains(node);
+	}
+	get implementation() {
+		return { hasFeature() {
+			return false;
+		} };
+	}
 	get defaultView() {
 		return this._defaultView;
 	}
@@ -1692,6 +1962,66 @@ var VirtualIntersectionObserver = class {
 	}
 };
 //#endregion
+//#region src/worker-thread/storage.ts
+/**
+* Scoped Storage implementation that can optionally sync with
+* the main thread's real localStorage/sessionStorage via the sync channel.
+*
+* Each worker app gets its own isolated storage with a unique prefix.
+* When a sync channel is available, reads/writes are persisted to the
+* real browser storage on the main thread.
+*/
+var ScopedStorage = class {
+	cache = /* @__PURE__ */ new Map();
+	prefix;
+	storageType;
+	getSyncChannel;
+	queryType;
+	constructor(prefix, storageType, getSyncChannel, queryType) {
+		this.prefix = prefix;
+		this.storageType = storageType;
+		this.getSyncChannel = getSyncChannel;
+		this.queryType = queryType;
+	}
+	syncCall(method, args) {
+		const channel = this.getSyncChannel();
+		if (!channel) return null;
+		return channel.request(this.queryType, JSON.stringify({
+			property: `${this.storageType}.${method}`,
+			args
+		}));
+	}
+	get length() {
+		return this.cache.size;
+	}
+	key(index) {
+		return [...this.cache.keys()][index] ?? null;
+	}
+	getItem(key) {
+		const cached = this.cache.get(key);
+		if (cached !== void 0) return cached;
+		const result = this.syncCall("getItem", [this.prefix + key]);
+		if (typeof result === "string") {
+			this.cache.set(key, result);
+			return result;
+		}
+		return null;
+	}
+	setItem(key, value) {
+		const strValue = String(value);
+		this.cache.set(key, strValue);
+		this.syncCall("setItem", [this.prefix + key, strValue]);
+	}
+	removeItem(key) {
+		this.cache.delete(key);
+		this.syncCall("removeItem", [this.prefix + key]);
+	}
+	clear() {
+		for (const key of this.cache.keys()) this.syncCall("removeItem", [this.prefix + key]);
+		this.cache.clear();
+	}
+};
+//#endregion
 //#region src/worker-thread/index.ts
 /**
 * Creates a virtual DOM environment inside a Web Worker.
@@ -1729,6 +2059,8 @@ function createWorkerDom(config) {
 				location.protocol = initLoc.protocol;
 				location.hostname = initLoc.hostname;
 				location.port = initLoc.port;
+				location.host = initLoc.host;
+				location.origin = initLoc.origin;
 				location.pathname = initLoc.pathname;
 				location.search = initLoc.search;
 				location.hash = initLoc.hash;
@@ -1738,7 +2070,21 @@ function createWorkerDom(config) {
 		}
 		if (require_sync_channel.isEventMessage(message)) {
 			const eventMsg = message;
+			const mutsBefore = doc.collector.totalAdded;
+			const dispatchStart = performance.now();
 			doc.dispatchEvent(eventMsg.listenerId, eventMsg.event);
+			const dispatchMs = performance.now() - dispatchStart;
+			const mutationCount = doc.collector.totalAdded - mutsBefore;
+			const evt = eventMsg.event;
+			const transportMs = evt.timeStamp != null ? dispatchStart - evt.timeStamp : void 0;
+			transport.send({
+				type: "eventTimingResult",
+				listenerId: eventMsg.listenerId,
+				eventType: evt.type ?? "",
+				dispatchMs,
+				mutationCount,
+				transportMs: transportMs ?? 0
+			});
 		}
 	});
 	const workerScope = self;
@@ -1775,18 +2121,43 @@ function createWorkerDom(config) {
 		type: "ready",
 		appId
 	});
-	const storage = /* @__PURE__ */ new Map();
-	const localStorage = {
-		setItem(key, value) {
-			storage.set(key, value);
-		},
-		getItem(key) {
-			return storage.get(key) ?? null;
-		},
-		removeItem(key) {
-			storage.delete(key);
-		}
-	};
+	const perfEntriesInterval = setInterval(() => {
+		if (typeof performance === "undefined" || !performance.getEntriesByType) return;
+		const measures = performance.getEntriesByType("measure").filter((e) => e.name.startsWith("async-dom:"));
+		if (measures.length === 0) return;
+		const entries = measures.map((e) => ({
+			name: e.name,
+			startTime: e.startTime,
+			duration: e.duration,
+			entryType: e.entryType
+		}));
+		transport.send({
+			type: "perfEntries",
+			appId,
+			entries
+		});
+		for (const e of measures) try {
+			performance.clearMeasures(e.name);
+		} catch {}
+	}, 2e3);
+	if (typeof self !== "undefined" && "addEventListener" in self) self.addEventListener("beforeunload", () => clearInterval(perfEntriesInterval));
+	const storagePrefix = `__async_dom_${appId}_`;
+	const localStorage = new ScopedStorage(storagePrefix, "localStorage", () => doc._syncChannel, require_sync_channel.QueryType.WindowProperty);
+	const sessionStorage = new ScopedStorage(`${storagePrefix}session_`, "sessionStorage", () => null, require_sync_channel.QueryType.WindowProperty);
+	function updateLocationFromURL(loc, url) {
+		try {
+			const parsed = new URL(url, loc.href);
+			loc.href = parsed.href;
+			loc.protocol = parsed.protocol;
+			loc.hostname = parsed.hostname;
+			loc.port = parsed.port;
+			loc.host = parsed.host;
+			loc.origin = parsed.origin;
+			loc.pathname = parsed.pathname;
+			loc.search = parsed.search;
+			loc.hash = parsed.hash;
+		} catch {}
+	}
 	const location = {
 		hash: "",
 		href: "http://localhost/",
@@ -1796,30 +2167,61 @@ function createWorkerDom(config) {
 		hostname: "localhost",
 		pathname: "/",
 		protocol: "http:",
-		search: ""
+		search: "",
+		toString() {
+			return this.href;
+		},
+		assign(url) {
+			updateLocationFromURL(location, url);
+			doc.collector.add({
+				action: "pushState",
+				state: null,
+				title: "",
+				url
+			});
+		},
+		replace(url) {
+			updateLocationFromURL(location, url);
+			doc.collector.add({
+				action: "replaceState",
+				state: null,
+				title: "",
+				url
+			});
+		},
+		reload() {}
+	};
+	const history = {
+		state: null,
+		length: 1,
+		pushState(state, title, url) {
+			history.state = state;
+			updateLocationFromURL(location, url);
+			doc.collector.add({
+				action: "pushState",
+				state,
+				title,
+				url
+			});
+		},
+		replaceState(state, title, url) {
+			history.state = state;
+			updateLocationFromURL(location, url);
+			doc.collector.add({
+				action: "replaceState",
+				state,
+				title,
+				url
+			});
+		},
+		back() {},
+		forward() {},
+		go(_delta) {}
 	};
 	const win = {
 		document: doc,
 		location,
-		history: {
-			state: null,
-			pushState(state, title, url) {
-				doc.collector.add({
-					action: "pushState",
-					state,
-					title,
-					url
-				});
-			},
-			replaceState(state, title, url) {
-				doc.collector.add({
-					action: "replaceState",
-					state,
-					title,
-					url
-				});
-			}
-		},
+		history,
 		screen: {
 			get width() {
 				if (doc._syncChannel) {
@@ -1839,6 +2241,7 @@ function createWorkerDom(config) {
 		innerWidth: 1280,
 		innerHeight: 720,
 		localStorage,
+		sessionStorage,
 		addEventListener(name, callback) {
 			doc.addEventListener(name, callback);
 		},
@@ -1867,7 +2270,52 @@ function createWorkerDom(config) {
 		},
 		MutationObserver: VirtualMutationObserver,
 		ResizeObserver: VirtualResizeObserver,
-		IntersectionObserver: VirtualIntersectionObserver
+		IntersectionObserver: VirtualIntersectionObserver,
+		setTimeout,
+		setInterval,
+		clearTimeout,
+		clearInterval,
+		queueMicrotask,
+		performance,
+		fetch: typeof fetch !== "undefined" ? fetch : void 0,
+		URL,
+		URLSearchParams,
+		console,
+		btoa,
+		atob,
+		navigator: self.navigator,
+		Event: VirtualEvent,
+		CustomEvent: VirtualCustomEvent,
+		Node: {
+			ELEMENT_NODE: 1,
+			TEXT_NODE: 3,
+			COMMENT_NODE: 8,
+			DOCUMENT_NODE: 9,
+			DOCUMENT_FRAGMENT_NODE: 11
+		},
+		HTMLElement: VirtualElement,
+		devicePixelRatio: 1,
+		matchMedia: (query) => ({
+			matches: false,
+			media: query,
+			addEventListener() {},
+			removeEventListener() {}
+		}),
+		getSelection: () => ({
+			rangeCount: 0,
+			getRangeAt() {
+				return null;
+			},
+			addRange() {},
+			removeAllRanges() {}
+		}),
+		dispatchEvent: (event) => {
+			doc.dispatchEvent("", event);
+			return true;
+		},
+		eval: (_code) => {
+			throw new Error("sandbox eval is not enabled — set sandbox: true or sandbox: 'eval'");
+		}
 	};
 	Object.defineProperties(win, {
 		innerWidth: {
@@ -1891,6 +2339,54 @@ function createWorkerDom(config) {
 			configurable: true
 		}
 	});
+	const sandboxMode = config?.sandbox;
+	if (sandboxMode === "eval" || sandboxMode === true) win.eval = (code) => {
+		const sandbox = new Proxy(win, {
+			has() {
+				return true;
+			},
+			get(target, prop) {
+				if (prop === Symbol.unscopables) return void 0;
+				if (prop in target) return target[prop];
+				if (prop in self) return self[prop];
+			},
+			set(target, prop, value) {
+				target[prop] = value;
+				return true;
+			}
+		});
+		return new Function("window", "self", "globalThis", "document", `with(window) {\n\t\t\t\treturn (function() { ${code} }).call(window);\n\t\t\t}`)(sandbox, sandbox, sandbox, doc);
+	};
+	if (sandboxMode === "global" || sandboxMode === true) {
+		const workerGlobal = self;
+		workerGlobal.document = doc;
+		workerGlobal.window = win;
+		workerGlobal.location = win.location;
+		workerGlobal.history = win.history;
+		workerGlobal.navigator = win.navigator;
+		workerGlobal.screen = win.screen;
+		workerGlobal.localStorage = win.localStorage;
+		workerGlobal.sessionStorage = win.sessionStorage;
+		workerGlobal.getComputedStyle = win.getComputedStyle.bind(win);
+		workerGlobal.requestAnimationFrame = win.requestAnimationFrame.bind(win);
+		workerGlobal.cancelAnimationFrame = win.cancelAnimationFrame.bind(win);
+		workerGlobal.scrollTo = win.scrollTo.bind(win);
+		workerGlobal.matchMedia = win.matchMedia;
+		workerGlobal.getSelection = win.getSelection;
+		workerGlobal.dispatchEvent = win.dispatchEvent;
+		workerGlobal.MutationObserver = win.MutationObserver;
+		workerGlobal.ResizeObserver = win.ResizeObserver;
+		workerGlobal.IntersectionObserver = win.IntersectionObserver;
+		workerGlobal.Event = win.Event;
+		workerGlobal.CustomEvent = win.CustomEvent;
+		workerGlobal.Node = win.Node;
+		workerGlobal.HTMLElement = win.HTMLElement;
+		workerGlobal.devicePixelRatio = win.devicePixelRatio;
+		const innerWidthDesc = Object.getOwnPropertyDescriptor(win, "innerWidth");
+		const innerHeightDesc = Object.getOwnPropertyDescriptor(win, "innerHeight");
+		if (innerWidthDesc) Object.defineProperty(workerGlobal, "innerWidth", innerWidthDesc);
+		if (innerHeightDesc) Object.defineProperty(workerGlobal, "innerHeight", innerHeightDesc);
+	}
 	doc._defaultView = win;
 	if (config?.debug?.exposeDevtools) globalThis.__ASYNC_DOM_DEVTOOLS__ = {
 		document: doc,
@@ -1908,6 +2404,7 @@ function createWorkerDom(config) {
 }
 //#endregion
 exports.MutationCollector = MutationCollector;
+exports.ScopedStorage = ScopedStorage;
 exports.VirtualCommentNode = VirtualCommentNode;
 exports.VirtualDocument = VirtualDocument;
 exports.VirtualElement = VirtualElement;

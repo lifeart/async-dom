@@ -1,4 +1,4 @@
-import { m as NodeId, o as DomMutation, r as AppId, t as Transport, u as InsertPosition } from "./base.cjs";
+import { d as InsertPosition, h as NodeId, i as AppId, s as DomMutation, t as Transport } from "./base.cjs";
 import { n as DebugOptions } from "./debug.cjs";
 
 //#region src/core/sync-channel.d.ts
@@ -73,6 +73,10 @@ declare class MutationCollector {
   private _stats;
   private _coalescedLog;
   private _perTypeCoalesced;
+  /** Total mutations added (monotonically increasing counter for diff-based tracking). */
+  get totalAdded(): number;
+  /** Feature 15: Current causal event tag for this flush cycle */
+  private _causalEvent;
   getStats(): {
     added: number;
     coalesced: number;
@@ -84,6 +88,18 @@ declare class MutationCollector {
     coalesced: number;
   }>;
   constructor(appId: AppId);
+  /** Feature 15: Set the causal event for the current mutation cycle. */
+  setCausalEvent(event: {
+    eventType: string;
+    listenerId: string;
+    timestamp: number;
+  } | null): void;
+  /** Feature 15: Get current causal event. */
+  getCausalEvent(): {
+    eventType: string;
+    listenerId: string;
+    timestamp: number;
+  } | null;
   enableCoalescing(enabled: boolean): void;
   setTransport(transport: Transport): void;
   add(mutation: DomMutation): void;
@@ -192,6 +208,18 @@ declare class VirtualElement {
     checked?: boolean;
     selectedIndex?: number;
   }): void;
+  private _currentTime;
+  private _duration;
+  private _paused;
+  private _ended;
+  private _readyState;
+  get currentTime(): number;
+  set currentTime(v: number);
+  get duration(): number;
+  get paused(): boolean;
+  get ended(): boolean;
+  get readyState(): number;
+  _updateMediaState(state: Record<string, unknown>): void;
   get className(): string;
   set className(value: string);
   private _eventListeners;
@@ -254,6 +282,14 @@ declare class VirtualElement {
   closest(selector: string): VirtualElement | null;
   focus(): void;
   blur(): void;
+  play(): void;
+  pause(): void;
+  load(): void;
+  click(): void;
+  scrollIntoView(options?: unknown): void;
+  select(): void;
+  showModal(): void;
+  close(): void;
   getBoundingClientRect(): {
     top: number;
     left: number;
@@ -288,6 +324,9 @@ declare class VirtualTextNode {
   set nodeValue(value: string);
   get textContent(): string;
   set textContent(value: string);
+  get nextSibling(): VirtualNode | null;
+  get previousSibling(): VirtualNode | null;
+  get childNodes(): VirtualNode[];
   remove(): void;
   cloneNode(_deep?: boolean): VirtualTextNode;
 }
@@ -312,16 +351,20 @@ declare class VirtualCommentNode {
   get nodeValue(): string;
   set nodeValue(value: string);
   get textContent(): string;
+  get nextSibling(): VirtualNode | null;
+  get previousSibling(): VirtualNode | null;
+  get childNodes(): VirtualNode[];
   remove(): void;
   cloneNode(_deep?: boolean): VirtualCommentNode;
 }
 declare class VirtualClassList {
   private element;
   constructor(element: VirtualElement);
-  add(name: string): void;
-  remove(name: string): void;
+  add(...names: string[]): void;
+  remove(...names: string[]): void;
   contains(name: string): boolean;
   toggle(name: string, force?: boolean): boolean;
+  get length(): number;
 }
 //#endregion
 //#region src/worker-thread/document.d.ts
@@ -338,6 +381,8 @@ declare class VirtualDocument {
   readonly collector: MutationCollector;
   _defaultView: unknown;
   _syncChannel: SyncChannel | null;
+  private _title;
+  private _cookie;
   private _ids;
   private _nodeIdToElement;
   private _listenerMap;
@@ -358,6 +403,8 @@ declare class VirtualDocument {
    */
   private _resolveTarget;
   dispatchEvent(listenerId: string, event: unknown): void;
+  /** Feature 16: finish performance measurement for an event dispatch */
+  private _finishEventPerf;
   /**
    * Register an element by its internal NodeId.
    */
@@ -393,12 +440,61 @@ declare class VirtualDocument {
   querySelectorAll(selector: string): VirtualElement[];
   getElementsByTagName(tagName: string): VirtualElement[];
   getElementsByClassName(className: string): VirtualElement[];
+  get title(): string;
+  set title(value: string);
+  get URL(): string;
+  get location(): unknown;
+  get cookie(): string;
+  set cookie(value: string);
+  get readyState(): string;
+  get compatMode(): string;
+  get characterSet(): string;
+  get contentType(): string;
+  get visibilityState(): string;
+  get hidden(): boolean;
+  get childNodes(): VirtualNode[];
+  get children(): VirtualElement[];
+  get firstChild(): VirtualElement;
+  contains(node: unknown): boolean;
+  get implementation(): {
+    hasFeature(): boolean;
+  };
   get defaultView(): unknown;
   get ownerDocument(): VirtualDocument;
   toJSON(): unknown;
   private _serializeNode;
 }
 //# sourceMappingURL=document.d.ts.map
+//#endregion
+//#region src/worker-thread/events.d.ts
+/**
+ * Virtual event classes that simulate DOM event behavior
+ * including bubbling, propagation control, and default prevention.
+ */
+declare class VirtualEvent {
+  readonly type: string;
+  target: unknown;
+  currentTarget: unknown;
+  readonly bubbles: boolean;
+  readonly cancelable: boolean;
+  defaultPrevented: boolean;
+  readonly timeStamp: number;
+  readonly isTrusted: boolean;
+  eventPhase: number;
+  private _stopPropagation;
+  private _stopImmediatePropagation;
+  constructor(type: string, init?: Record<string, unknown>);
+  preventDefault(): void;
+  stopPropagation(): void;
+  stopImmediatePropagation(): void;
+  get propagationStopped(): boolean;
+  get immediatePropagationStopped(): boolean;
+}
+declare class VirtualCustomEvent extends VirtualEvent {
+  readonly detail: unknown;
+  constructor(type: string, init?: Record<string, unknown>);
+}
+//# sourceMappingURL=events.d.ts.map
 //#endregion
 //#region src/worker-thread/observers.d.ts
 /**
@@ -429,11 +525,38 @@ declare class VirtualIntersectionObserver {
 }
 //# sourceMappingURL=observers.d.ts.map
 //#endregion
+//#region src/worker-thread/storage.d.ts
+/**
+ * Scoped Storage implementation that can optionally sync with
+ * the main thread's real localStorage/sessionStorage via the sync channel.
+ *
+ * Each worker app gets its own isolated storage with a unique prefix.
+ * When a sync channel is available, reads/writes are persisted to the
+ * real browser storage on the main thread.
+ */
+declare class ScopedStorage {
+  private cache;
+  private prefix;
+  private storageType;
+  private getSyncChannel;
+  private queryType;
+  constructor(prefix: string, storageType: "localStorage" | "sessionStorage", getSyncChannel: () => SyncChannel | null, queryType: QueryType);
+  private syncCall;
+  get length(): number;
+  key(index: number): string | null;
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+  clear(): void;
+}
+//# sourceMappingURL=storage.d.ts.map
+//#endregion
 //#region src/worker-thread/index.d.ts
 interface WorkerDomConfig {
   appId?: AppId;
   transport?: Transport;
   debug?: DebugOptions;
+  sandbox?: boolean | "global" | "eval";
 }
 interface WorkerDomResult {
   document: VirtualDocument;
@@ -449,7 +572,8 @@ interface WorkerWindow {
   };
   innerWidth: number;
   innerHeight: number;
-  localStorage: WorkerLocalStorage;
+  localStorage: ScopedStorage;
+  sessionStorage: ScopedStorage;
   addEventListener(name: string, callback: (e: unknown) => void): void;
   removeEventListener(name: string, callback: (e: unknown) => void): void;
   scrollTo(x: number, y: number): void;
@@ -459,6 +583,44 @@ interface WorkerWindow {
   MutationObserver: typeof VirtualMutationObserver;
   ResizeObserver: typeof VirtualResizeObserver;
   IntersectionObserver: typeof VirtualIntersectionObserver;
+  setTimeout: typeof setTimeout;
+  setInterval: typeof setInterval;
+  clearTimeout: typeof clearTimeout;
+  clearInterval: typeof clearInterval;
+  queueMicrotask: typeof queueMicrotask;
+  performance: typeof performance;
+  fetch: typeof fetch | undefined;
+  URL: typeof URL;
+  URLSearchParams: typeof URLSearchParams;
+  console: typeof console;
+  btoa: typeof btoa;
+  atob: typeof atob;
+  navigator: typeof self.navigator;
+  Event: typeof VirtualEvent;
+  CustomEvent: typeof VirtualCustomEvent;
+  Node: {
+    ELEMENT_NODE: 1;
+    TEXT_NODE: 3;
+    COMMENT_NODE: 8;
+    DOCUMENT_NODE: 9;
+    DOCUMENT_FRAGMENT_NODE: 11;
+  };
+  HTMLElement: typeof VirtualElement;
+  devicePixelRatio: number;
+  matchMedia: (query: string) => {
+    matches: boolean;
+    media: string;
+    addEventListener: () => void;
+    removeEventListener: () => void;
+  };
+  getSelection: () => {
+    rangeCount: number;
+    getRangeAt: () => null;
+    addRange: () => void;
+    removeAllRanges: () => void;
+  };
+  dispatchEvent: (event: unknown) => boolean;
+  eval: (code: string) => unknown;
 }
 interface WorkerLocation {
   hash: string;
@@ -470,16 +632,19 @@ interface WorkerLocation {
   pathname: string;
   protocol: string;
   search: string;
+  toString(): string;
+  assign(url: string): void;
+  replace(url: string): void;
+  reload(): void;
 }
 interface WorkerHistory {
   state: unknown;
   pushState(state: unknown, title: string, url: string): void;
   replaceState(state: unknown, title: string, url: string): void;
-}
-interface WorkerLocalStorage {
-  setItem(key: string, value: string): void;
-  getItem(key: string): string | null;
-  removeItem(key: string): void;
+  back(): void;
+  forward(): void;
+  go(delta?: number): void;
+  length: number;
 }
 /**
  * Creates a virtual DOM environment inside a Web Worker.
@@ -490,5 +655,5 @@ interface WorkerLocalStorage {
  */
 declare function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult;
 //#endregion
-export { MutationCollector, VirtualCommentNode, VirtualDocument, VirtualElement, type VirtualNode, VirtualTextNode, WorkerDomConfig, WorkerDomResult, WorkerWindow, createWorkerDom };
+export { MutationCollector, ScopedStorage, VirtualCommentNode, VirtualDocument, VirtualElement, type VirtualNode, VirtualTextNode, WorkerDomConfig, WorkerDomResult, WorkerWindow, createWorkerDom };
 //# sourceMappingURL=worker.d.cts.map

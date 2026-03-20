@@ -1,4 +1,4 @@
-import { d as Message, n as TransportReadyState, t as Transport } from "./base.cjs";
+import { f as Message, n as TransportReadyState, r as TransportStats, t as Transport } from "./base.cjs";
 
 //#region src/transport/ws-transport.d.ts
 interface WebSocketTransportOptions {
@@ -15,6 +15,7 @@ declare class WebSocketTransport implements Transport {
   private ws;
   private handlers;
   private _readyState;
+  private _stats;
   onError?: (error: Error) => void;
   onClose?: () => void;
   private attempt;
@@ -33,6 +34,7 @@ declare class WebSocketTransport implements Transport {
   onMessage(handler: (message: Message) => void): void;
   close(): void;
   get readyState(): TransportReadyState;
+  getStats(): TransportStats;
 }
 //# sourceMappingURL=ws-transport.d.ts.map
 //#endregion
@@ -61,13 +63,17 @@ declare class BinaryWorkerTransport implements Transport {
   private _readyState;
   private strings;
   private mutDecoder;
+  private _statsEnabled;
+  private _stats;
   onError?: (error: Error) => void;
   onClose?: () => void;
   constructor(worker: Worker);
+  enableStats(enabled: boolean): void;
   send(message: Message): void;
   onMessage(handler: (message: Message) => void): void;
   close(): void;
   get readyState(): TransportReadyState;
+  getStats(): TransportStats;
 }
 /**
  * Worker-side binary transport (used inside the worker via self.postMessage).
@@ -83,6 +89,8 @@ declare class BinaryWorkerSelfTransport implements Transport {
   private _readyState;
   private strings;
   private mutEncoder;
+  private _statsEnabled;
+  private _stats;
   onError?: (error: Error) => void;
   onClose?: () => void;
   private scope;
@@ -90,10 +98,12 @@ declare class BinaryWorkerSelfTransport implements Transport {
     postMessage(message: unknown, transfer?: Transferable[]): void;
     onmessage: ((e: MessageEvent) => void) | null;
   });
+  enableStats(enabled: boolean): void;
   send(message: Message): void;
   onMessage(handler: (message: Message) => void): void;
   close(): void;
   get readyState(): TransportReadyState;
+  getStats(): TransportStats;
 }
 //# sourceMappingURL=binary-worker-transport.d.ts.map
 //#endregion
@@ -106,13 +116,17 @@ declare class WorkerTransport implements Transport {
   private worker;
   private handlers;
   private _readyState;
+  private _statsEnabled;
+  private _stats;
   onError?: (error: Error) => void;
   onClose?: () => void;
   constructor(worker: Worker);
+  enableStats(enabled: boolean): void;
   send(message: Message): void;
   onMessage(handler: (message: Message) => void): void;
   close(): void;
   get readyState(): TransportReadyState;
+  getStats(): TransportStats;
 }
 /**
  * Transport implementation used inside a Web Worker.
@@ -121,6 +135,8 @@ declare class WorkerTransport implements Transport {
 declare class WorkerSelfTransport implements Transport {
   private handlers;
   private _readyState;
+  private _statsEnabled;
+  private _stats;
   onError?: (error: Error) => void;
   onClose?: () => void;
   private scope;
@@ -128,10 +144,12 @@ declare class WorkerSelfTransport implements Transport {
     postMessage(message: unknown): void;
     onmessage: ((e: MessageEvent) => void) | null;
   });
+  enableStats(enabled: boolean): void;
   send(message: Message): void;
   onMessage(handler: (message: Message) => void): void;
   close(): void;
   get readyState(): TransportReadyState;
+  getStats(): TransportStats;
 }
 //# sourceMappingURL=worker-transport.d.ts.map
 

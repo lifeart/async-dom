@@ -6,6 +6,13 @@
 var WorkerTransport = class {
 	handlers = [];
 	_readyState = "open";
+	_statsEnabled = false;
+	_stats = {
+		messageCount: 0,
+		totalBytes: 0,
+		largestMessageBytes: 0,
+		lastMessageBytes: 0
+	};
 	onError;
 	onClose;
 	constructor(worker) {
@@ -30,8 +37,18 @@ var WorkerTransport = class {
 			this.onError?.(error);
 		};
 	}
+	enableStats(enabled) {
+		this._statsEnabled = enabled;
+	}
 	send(message) {
 		if (this._readyState !== "open") return;
+		if (this._statsEnabled) {
+			const size = JSON.stringify(message).length;
+			this._stats.messageCount++;
+			this._stats.totalBytes += size;
+			this._stats.lastMessageBytes = size;
+			if (size > this._stats.largestMessageBytes) this._stats.largestMessageBytes = size;
+		}
 		this.worker.postMessage(message);
 	}
 	onMessage(handler) {
@@ -44,6 +61,9 @@ var WorkerTransport = class {
 	get readyState() {
 		return this._readyState;
 	}
+	getStats() {
+		return { ...this._stats };
+	}
 };
 /**
 * Transport implementation used inside a Web Worker.
@@ -52,6 +72,13 @@ var WorkerTransport = class {
 var WorkerSelfTransport = class {
 	handlers = [];
 	_readyState = "open";
+	_statsEnabled = false;
+	_stats = {
+		messageCount: 0,
+		totalBytes: 0,
+		largestMessageBytes: 0,
+		lastMessageBytes: 0
+	};
 	onError;
 	onClose;
 	scope;
@@ -65,8 +92,18 @@ var WorkerSelfTransport = class {
 			}
 		};
 	}
+	enableStats(enabled) {
+		this._statsEnabled = enabled;
+	}
 	send(message) {
 		if (this._readyState !== "open") return;
+		if (this._statsEnabled) {
+			const size = JSON.stringify(message).length;
+			this._stats.messageCount++;
+			this._stats.totalBytes += size;
+			this._stats.lastMessageBytes = size;
+			if (size > this._stats.largestMessageBytes) this._stats.largestMessageBytes = size;
+		}
 		this.scope.postMessage(message);
 	}
 	onMessage(handler) {
@@ -77,6 +114,9 @@ var WorkerSelfTransport = class {
 	}
 	get readyState() {
 		return this._readyState;
+	}
+	getStats() {
+		return { ...this._stats };
 	}
 };
 //#endregion
