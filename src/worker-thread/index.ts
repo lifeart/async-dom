@@ -13,6 +13,7 @@ import {
 	VirtualMutationObserver,
 	VirtualResizeObserver,
 } from "./observers.ts";
+import { ScopedStorage } from "./storage.ts";
 
 export interface WorkerDomConfig {
 	appId?: AppId;
@@ -33,7 +34,8 @@ export interface WorkerWindow {
 	screen: { width: number; height: number };
 	innerWidth: number;
 	innerHeight: number;
-	localStorage: WorkerLocalStorage;
+	localStorage: ScopedStorage;
+	sessionStorage: ScopedStorage;
 	addEventListener(name: string, callback: (e: unknown) => void): void;
 	removeEventListener(name: string, callback: (e: unknown) => void): void;
 	scrollTo(x: number, y: number): void;
@@ -107,12 +109,6 @@ interface WorkerHistory {
 	forward(): void;
 	go(delta?: number): void;
 	length: number;
-}
-
-interface WorkerLocalStorage {
-	setItem(key: string, value: string): void;
-	getItem(key: string): string | null;
-	removeItem(key: string): void;
 }
 
 /**
@@ -226,19 +222,20 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 	// Send ready message after setup
 	transport.send({ type: "ready", appId });
 
-	// localStorage polyfill
-	const storage = new Map<string, string>();
-	const localStorage: WorkerLocalStorage = {
-		setItem(key: string, value: string) {
-			storage.set(key, value);
-		},
-		getItem(key: string): string | null {
-			return storage.get(key) ?? null;
-		},
-		removeItem(key: string) {
-			storage.delete(key);
-		},
-	};
+	// Scoped storage instances with app-specific prefixes
+	const storagePrefix = `__async_dom_${appId}_`;
+	const localStorage = new ScopedStorage(
+		storagePrefix,
+		"localStorage",
+		() => doc._syncChannel,
+		QueryType.WindowProperty,
+	);
+	const sessionStorage = new ScopedStorage(
+		`${storagePrefix}session_`,
+		"sessionStorage",
+		() => null, // sessionStorage is always in-memory (tied to worker lifecycle)
+		QueryType.WindowProperty,
+	);
 
 	function updateLocationFromURL(loc: WorkerLocation, url: string): void {
 		try {
@@ -346,6 +343,7 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 		innerWidth: 1280,
 		innerHeight: 720,
 		localStorage,
+		sessionStorage,
 		addEventListener(name: string, callback: (e: unknown) => void) {
 			doc.addEventListener(name, callback);
 		},
@@ -499,6 +497,7 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 		workerGlobal.navigator = win.navigator;
 		workerGlobal.screen = win.screen;
 		workerGlobal.localStorage = win.localStorage;
+		workerGlobal.sessionStorage = win.sessionStorage;
 		workerGlobal.getComputedStyle = win.getComputedStyle.bind(win);
 		workerGlobal.requestAnimationFrame = win.requestAnimationFrame.bind(win);
 		workerGlobal.cancelAnimationFrame = win.cancelAnimationFrame.bind(win);
@@ -546,3 +545,4 @@ export { VirtualDocument } from "./document.ts";
 export type { VirtualNode } from "./element.ts";
 export { VirtualCommentNode, VirtualElement, VirtualTextNode } from "./element.ts";
 export { MutationCollector } from "./mutation-collector.ts";
+export { ScopedStorage } from "./storage.ts";

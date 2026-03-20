@@ -48,6 +48,16 @@ const ALLOWED_WINDOW_PROPERTIES = new Set([
 	"navigator.hardwareConcurrency",
 	"document.visibilityState",
 	"document.hidden",
+	"localStorage.getItem",
+	"localStorage.setItem",
+	"localStorage.removeItem",
+	"localStorage.length",
+	"localStorage.key",
+	"sessionStorage.getItem",
+	"sessionStorage.setItem",
+	"sessionStorage.removeItem",
+	"sessionStorage.length",
+	"sessionStorage.key",
 ]);
 
 export interface AsyncDomConfig {
@@ -213,6 +223,35 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 					if (!property) return null;
 					// Allowlist of safe window properties to prevent data exfiltration
 					if (!ALLOWED_WINDOW_PROPERTIES.has(property)) return null;
+
+					// Handle storage method calls (localStorage.getItem, etc.)
+					if (property.startsWith("localStorage.") || property.startsWith("sessionStorage.")) {
+						const dotIndex = property.indexOf(".");
+						const storageType = property.slice(0, dotIndex);
+						const method = property.slice(dotIndex + 1);
+						const storage =
+							storageType === "localStorage" ? window.localStorage : window.sessionStorage;
+						const args = parsed.args as string[] | undefined;
+						if (method === "getItem" && args?.[0] != null) {
+							return storage.getItem(args[0]);
+						}
+						if (method === "setItem" && args?.[0] != null && args[1] !== undefined) {
+							storage.setItem(args[0], args[1]);
+							return null;
+						}
+						if (method === "removeItem" && args?.[0] != null) {
+							storage.removeItem(args[0]);
+							return null;
+						}
+						if (method === "length") {
+							return storage.length;
+						}
+						if (method === "key" && args?.[0] !== undefined) {
+							return storage.key(Number(args[0]));
+						}
+						return null;
+					}
+
 					// Support dotted paths like "screen.width"
 					const parts = property.split(".");
 					let current: unknown = window;
