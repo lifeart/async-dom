@@ -1,7 +1,7 @@
 import { BinaryMutationDecoder, BinaryMutationEncoder } from "../core/binary-codec.ts";
 import type { Message, MutationMessage } from "../core/protocol.ts";
 import { StringStore } from "../core/string-store.ts";
-import type { Transport, TransportReadyState } from "./base.ts";
+import type { Transport, TransportReadyState, TransportStats } from "./base.ts";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -219,6 +219,8 @@ export class BinaryWorkerTransport implements Transport {
 	private _readyState: TransportReadyState = "open";
 	private strings = new StringStore();
 	private mutDecoder = new BinaryMutationDecoder(this.strings);
+	private _statsEnabled = false;
+	private _stats: TransportStats = { messageCount: 0, totalBytes: 0, largestMessageBytes: 0, lastMessageBytes: 0 };
 	onError?: (error: Error) => void;
 	onClose?: () => void;
 
@@ -258,14 +260,36 @@ export class BinaryWorkerTransport implements Transport {
 		};
 	}
 
+	enableStats(enabled: boolean): void {
+		this._statsEnabled = enabled;
+	}
+
 	send(message: Message): void {
 		if (this._readyState !== "open") {
 			return;
 		}
 		if (shouldUseBinaryTransfer(message)) {
 			const buffer = encodeBinaryMessage(message);
+			if (this._statsEnabled) {
+				const bytes = buffer.byteLength;
+				this._stats.messageCount++;
+				this._stats.totalBytes += bytes;
+				this._stats.lastMessageBytes = bytes;
+				if (bytes > this._stats.largestMessageBytes) {
+					this._stats.largestMessageBytes = bytes;
+				}
+			}
 			this.worker.postMessage(buffer, [buffer]);
 		} else {
+			if (this._statsEnabled) {
+				const bytes = JSON.stringify(message).length;
+				this._stats.messageCount++;
+				this._stats.totalBytes += bytes;
+				this._stats.lastMessageBytes = bytes;
+				if (bytes > this._stats.largestMessageBytes) {
+					this._stats.largestMessageBytes = bytes;
+				}
+			}
 			this.worker.postMessage(message);
 		}
 	}
@@ -281,6 +305,10 @@ export class BinaryWorkerTransport implements Transport {
 
 	get readyState(): TransportReadyState {
 		return this._readyState;
+	}
+
+	getStats(): TransportStats {
+		return { ...this._stats };
 	}
 }
 
@@ -298,6 +326,8 @@ export class BinaryWorkerSelfTransport implements Transport {
 	private _readyState: TransportReadyState = "open";
 	private strings = new StringStore();
 	private mutEncoder = new BinaryMutationEncoder(this.strings);
+	private _statsEnabled = false;
+	private _stats: TransportStats = { messageCount: 0, totalBytes: 0, largestMessageBytes: 0, lastMessageBytes: 0 };
 	onError?: (error: Error) => void;
 	onClose?: () => void;
 	private scope: {
@@ -323,6 +353,10 @@ export class BinaryWorkerSelfTransport implements Transport {
 		};
 	}
 
+	enableStats(enabled: boolean): void {
+		this._statsEnabled = enabled;
+	}
+
 	send(message: Message): void {
 		if (this._readyState !== "open") {
 			return;
@@ -333,8 +367,26 @@ export class BinaryWorkerSelfTransport implements Transport {
 				this.strings,
 				this.mutEncoder,
 			);
+			if (this._statsEnabled) {
+				const bytes = buffer.byteLength;
+				this._stats.messageCount++;
+				this._stats.totalBytes += bytes;
+				this._stats.lastMessageBytes = bytes;
+				if (bytes > this._stats.largestMessageBytes) {
+					this._stats.largestMessageBytes = bytes;
+				}
+			}
 			this.scope.postMessage(buffer, [buffer]);
 		} else {
+			if (this._statsEnabled) {
+				const bytes = JSON.stringify(message).length;
+				this._stats.messageCount++;
+				this._stats.totalBytes += bytes;
+				this._stats.lastMessageBytes = bytes;
+				if (bytes > this._stats.largestMessageBytes) {
+					this._stats.largestMessageBytes = bytes;
+				}
+			}
 			this.scope.postMessage(message);
 		}
 	}
@@ -349,5 +401,9 @@ export class BinaryWorkerSelfTransport implements Transport {
 
 	get readyState(): TransportReadyState {
 		return this._readyState;
+	}
+
+	getStats(): TransportStats {
+		return { ...this._stats };
 	}
 }

@@ -51,7 +51,7 @@ export {
 } from "./main-thread/index.ts";
 
 // Re-export transport base interface and implementations
-export type { Transport, TransportReadyState } from "./transport/base.ts";
+export type { Transport, TransportReadyState, TransportStats } from "./transport/base.ts";
 export {
 	BinaryWorkerSelfTransport,
 	BinaryWorkerTransport,

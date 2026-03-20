@@ -414,6 +414,10 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		const bridge = new EventBridge(appId, appNodeCache);
 		const appTransport = threadManager.getTransport(appId);
 		if (appTransport) {
+			// Enable transport stats measurement when devtools are active
+			if (config.debug?.exposeDevtools) {
+				appTransport.enableStats?.(true);
+			}
 			bridge.setTransport(appTransport);
 
 			// Wire transport error/close handlers for crash recovery (B4)
@@ -591,6 +595,15 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			},
 			// Get cached debug data for a specific app
 			getAppData: (appId: string) => debugData.get(appId as AppId),
+			// Get transport stats for all apps
+			getTransportStats: () => {
+				const result: Record<string, { messageCount: number; totalBytes: number; largestMessageBytes: number; lastMessageBytes: number } | null> = {};
+				for (const appId of renderers.keys()) {
+					const transport = threadManager.getTransport(appId);
+					result[String(appId)] = transport?.getStats?.() ?? null;
+				}
+				return result;
+			},
 			// Get all apps' cached debug data
 			getAllAppsData: () => {
 				const result: Record<
