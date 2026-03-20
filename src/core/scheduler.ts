@@ -88,7 +88,17 @@ export class FrameScheduler {
 		if (this.running) return;
 		this.running = true;
 		this.setupScrollListener();
-		this.rafId = requestAnimationFrame((ts) => this.tick(ts));
+		this.scheduleFrame();
+	}
+
+	private scheduleFrame(): void {
+		if (!this.running) return;
+		if (typeof document !== "undefined" && document.hidden) {
+			// Tab is hidden — rAF won't fire. Use setTimeout fallback.
+			setTimeout(() => this.tick(performance.now()), this.frameBudgetMs);
+		} else {
+			this.rafId = requestAnimationFrame((ts) => this.tick(ts));
+		}
 	}
 
 	stop(): void {
@@ -206,11 +216,11 @@ export class FrameScheduler {
 	private scheduleNext(frameStart: number): void {
 		const elapsed = performance.now() - frameStart;
 		if (elapsed + 1 >= this.frameBudgetMs) {
-			this.rafId = requestAnimationFrame((ts) => this.tick(ts));
+			this.scheduleFrame();
 		} else {
 			// Frame finished early — delay next tick to avoid burning CPU
 			setTimeout(() => {
-				this.rafId = requestAnimationFrame((ts) => this.tick(ts));
+				this.scheduleFrame();
 			}, this.frameBudgetMs - elapsed);
 		}
 	}
