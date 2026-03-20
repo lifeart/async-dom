@@ -1,5 +1,5 @@
 import type { DebugOptions } from "../core/debug.ts";
-import { resolveDebugHooks } from "../core/debug.ts";
+import { DebugStats, resolveDebugHooks } from "../core/debug.ts";
 import { NodeCache } from "../core/node-cache.ts";
 import type { AppId, DomMutation, Message, NodeId } from "../core/protocol.ts";
 import {
@@ -12,7 +12,13 @@ import {
 } from "../core/protocol.ts";
 import { FrameScheduler, type SchedulerConfig } from "../core/scheduler.ts";
 import { QueryType, SyncChannelHost } from "../core/sync-channel.ts";
-import { captureMutation, captureWarning, createDevtoolsPanel } from "../debug/devtools-panel.ts";
+import {
+	captureEvent,
+	captureMutation,
+	captureSyncRead,
+	captureWarning,
+	createDevtoolsPanel,
+} from "../debug/devtools-panel.ts";
 import { EventBridge } from "./event-bridge.ts";
 import { DomRenderer, type RendererRoot } from "./renderer.ts";
 import { ThreadManager } from "./thread-manager.ts";
@@ -82,6 +88,7 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 	const eventBridges = new Map<AppId, EventBridge>();
 	const syncHosts = new Map<AppId, SyncChannelHost>();
 	const debugHooks = resolveDebugHooks(config.debug);
+	const debugStats = new DebugStats();
 
 	// Per-app DomRenderer map (each has its own NodeCache)
 	const renderers = new Map<AppId, DomRenderer>();
@@ -91,13 +98,19 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 	// Debug data cache: stores virtual DOM trees and worker stats received from workers
 	const debugData = new Map<
 		AppId,
-		{ tree: unknown; workerStats: unknown; perTypeCoalesced: unknown }
+		{
+			tree: unknown;
+			workerStats: unknown;
+			perTypeCoalesced: unknown;
+			coalescedLog: unknown;
+		}
 	>();
 
 	function requestDebugData(appId: AppId): void {
 		threadManager.sendToThread(appId, { type: "debugQuery", query: "tree" });
 		threadManager.sendToThread(appId, { type: "debugQuery", query: "stats" });
 		threadManager.sendToThread(appId, { type: "debugQuery", query: "perTypeCoalesced" });
+		threadManager.sendToThread(appId, { type: "debugQuery", query: "coalescedLog" });
 	}
 
 	function handleSyncQuery(
@@ -225,6 +238,7 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			const bridge = eventBridges.get(appId);
 			if (bridge) {
 				bridge.attach(mutation.id, mutation.name, mutation.listenerId);
+				debugStats.eventsForwarded++;
 			}
 			return;
 		}
@@ -259,6 +273,7 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		}
 		if (renderer) {
 			renderer.apply(mutation, batchUid);
+			debugStats.mutationsApplied++;
 		}
 	});
 
@@ -275,10 +290,12 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				tree: null,
 				workerStats: null,
 				perTypeCoalesced: null,
+				coalescedLog: null,
 			};
 			if (debugMsg.query === "tree") data.tree = debugMsg.result;
 			if (debugMsg.query === "stats") data.workerStats = debugMsg.result;
 			if (debugMsg.query === "perTypeCoalesced") data.perTypeCoalesced = debugMsg.result;
+			if (debugMsg.query === "coalescedLog") data.coalescedLog = debugMsg.result;
 			debugData.set(appId, data);
 		}
 	});
@@ -515,6 +532,7 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				}
 				return null;
 			},
+			debugStats: () => debugStats.snapshot(),
 			apps: () => [...renderers.keys()],
 			renderers: () => {
 				const info: Record<string, unknown> = {};
@@ -535,7 +553,12 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			getAllAppsData: () => {
 				const result: Record<
 					string,
-					{ tree: unknown; workerStats: unknown; perTypeCoalesced: unknown }
+					{
+						tree: unknown;
+						workerStats: unknown;
+						perTypeCoalesced: unknown;
+						coalescedLog: unknown;
+					}
 				> = {};
 				for (const [appId, data] of debugData) {
 					result[String(appId)] = data;
@@ -550,10 +573,12 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		}
 	}
 
-	// Wire mutation/warning capture for the devtools panel
+	// Wire mutation/warning/event/syncRead capture for the devtools panel
 	if (config.debug?.exposeDevtools) {
 		const origOnMutation = debugHooks.onMutation;
 		const origOnWarning = debugHooks.onWarning;
+		const origOnEvent = debugHooks.onEvent;
+		const origOnSyncRead = debugHooks.onSyncRead;
 		debugHooks.onMutation = (entry) => {
 			origOnMutation?.(entry);
 			captureMutation(entry);
@@ -561,6 +586,14 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		debugHooks.onWarning = (entry) => {
 			origOnWarning?.(entry);
 			captureWarning(entry);
+		};
+		debugHooks.onEvent = (entry) => {
+			origOnEvent?.(entry);
+			captureEvent(entry);
+		};
+		debugHooks.onSyncRead = (entry) => {
+			origOnSyncRead?.(entry);
+			captureSyncRead(entry);
 		};
 	}
 

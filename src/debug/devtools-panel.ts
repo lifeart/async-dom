@@ -1,4 +1,9 @@
-import type { MutationLogEntry, WarningLogEntry } from "../core/debug.ts";
+import type {
+	EventLogEntry,
+	MutationLogEntry,
+	SyncReadLogEntry,
+	WarningLogEntry,
+} from "../core/debug.ts";
 
 /**
  * The shape of __ASYNC_DOM_DEVTOOLS__ exposed on globalThis (main thread).
@@ -31,6 +36,7 @@ interface DevtoolsAPI {
 		frameLog: () => FrameLogEntry[];
 		flush: () => void;
 	};
+	debugStats: () => Record<string, number>;
 	getEventTraces: () => EventTraceEntry[];
 	enableHighlightUpdates: (enabled: boolean) => void;
 	findRealNode: (nodeId: number) => Node | null;
@@ -45,6 +51,7 @@ interface AppDebugData {
 	tree: unknown;
 	workerStats: unknown;
 	perTypeCoalesced: unknown;
+	coalescedLog: unknown;
 }
 
 interface TreeNode {
@@ -59,11 +66,15 @@ interface TreeNode {
 
 const MAX_LOG_ENTRIES = 200;
 const MAX_WARNING_ENTRIES = 200;
+const MAX_EVENT_LOG_ENTRIES = 200;
+const MAX_SYNC_READ_LOG_ENTRIES = 200;
 
-// ---- Mutation / Warning capture ----
+// ---- Mutation / Warning / Event / SyncRead capture ----
 
 const mutationLog: MutationLogEntry[] = [];
 const warningLog: WarningLogEntry[] = [];
+const eventLog: EventLogEntry[] = [];
+const syncReadLog: SyncReadLogEntry[] = [];
 let warningBadgeCount = 0;
 let onWarningBadgeUpdate: (() => void) | null = null;
 let logPaused = false;
@@ -72,6 +83,18 @@ export function captureMutation(entry: MutationLogEntry): void {
 	if (logPaused) return;
 	mutationLog.push(entry);
 	if (mutationLog.length > MAX_LOG_ENTRIES) mutationLog.shift();
+}
+
+export function captureEvent(entry: EventLogEntry): void {
+	if (logPaused) return;
+	eventLog.push(entry);
+	if (eventLog.length > MAX_EVENT_LOG_ENTRIES) eventLog.shift();
+}
+
+export function captureSyncRead(entry: SyncReadLogEntry): void {
+	if (logPaused) return;
+	syncReadLog.push(entry);
+	if (syncReadLog.length > MAX_SYNC_READ_LOG_ENTRIES) syncReadLog.shift();
 }
 
 export function captureWarning(entry: WarningLogEntry): void {
@@ -699,6 +722,60 @@ const PANEL_CSS = `
 .coalesce-action { color: #569cd6; width: 120px; flex-shrink: 0; }
 .coalesce-detail { color: #808080; flex: 1; }
 .coalesce-pct { color: #d7ba7d; flex-shrink: 0; width: 60px; text-align: right; }
+
+/* ---- Flush button ---- */
+
+.flush-btn {
+  background: #3c3c3c;
+  border: 1px solid #555;
+  color: #d4d4d4;
+  padding: 1px 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  border-radius: 3px;
+  white-space: nowrap;
+  margin-left: 6px;
+}
+.flush-btn:hover { background: #505050; }
+
+/* ---- Coalesced log (dimmed/strikethrough) ---- */
+
+.coalesced-entry {
+  display: flex;
+  gap: 6px;
+  padding: 2px 0;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 11px;
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+.coalesced-entry .log-action { color: #808080; }
+
+.coalesced-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+  font-size: 11px;
+  color: #808080;
+}
+.coalesced-toggle input { margin: 0; }
+.coalesced-toggle label { cursor: pointer; }
+
+/* ---- Event / Sync Read log entries ---- */
+
+.log-section-title {
+  color: #007acc;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 0 3px;
+  border-top: 1px solid #2d2d2d;
+  margin-top: 4px;
+}
+
+.log-entry.event-entry .log-action { color: #d7ba7d; }
+.log-entry.syncread-entry .log-action { color: #c586c0; }
 
 /* Responsive / mobile-friendly */
 @media (max-width: 600px) {
@@ -1421,8 +1498,9 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 		let html = "";
 
-		// Scheduler section
-		html += '<div class="perf-section-title">Scheduler</div>';
+		// Scheduler section with Flush button
+		html +=
+			'<div class="perf-section-title">Scheduler<button class="flush-btn" id="flush-btn">\u23E9 Flush</button></div>';
 
 		let pendingClass = "";
 		if (pending > 1000) pendingClass = "red";
@@ -1477,6 +1555,27 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 						? "yellow"
 						: "";
 			html += `<div class="perf-row"><span class="perf-label">Coalescing Ratio</span><span class="perf-value ${ratioClass}">${coalescingRatio}%</span></div>`;
+		}
+
+		// Main Thread Stats (DebugStats)
+		if (dt.debugStats) {
+			const ds = dt.debugStats();
+			html += '<div class="perf-section-title">Main Thread Stats</div>';
+			const statKeys: Array<[string, string]> = [
+				["mutationsAdded", "Mutations Added"],
+				["mutationsCoalesced", "Mutations Coalesced"],
+				["mutationsFlushed", "Mutations Flushed"],
+				["mutationsApplied", "Mutations Applied"],
+				["eventsForwarded", "Events Forwarded"],
+				["eventsDispatched", "Events Dispatched"],
+				["syncReadRequests", "Sync Read Requests"],
+				["syncReadTimeouts", "Sync Read Timeouts"],
+			];
+			for (const [key, label] of statKeys) {
+				const val = ds[key] ?? 0;
+				const valClass = key === "syncReadTimeouts" && val > 0 ? "red" : "";
+				html += `<div class="perf-row"><span class="perf-label">${escapeHtml(label)}</span><span class="perf-value ${valClass}">${val}</span></div>`;
+			}
 		}
 
 		// Frame budget flamechart
@@ -1551,6 +1650,17 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 		perfContent.innerHTML = html;
 
+		// Wire flush button
+		const flushBtn = perfContent.querySelector("#flush-btn");
+		if (flushBtn) {
+			flushBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				const dtf = getDevtools();
+				if (dtf) dtf.scheduler.flush();
+				renderPerfTab();
+			});
+		}
+
 		// Wire click handlers for frame rows
 		const frameRows = perfContent.querySelectorAll(".frame-bar-row");
 		for (const row of frameRows) {
@@ -1565,6 +1675,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	// ---- Log rendering ----
 
 	let lastRenderedLogLength = 0;
+	let showCoalesced = false;
 
 	logPauseBtn.addEventListener("click", () => {
 		logPaused = !logPaused;
@@ -1750,6 +1861,133 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			}
 		}
 
+		// Events section (Gap 4)
+		if (eventLog.length > 0) {
+			const evtSection = document.createElement("div");
+			evtSection.className = "log-section-title";
+			evtSection.textContent = `Events (${eventLog.length})`;
+			logList.appendChild(evtSection);
+
+			const recentEvents = eventLog.slice(-50);
+			for (const entry of recentEvents) {
+				const div = document.createElement("div");
+				div.className = "log-entry event-entry";
+
+				const timeSpan = document.createElement("span");
+				timeSpan.className = "log-time";
+				timeSpan.textContent = formatTime(entry.timestamp);
+				div.appendChild(timeSpan);
+
+				const actionSpan = document.createElement("span");
+				actionSpan.className = "log-action";
+				actionSpan.textContent = entry.eventType;
+				div.appendChild(actionSpan);
+
+				const detailSpan = document.createElement("span");
+				detailSpan.className = "log-detail";
+				detailSpan.textContent = `${entry.phase}\u2192${entry.phase === "serialize" ? "dispatch" : "done"} targetId=${entry.targetId ?? "?"}`;
+				div.appendChild(detailSpan);
+
+				logList.appendChild(div);
+			}
+		}
+
+		// Sync Reads section (Gap 4)
+		if (syncReadLog.length > 0) {
+			const syncSection = document.createElement("div");
+			syncSection.className = "log-section-title";
+			syncSection.textContent = `Sync Reads (${syncReadLog.length})`;
+			logList.appendChild(syncSection);
+
+			const recentReads = syncReadLog.slice(-50);
+			for (const entry of recentReads) {
+				const div = document.createElement("div");
+				div.className = "log-entry syncread-entry";
+
+				const timeSpan = document.createElement("span");
+				timeSpan.className = "log-time";
+				timeSpan.textContent = formatTime(entry.timestamp);
+				div.appendChild(timeSpan);
+
+				const actionSpan = document.createElement("span");
+				actionSpan.className = "log-action";
+				const queryNames = ["boundingRect", "computedStyle", "nodeProperty", "windowProperty"];
+				actionSpan.textContent = queryNames[entry.queryType] ?? `query:${entry.queryType}`;
+				div.appendChild(actionSpan);
+
+				const detailSpan = document.createElement("span");
+				detailSpan.className = "log-detail";
+				detailSpan.textContent = `node=${entry.nodeId} ${entry.latencyMs.toFixed(1)}ms ${entry.result}`;
+				div.appendChild(detailSpan);
+
+				logList.appendChild(div);
+			}
+		}
+
+		// Coalesced log section (Gap 2)
+		{
+			const coalescedToggleDiv = document.createElement("div");
+			coalescedToggleDiv.className = "coalesced-toggle";
+			const checkbox = document.createElement("input");
+			checkbox.type = "checkbox";
+			checkbox.id = "coalesced-toggle-cb";
+			checkbox.checked = showCoalesced;
+			const label = document.createElement("label");
+			label.htmlFor = "coalesced-toggle-cb";
+			label.textContent = "Show coalesced";
+			coalescedToggleDiv.appendChild(checkbox);
+			coalescedToggleDiv.appendChild(label);
+			logList.appendChild(coalescedToggleDiv);
+
+			checkbox.addEventListener("change", () => {
+				showCoalesced = checkbox.checked;
+				renderLogTab();
+			});
+
+			if (showCoalesced) {
+				const allData = dt ? dt.getAllAppsData() : {};
+				let allCoalesced: Array<{ action: string; key: string; timestamp: number }> = [];
+				for (const data of Object.values(allData)) {
+					if (data?.coalescedLog && Array.isArray(data.coalescedLog)) {
+						allCoalesced = allCoalesced.concat(
+							data.coalescedLog as Array<{ action: string; key: string; timestamp: number }>,
+						);
+					}
+				}
+				allCoalesced.sort((a, b) => b.timestamp - a.timestamp);
+				const last50 = allCoalesced.slice(0, 50);
+
+				if (last50.length > 0) {
+					const coalTitle = document.createElement("div");
+					coalTitle.className = "log-section-title";
+					coalTitle.textContent = `Coalesced (${last50.length} of ${allCoalesced.length})`;
+					logList.appendChild(coalTitle);
+
+					for (const entry of last50) {
+						const div = document.createElement("div");
+						div.className = "coalesced-entry";
+
+						const timeSpan = document.createElement("span");
+						timeSpan.className = "log-time";
+						timeSpan.textContent = formatTime(entry.timestamp);
+						div.appendChild(timeSpan);
+
+						const actionSpan = document.createElement("span");
+						actionSpan.className = "log-action";
+						actionSpan.textContent = entry.action;
+						div.appendChild(actionSpan);
+
+						const detailSpan = document.createElement("span");
+						detailSpan.className = "log-detail";
+						detailSpan.textContent = entry.key;
+						div.appendChild(detailSpan);
+
+						logList.appendChild(div);
+					}
+				}
+			}
+		}
+
 		if (autoScroll) {
 			logList.scrollTop = logList.scrollHeight;
 		}
@@ -1907,6 +2145,8 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			// Reset module-level state for clean re-creation (e.g., HMR)
 			mutationLog.length = 0;
 			warningLog.length = 0;
+			eventLog.length = 0;
+			syncReadLog.length = 0;
 			warningBadgeCount = 0;
 			host.remove();
 		},
