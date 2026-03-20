@@ -16,7 +16,7 @@ Offload UI to Web Workers with frame-budgeted scheduling. Your application logic
 - **Frame budgeting** — adaptive batch sizing per frame with priority levels and optional viewport culling.
 - **Binary wire format** — 22-opcode binary codec with string deduplication and numeric Node IDs.
 - **Per-app isolation** — multiple workers render into the same page, each with its own renderer and optional shadow DOM.
-- **Built-in DevTools** — in-page debug panel with virtual DOM tree, scheduler stats, mutation log, and worker error reporting.
+- **Built-in DevTools** — in-page debug panel with virtual DOM tree, scheduler profiler, mutation log, event tracer, causality graph, time-travel replay, and session export/import.
 - **Security** — HTML sanitizer, property allowlist, and attribute filtering block dangerous content.
 
 ## Getting Started
@@ -99,14 +99,17 @@ const dom = createAsyncDom({
 });
 ```
 
-This injects a collapsible panel in the bottom-right corner with 4 tabs:
+This injects a collapsible panel in the bottom-right corner with 5 tabs:
 
 | Tab | What it shows |
 | --- | ------------- |
-| **Tree** | Virtual DOM tree from the worker thread (not a copy of the real DOM) |
-| **Performance** | Scheduler stats: pending queue, frame time, mutations/frame, coalescing ratio |
-| **Log** | Live mutation stream with filtering, pause/resume, auto-scroll |
-| **Warnings** | Missing nodes, queue overflow, worker errors with expandable stack traces |
+| **Tree** | Virtual DOM tree from the worker with node inspector sidebar (attributes, computed styles, event listeners, mutation history, "why updated?" trail). Snapshot & diff two tree states. |
+| **Performance** | Scheduler stats, frame budget flamechart, worker-to-main latency (P50/P95/P99), dropped frames, mutation type chart, coalescing breakdown, sync read heatmap, transport message sizes, worker CPU profiler, multi-app interleaving timeline |
+| **Log** | Live mutation stream grouped by batch with color-coded diffs, event round-trip tracer with visual timeline bars, coalesced mutation display, time-travel replay with scrubber |
+| **Warnings** | Warnings grouped by code with inline docs and suggested fixes, suppress per code, filter |
+| **Graph** | Causality DAG: events → mutation batches → affected DOM nodes |
+
+Additional header controls: highlight DOM updates toggle, export/import debug sessions, health status dot.
 
 Multi-app: when multiple workers are running, the panel shows a per-app selector with separate trees and stats.
 
@@ -162,11 +165,18 @@ When `exposeDevtools: true`, inspect from the browser console:
 
 ```js
 // Main thread console:
-__ASYNC_DOM_DEVTOOLS__.scheduler.stats()    // {pending, frameId, frameTime, isRunning}
-__ASYNC_DOM_DEVTOOLS__.scheduler.flush()    // Manual drain for debugging
-__ASYNC_DOM_DEVTOOLS__.apps()               // List all app IDs
-__ASYNC_DOM_DEVTOOLS__.findRealNode(42)     // Find real DOM element by nodeId
-__ASYNC_DOM_DEVTOOLS__.getAllAppsData()      // Virtual DOM trees + worker stats
+__ASYNC_DOM_DEVTOOLS__.scheduler.stats()       // {pending, frameId, frameTime, isRunning, droppedFrameCount, workerToMainLatencyMs}
+__ASYNC_DOM_DEVTOOLS__.scheduler.frameLog()    // Per-frame timing breakdown
+__ASYNC_DOM_DEVTOOLS__.scheduler.flush()       // Manual drain for debugging
+__ASYNC_DOM_DEVTOOLS__.apps()                  // List all app IDs
+__ASYNC_DOM_DEVTOOLS__.findRealNode(42)        // Find real DOM element by nodeId
+__ASYNC_DOM_DEVTOOLS__.getAllAppsData()         // Virtual DOM trees + worker stats
+__ASYNC_DOM_DEVTOOLS__.getEventTraces()        // Event round-trip timing data
+__ASYNC_DOM_DEVTOOLS__.getTransportStats()     // Per-app transport message sizes
+__ASYNC_DOM_DEVTOOLS__.getWorkerPerfEntries()  // Worker CPU performance entries
+__ASYNC_DOM_DEVTOOLS__.getCausalityTracker()   // Event → mutation causality graph
+__ASYNC_DOM_DEVTOOLS__.getMutationCorrelation() // "Why was this node updated?" data
+__ASYNC_DOM_DEVTOOLS__.enableHighlightUpdates(true)  // Flash DOM nodes on mutation
 
 // Worker console:
 __ASYNC_DOM_DEVTOOLS__.tree()               // Virtual DOM tree snapshot
@@ -319,7 +329,7 @@ Cross-Origin-Embedder-Policy: require-corp
 npm install          # install dependencies
 npm run dev          # dev server with examples
 npm run build        # build ESM + CJS + declarations
-npm test             # 472 tests across 34 files
+npm test             # 634 tests across 46 files
 npm run typecheck    # type-check
 npm run lint         # lint (Biome)
 ```
