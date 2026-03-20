@@ -102,6 +102,7 @@ export interface MutationMessage {
 	uid: number;
 	mutations: DomMutation[];
 	priority?: Priority;
+	sentAt?: number;
 }
 
 // Serialized event data sent from main thread to worker

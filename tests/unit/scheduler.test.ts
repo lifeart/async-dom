@@ -158,4 +158,32 @@ describe("FrameScheduler", () => {
 		expect((applied[2] as { id: NodeId }).id).toBe(b1);
 		expect((applied[3] as { id: NodeId }).id).toBe(b2);
 	});
+
+	it("getStats() returns droppedFrameCount", () => {
+		const stats = scheduler.getStats();
+		expect(stats).toHaveProperty("droppedFrameCount");
+		expect(stats.droppedFrameCount).toBe(0);
+	});
+
+	it("getStats() returns workerToMainLatencyMs", () => {
+		const stats = scheduler.getStats();
+		expect(stats).toHaveProperty("workerToMainLatencyMs");
+		expect(stats.workerToMainLatencyMs).toBe(0);
+	});
+
+	it("recordWorkerLatency() updates workerToMainLatencyMs in stats", () => {
+		const sentAt = Date.now() - 10;
+		scheduler.recordWorkerLatency(sentAt);
+		const stats = scheduler.getStats();
+		expect(stats.workerToMainLatencyMs).toBeGreaterThanOrEqual(10);
+		expect(stats.workerToMainLatencyMs).toBeLessThan(100);
+	});
+
+	it("droppedFrameCount does NOT increment for empty frames (no mutations processed)", () => {
+		// Simulate a tick with no mutations: just flush an empty queue
+		// droppedFrameCount should remain 0
+		scheduler.flush();
+		const stats = scheduler.getStats();
+		expect(stats.droppedFrameCount).toBe(0);
+	});
 });
