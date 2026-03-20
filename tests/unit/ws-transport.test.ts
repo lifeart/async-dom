@@ -40,7 +40,6 @@ class MockWebSocket {
 		this.onclose?.({} as CloseEvent);
 	}
 
-	// Test helpers
 	simulateOpen(): void {
 		this.readyState = MockWebSocket.OPEN;
 		this.onopen?.({} as Event);
@@ -67,7 +66,6 @@ describe("WebSocketTransport", () => {
 				lastCreatedWs = this;
 			}
 		};
-		// Also set static constants on the replacement
 		(globalThis.WebSocket as unknown as Record<string, number>).OPEN = MockWebSocket.OPEN;
 		(globalThis.WebSocket as unknown as Record<string, number>).CONNECTING =
 			MockWebSocket.CONNECTING;
@@ -91,11 +89,9 @@ describe("WebSocketTransport", () => {
 			mutations: [{ action: "createNode", id: createNodeId(), tag: "div" }],
 		};
 
-		// WebSocket is still connecting, message should be queued
 		transport.send(msg);
 		expect(lastCreatedWs.sentMessages).toHaveLength(0);
 
-		// Now open the connection, queued message should be flushed
 		lastCreatedWs.simulateOpen();
 		expect(lastCreatedWs.sentMessages).toHaveLength(1);
 		expect(JSON.parse(lastCreatedWs.sentMessages[0])).toEqual(msg);
@@ -137,7 +133,6 @@ describe("WebSocketTransport", () => {
 		const { WebSocketTransport } = await import("../../src/transport/ws-transport.ts");
 		const transport = new WebSocketTransport("ws://localhost:1234", { maxRetries: 0 });
 
-		// Queue messages while connecting
 		transport.send({
 			type: "mutation",
 			appId: createAppId("a"),
@@ -147,7 +142,6 @@ describe("WebSocketTransport", () => {
 
 		transport.close();
 
-		// Messages should not be flushed even if we somehow open the ws
 		expect(lastCreatedWs.sentMessages).toHaveLength(0);
 	});
 

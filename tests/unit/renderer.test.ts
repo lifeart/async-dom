@@ -258,7 +258,6 @@ describe("DomRenderer", () => {
 			const id = createNodeId();
 			renderer.apply({ action: "createNode", id, tag: "div" });
 			renderer.apply({ action: "setProperty", id, property: "__proto__", value: {} });
-			// Should not throw, just be silently blocked
 		});
 
 		it("blocks constructor property", () => {

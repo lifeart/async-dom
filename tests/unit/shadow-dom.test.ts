@@ -175,7 +175,6 @@ describe("Shadow DOM Support", () => {
 			renderer1.apply({ action: "createNode", id: styleId, tag: "style" });
 			renderer1.apply({ action: "headAppendChild", id: styleId });
 
-			// Style should be in shadow1 only
 			expect(shadow1.querySelector("style")).toBeTruthy();
 			expect(shadow2.querySelector("style")).toBeNull();
 		});

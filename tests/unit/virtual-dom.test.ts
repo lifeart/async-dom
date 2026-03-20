@@ -212,11 +212,10 @@ describe("VirtualElement", () => {
 			expect(el.textContent).toBe("hello");
 		});
 
-		it("sets innerHTML", () => {
+		it("sets innerHTML and clears childNodes", () => {
 			const el = doc.createElement("div");
 			el.innerHTML = "<b>bold</b>";
 			expect(el.innerHTML).toBe("<b>bold</b>");
-			// innerHTML clears childNodes
 			expect(el.childNodes).toHaveLength(0);
 		});
 	});

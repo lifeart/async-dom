@@ -83,11 +83,7 @@ describe("Per-app DomRenderer isolation", () => {
 		const id = createNodeId();
 
 		rendererA.apply({ action: "createNode", id, tag: "div" });
-
-		// Renderer A can find the node
 		expect(rendererA.getNode(id)).toBeInstanceOf(HTMLDivElement);
-
-		// Renderer B cannot find the node — separate cache
 		expect(rendererB.getNode(id)).toBeNull();
 	});
 
