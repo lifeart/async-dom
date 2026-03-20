@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>async-dom — Examples</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; }
+    .header { text-align: center; padding: 48px 16px 32px; }
+    .header h1 { font-size: 2.5rem; font-weight: 700; }
+    .header h1 span { color: #58a6ff; }
+    .header p { color: #8b949e; margin-top: 8px; font-size: 1.1rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; max-width: 960px; margin: 0 auto; padding: 0 20px 60px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 24px; transition: border-color 0.2s; }
+    .card:hover { border-color: #58a6ff; }
+    .card h2 { font-size: 1.2rem; margin-bottom: 8px; }
+    .card h2 a { color: #58a6ff; text-decoration: none; }
+    .card h2 a:hover { text-decoration: underline; }
+    .card p { color: #8b949e; font-size: 0.9rem; line-height: 1.5; }
+    .card .tags { margin-top: 12px; }
+    .card .tag { display: inline-block; background: #1f2937; color: #9ca3af; font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; margin-right: 4px; }
+    .footer { text-align: center; padding: 32px; color: #8b949e; font-size: 0.85rem; }
+    .footer a { color: #58a6ff; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><span>async-dom</span> Examples</h1>
+    <p>UI in Web Workers — frame-budgeted rendering at 60 fps</p>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <h2><a href="./vanilla/">7000 Nodes Grid</a></h2>
+      <p>Interactive color grid with 7,000 DOM nodes rendered from a worker. Click to score, hover to highlight, periodic color updates.</p>
+      <div class="tags">
+        <span class="tag">performance</span>
+        <span class="tag">events</span>
+        <span class="tag">scheduler</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2><a href="./counter/">Counter</a></h2>
+      <p>Minimal example — increment/decrement buttons with click handlers and textContent updates.</p>
+      <div class="tags">
+        <span class="tag">beginner</span>
+        <span class="tag">events</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2><a href="./todo/">Todo List</a></h2>
+      <p>Todo app with input sync, keyboard events, dynamic add/remove, classList toggling, and checkbox state.</p>
+      <div class="tags">
+        <span class="tag">input sync</span>
+        <span class="tag">dynamic DOM</span>
+        <span class="tag">classList</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2><a href="./multi-app/">Multi-App Isolation</a></h2>
+      <p>Two worker apps in separate shadow roots — fully isolated CSS. Color picker + stopwatch side by side.</p>
+      <div class="tags">
+        <span class="tag">shadow DOM</span>
+        <span class="tag">isolation</span>
+        <span class="tag">multi-app</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2><a href="./audio-player/">Audio Player</a></h2>
+      <p>Audio playback controlled from a Web Worker — play(), pause(), currentTime, timeupdate events, all via callMethod mutations.</p>
+      <div class="tags">
+        <span class="tag">callMethod</span>
+        <span class="tag">media API</span>
+        <span class="tag">events</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2><a href="./vanilla/?debug">DevTools Panel</a></h2>
+      <p>The 7000-node grid with the built-in debug panel enabled. Virtual DOM tree, scheduler stats, mutation log, warnings.</p>
+      <div class="tags">
+        <span class="tag">devtools</span>
+        <span class="tag">debugging</span>
+        <span class="tag">flamechart</span>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <a href="https://github.com/lifeart/async-dom">GitHub</a> · MIT License
+  </div>
+</body>
+</html>

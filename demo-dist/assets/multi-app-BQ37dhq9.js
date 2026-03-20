@@ -1,0 +1,1 @@
+import{c as t}from"./index-DOSw9tUU.js";const e=t({target:document.body});e.addApp({worker:new Worker(new URL("/assets/app1-DlykB3sR.js",import.meta.url),{type:"module"}),mountPoint:"#app1",shadow:!0});e.addApp({worker:new Worker(new URL("/assets/app2-BrMM20Ha.js",import.meta.url),{type:"module"}),mountPoint:"#app2",shadow:!0});e.start();

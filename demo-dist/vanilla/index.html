@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>async-dom — Vanilla Demo</title>
+  <script src="../coi-serviceworker.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #1a1a1a;
+      color: #fff;
+      margin: 0;
+      padding: 0;
+    }
+    #score-board {
+      position: fixed;
+      top: 0;
+      right: 0;
+      padding: 8px 16px;
+      background: rgba(0,0,0,0.7);
+      z-index: 10;
+      font-size: 14px;
+    }
+    #info {
+      text-align: center;
+      padding: 8px;
+      background: #232323;
+    }
+    #info a {
+      color: #f2f2f2;
+      text-decoration: none;
+    }
+  </style>
+  <script type="module" crossorigin src="/assets/vanilla-F2pdmWOW.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/index-DOSw9tUU.js">
+</head>
+<body>
+  <div id="score-board">Score: 0</div>
+  <div id="info">
+    <a href="https://github.com/lifeart/async-dom" target="_blank">
+      async-dom — 7000 DOM Nodes from Worker — 60 FPS
+    </a>
+    <button id="debug-toggle" style="margin-left:16px;padding:4px 12px;cursor:pointer;background:#444;color:#fff;border:1px solid #666;border-radius:4px;font-size:12px">
+      🛠 DevTools
+    </button>
+  </div>
+  <script>
+    document.getElementById('debug-toggle').addEventListener('click', function() {
+      var url = new URL(window.location);
+      if (url.searchParams.has('debug')) {
+        url.searchParams.delete('debug');
+      } else {
+        url.searchParams.set('debug', '');
+      }
+      window.location = url;
+    });
+  </script>
+  <div id="app"></div>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>async-dom Multi-App</title>
+  <script src="../coi-serviceworker.js"></script>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0; padding: 40px;
+      background: #f0f0f0;
+    }
+    h1 { text-align: center; margin-bottom: 24px; color: #333; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .app-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      min-height: 250px;
+      overflow: hidden;
+    }
+  </style>
+  <script type="module" crossorigin src="/assets/multi-app-BQ37dhq9.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/index-DOSw9tUU.js">
+</head>
+<body>
+  <h1>Multi-App Isolation (Shadow DOM)</h1>
+  <div class="grid">
+    <div class="app-container" id="app1"></div>
+    <div class="app-container" id="app2"></div>
+  </div>
+</body>
+</html>
