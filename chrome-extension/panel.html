@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<div id="app">
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <button class="active" data-tab="tree">Tree</button>
+    <button data-tab="performance">Performance</button>
+    <button data-tab="messages">Messages</button>
+    <button data-tab="warnings">Warnings</button>
+    <div class="spacer"></div>
+    <div class="status">
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-text">Detecting...</span>
+    </div>
+  </div>
+
+  <!-- Not Detected Overlay -->
+  <div id="not-detected" class="hidden">
+    <h2>async-dom not detected</h2>
+    <p>
+      This page does not appear to be using async-dom, or devtools are not enabled.
+      Make sure your app is initialized with:
+    </p>
+    <code>createAsyncDom({ debug: { exposeDevtools: true } })</code>
+    <p>Then reload the page.</p>
+  </div>
+
+  <!-- Panel 1: Tree -->
+  <div class="tab-content active" data-panel="tree">
+    <div class="tree-panel">
+      <div class="tree-pane" id="tree-pane"></div>
+      <div class="props-pane" id="props-pane">
+        <div class="props-empty">Select a node to inspect its properties.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 2: Performance -->
+  <div class="tab-content" data-panel="performance">
+    <div class="perf-panel" id="perf-panel">
+      <!-- Scheduler Stats -->
+      <div class="perf-card">
+        <h3>Queue Depth</h3>
+        <div class="perf-metric">
+          <span class="perf-metric-label">Pending mutations</span>
+          <span class="perf-metric-value" id="perf-pending">--</span>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-queue"></canvas>
+        </div>
+      </div>
+
+      <div class="perf-card">
+        <h3>Frame Timing</h3>
+        <div class="perf-metric">
+          <span class="perf-metric-label">Last frame</span>
+          <span class="perf-metric-value" id="perf-frame-time">--</span>
+        </div>
+        <div class="perf-metric">
+          <span class="perf-metric-label">Budget</span>
+          <span class="perf-metric-value" style="font-size:13px;color:var(--text-muted)">16ms</span>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-frame"></canvas>
+        </div>
+      </div>
+
+      <div class="perf-card">
+        <h3>Scheduler</h3>
+        <div class="perf-metric">
+          <span class="perf-metric-label">Frame ID</span>
+          <span class="perf-metric-value" id="perf-frame-id" style="font-size:14px">--</span>
+        </div>
+        <div class="perf-metric">
+          <span class="perf-metric-label">Actions/frame</span>
+          <span class="perf-metric-value" id="perf-actions" style="font-size:14px">--</span>
+        </div>
+        <div class="perf-metric">
+          <span class="perf-metric-label">Running</span>
+          <span class="perf-metric-value" id="perf-running" style="font-size:14px">--</span>
+        </div>
+      </div>
+
+      <div class="perf-card">
+        <h3>Debug Stats</h3>
+        <div id="perf-debug-stats">
+          <div class="perf-metric">
+            <span class="perf-metric-label">Mutations added</span>
+            <span class="perf-metric-value" id="stat-mutationsAdded" style="font-size:14px">--</span>
+          </div>
+          <div class="perf-metric">
+            <span class="perf-metric-label">Mutations coalesced</span>
+            <span class="perf-metric-value" id="stat-mutationsCoalesced" style="font-size:14px">--</span>
+          </div>
+          <div class="perf-metric">
+            <span class="perf-metric-label">Mutations flushed</span>
+            <span class="perf-metric-value" id="stat-mutationsFlushed" style="font-size:14px">--</span>
+          </div>
+          <div class="perf-metric">
+            <span class="perf-metric-label">Mutations applied</span>
+            <span class="perf-metric-value" id="stat-mutationsApplied" style="font-size:14px">--</span>
+          </div>
+          <div class="perf-metric">
+            <span class="perf-metric-label">Events forwarded</span>
+            <span class="perf-metric-value" id="stat-eventsForwarded" style="font-size:14px">--</span>
+          </div>
+          <div class="perf-metric">
+            <span class="perf-metric-label">Events dispatched</span>
+            <span class="perf-metric-value" id="stat-eventsDispatched" style="font-size:14px">--</span>
+          </div>
+          <div class="perf-metric">
+            <span class="perf-metric-label">Sync reads</span>
+            <span class="perf-metric-value" id="stat-syncReadRequests" style="font-size:14px">--</span>
+          </div>
+          <div class="perf-metric">
+            <span class="perf-metric-label">Sync timeouts</span>
+            <span class="perf-metric-value" id="stat-syncReadTimeouts" style="font-size:14px">--</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="perf-card full-width">
+        <h3>Mutation Types</h3>
+        <div class="mutation-bar-container" id="mutation-type-bars">
+          <div class="perf-metric">
+            <span class="perf-metric-label" style="font-style:italic">Waiting for data...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="perf-card full-width">
+        <h3>Apps</h3>
+        <div id="perf-apps">
+          <div class="perf-metric">
+            <span class="perf-metric-label" style="font-style:italic">--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 3: Messages -->
+  <div class="tab-content" data-panel="messages">
+    <div class="messages-panel">
+      <div class="messages-toolbar">
+        <select id="msg-type-filter">
+          <option value="all">All types</option>
+          <option value="mutation">Mutations</option>
+          <option value="event">Events</option>
+        </select>
+        <input type="text" id="msg-action-filter" placeholder="Filter by action...">
+        <label>
+          <input type="checkbox" id="msg-autoscroll" checked> Auto-scroll
+        </label>
+        <button id="msg-clear">Clear</button>
+      </div>
+      <div class="messages-list" id="messages-list"></div>
+    </div>
+  </div>
+
+  <!-- Panel 4: Warnings -->
+  <div class="tab-content" data-panel="warnings">
+    <div class="warnings-panel">
+      <div class="messages-toolbar">
+        <button id="warn-clear">Clear</button>
+        <span style="color:var(--text-muted);font-size:11px" id="warn-count">0 warnings</span>
+      </div>
+      <div class="warnings-list" id="warnings-list">
+        <div class="warnings-empty">No warnings captured yet.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="panel.js"></script>
+</body>
+</html>
