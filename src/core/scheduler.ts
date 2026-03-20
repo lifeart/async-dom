@@ -81,6 +81,12 @@ export class FrameScheduler {
 	// Latency tracking: time from enqueue to next tick completion
 	private lastEnqueueTime = 0;
 
+	// Dropped frame counter: frames where delta > frameBudgetMs and mutations were processed
+	private droppedFrameCount = 0;
+
+	// Worker-to-main latency tracking (from MutationMessage.sentAt)
+	private lastWorkerToMainLatencyMs = 0;
+
 	// Frame log for devtools flamechart
 	private frameLog: FrameLogEntry[] = [];
 
@@ -190,6 +196,11 @@ export class FrameScheduler {
 		return this.queue.length;
 	}
 
+	/** Record the cross-thread latency from a worker MutationMessage.sentAt */
+	recordWorkerLatency(sentAt: number): void {
+		this.lastWorkerToMainLatencyMs = Math.max(0, Date.now() - sentAt);
+	}
+
 	getStats(): {
 		pending: number;
 		frameId: number;
@@ -198,6 +209,8 @@ export class FrameScheduler {
 		isRunning: boolean;
 		lastTickTime: number;
 		enqueueToApplyMs: number;
+		droppedFrameCount: number;
+		workerToMainLatencyMs: number;
 	} {
 		return {
 			pending: this.queue.length,
@@ -210,6 +223,8 @@ export class FrameScheduler {
 				this.lastTickTime > 0 && this.lastEnqueueTime > 0
 					? Math.max(0, this.lastTickTime - this.lastEnqueueTime)
 					: 0,
+			droppedFrameCount: this.droppedFrameCount,
+			workerToMainLatencyMs: this.lastWorkerToMainLatencyMs,
 		};
 	}
 
@@ -296,6 +311,9 @@ export class FrameScheduler {
 
 		const delta = performance.now() - start;
 		if (processed > 0) {
+			if (delta > this.frameBudgetMs) {
+				this.droppedFrameCount++;
+			}
 			this.timePerLastFrame = delta;
 			this.totalActionsLastFrame = processed;
 			this.frameLog.push({

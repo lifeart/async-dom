@@ -5,6 +5,11 @@ import type {
 	WarningLogEntry,
 } from "../core/debug.ts";
 import { WarningDescriptions } from "../core/debug.ts";
+import {
+	computePercentiles,
+	latencyColorClass,
+	syncReadColorClass,
+} from "./stats-helpers.ts";
 
 /**
  * The shape of __ASYNC_DOM_DEVTOOLS__ exposed on globalThis (main thread).
@@ -33,6 +38,8 @@ interface DevtoolsAPI {
 			isRunning: boolean;
 			lastTickTime: number;
 			enqueueToApplyMs: number;
+			droppedFrameCount: number;
+			workerToMainLatencyMs: number;
 		};
 		frameLog: () => FrameLogEntry[];
 		flush: () => void;
@@ -795,6 +802,23 @@ const PANEL_CSS = `
 .log-entry.event-entry .log-action { color: #d7ba7d; }
 .log-entry.syncread-entry .log-action { color: #c586c0; }
 
+/* Sync Read Heatmap */
+.heatmap-container { display: flex; flex-wrap: wrap; gap: 2px; padding: 4px 0; }
+.heatmap-block { width: 14px; height: 14px; border-radius: 2px; cursor: pointer; position: relative; }
+.heatmap-block.green { background: #4ec9b0; }
+.heatmap-block.yellow { background: #d7ba7d; }
+.heatmap-block.red { background: #f44747; }
+.heatmap-tooltip { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #1a1a1a; border: 1px solid #555; padding: 2px 6px; border-radius: 3px; font-size: 10px; white-space: nowrap; z-index: 10; color: #d4d4d4; pointer-events: none; }
+
+/* Latency sparkline color coding */
+.perf-latency-val.green { color: #4ec9b0; }
+.perf-latency-val.yellow { color: #d7ba7d; }
+.perf-latency-val.red { color: #f44747; }
+
+/* Threshold line on sparkline */
+.sparkline-with-threshold { position: relative; display: inline-block; }
+.sparkline-threshold { position: absolute; bottom: 50%; left: 0; right: 0; border-top: 1px dashed #f44747; opacity: 0.5; pointer-events: none; }
+
 /* Responsive / mobile-friendly */
 @media (max-width: 600px) {
   .panel { width: calc(100vw - 16px) !important; height: 50vh !important; left: 8px; right: 8px; bottom: 8px; }
@@ -1078,15 +1102,19 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	let selectedNodeForSidebar: TreeNode | null = null;
 	let expandedFrameId: number | null = null;
 
+	// Feature 3: Latency history tracking
+	const latencyHistory: number[] = [];
+	const MAX_LATENCY_HISTORY = 60;
+
 	// ---- Feature 1: Queue pressure health dot (polls even when collapsed) ----
 	function updateHealthDot(): void {
 		const dt = getDevtools();
 		if (!dt?.scheduler?.stats) return;
 		const stats = dt.scheduler.stats();
 		const pending = stats.pending;
-		if (pending > 1000 || !stats.isRunning) {
+		if (pending > 1000 || !stats.isRunning || stats.lastFrameTimeMs > 16) {
 			healthDot.style.backgroundColor = "#f44747"; // red
-		} else if (pending > 100) {
+		} else if (pending > 100 || stats.lastFrameTimeMs > 12) {
 			healthDot.style.backgroundColor = "#d7ba7d"; // yellow
 		} else {
 			healthDot.style.backgroundColor = "#4ec9b0"; // green
@@ -1550,14 +1578,41 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 		html += `<div class="perf-row"><span class="perf-label">Last Tick</span><span class="perf-value">${stats.lastTickTime > 0 ? `${stats.lastTickTime.toFixed(0)}ms` : "N/A"}</span></div>`;
 
-		// Enqueue-to-apply latency
-		const latencyMs = stats.enqueueToApplyMs;
-		const latencyClass = latencyMs > 16 ? "red" : latencyMs > 5 ? "yellow" : "green";
-		html += `<div class="perf-row"><span class="perf-label">Enqueue\u2192Apply</span><span class="perf-value ${latencyClass}">${latencyMs > 0 ? `${latencyMs.toFixed(1)}ms` : "N/A"}</span></div>`;
+		// Worker-to-main cross-thread latency (real, from Date.now() diff)
+		const workerLatencyMs = stats.workerToMainLatencyMs;
+		if (workerLatencyMs > 0) {
+			latencyHistory.push(workerLatencyMs);
+			if (latencyHistory.length > MAX_LATENCY_HISTORY) latencyHistory.shift();
+		}
+		const workerLatencyClass = latencyColorClass(workerLatencyMs);
+		html += `<div class="perf-row"><span class="perf-label">Worker\u2192Main</span><span class="perf-value ${workerLatencyClass}">${workerLatencyMs > 0 ? `${workerLatencyMs.toFixed(1)}ms` : "N/A"}</span></div>`;
 
-		// Queue depth sparkline
+		// Enqueue-to-apply latency (intra-main-thread)
+		const enqueueLatencyMs = stats.enqueueToApplyMs;
+		const enqueueLatencyClass = latencyColorClass(enqueueLatencyMs);
+		html += `<div class="perf-row"><span class="perf-label">Enqueue\u2192Apply</span><span class="perf-value ${enqueueLatencyClass}">${enqueueLatencyMs > 0 ? `${enqueueLatencyMs.toFixed(1)}ms` : "N/A"}</span></div>`;
+
+		// Latency percentiles
+		if (latencyHistory.length > 0) {
+			const pcts = computePercentiles(latencyHistory);
+			html += `<div class="perf-row"><span class="perf-label">Latency P50</span><span class="perf-value ${latencyColorClass(pcts.p50)}">${pcts.p50.toFixed(1)}ms</span></div>`;
+			html += `<div class="perf-row"><span class="perf-label">Latency P95</span><span class="perf-value ${latencyColorClass(pcts.p95)}">${pcts.p95.toFixed(1)}ms</span></div>`;
+			html += `<div class="perf-row"><span class="perf-label">Latency P99</span><span class="perf-value ${latencyColorClass(pcts.p99)}">${pcts.p99.toFixed(1)}ms</span></div>`;
+		}
+
+		// Latency sparkline
+		if (latencyHistory.length > 1) {
+			html += `<div class="perf-row"><span class="perf-label">Latency (${MAX_LATENCY_HISTORY})</span><span class="perf-sparkline">${sparkline(latencyHistory)}</span></div>`;
+		}
+
+		// Dropped frames counter (Feature 7)
+		const droppedFrames = stats.droppedFrameCount;
+		const droppedClass = droppedFrames > 0 ? "red" : "green";
+		html += `<div class="perf-row"><span class="perf-label">Dropped Frames</span><span class="perf-value ${droppedClass}">${droppedFrames}</span></div>`;
+
+		// Queue depth sparkline with 16ms threshold reference
 		if (queueHistory.length > 1) {
-			html += `<div class="perf-row"><span class="perf-label">Queue (${MAX_HISTORY}f)</span><span class="perf-sparkline">${sparkline(queueHistory)}</span></div>`;
+			html += `<div class="perf-row"><span class="perf-label">Queue (${MAX_HISTORY}f)</span><span class="sparkline-with-threshold"><span class="perf-sparkline">${sparkline(queueHistory)}</span><span class="sparkline-threshold"></span></span></div>`;
 		}
 
 		// Apps section
@@ -1677,7 +1732,63 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			}
 		}
 
+		// Sync Read Heatmap (Feature 12)
+		if (syncReadLog.length > 0) {
+			const totalReads = syncReadLog.length;
+			const timeouts = syncReadLog.filter((e) => e.result === "timeout").length;
+			const timeoutRate = totalReads > 0 ? ((timeouts / totalReads) * 100).toFixed(1) : "0.0";
+			const syncLatencies = syncReadLog.map((e) => e.latencyMs);
+			const syncPcts = computePercentiles(syncLatencies);
+
+			html += '<div class="perf-section-title">Sync Reads</div>';
+			html += `<div class="perf-row"><span class="perf-label">Total</span><span class="perf-value">${totalReads}</span></div>`;
+			const timeoutClass = timeouts > 0 ? "red" : "green";
+			html += `<div class="perf-row"><span class="perf-label">Timeout Rate</span><span class="perf-value ${timeoutClass}">${timeoutRate}% (${timeouts})</span></div>`;
+			html += `<div class="perf-row"><span class="perf-label">P95 Latency</span><span class="perf-value ${syncReadColorClass(syncPcts.p95)}">${syncPcts.p95.toFixed(1)}ms</span></div>`;
+
+			// Heatmap blocks
+			html += '<div class="heatmap-container">';
+			const recentReads = syncReadLog.slice(-100);
+			const queryNames = ["boundingRect", "computedStyle", "nodeProperty", "windowProperty"];
+			for (let i = 0; i < recentReads.length; i++) {
+				const entry = recentReads[i];
+				const colorCls = syncReadColorClass(entry.latencyMs);
+				const queryName = queryNames[entry.queryType] ?? `query:${entry.queryType}`;
+				html += `<div class="heatmap-block ${colorCls}" data-sync-read-idx="${i}" title="${entry.latencyMs.toFixed(1)}ms ${queryName} node=${entry.nodeId} ${entry.result}"></div>`;
+			}
+			html += "</div>";
+		}
+
 		perfContent.innerHTML = html;
+
+		// Wire sync read heatmap block click handlers
+		const heatmapBlocks = perfContent.querySelectorAll(".heatmap-block");
+		const queryNamesForClick = ["boundingRect", "computedStyle", "nodeProperty", "windowProperty"];
+		for (const block of heatmapBlocks) {
+			block.addEventListener("click", (e) => {
+				const el = e.currentTarget as HTMLElement;
+				// Remove any existing tooltip
+				const existing = el.querySelector(".heatmap-tooltip");
+				if (existing) {
+					existing.remove();
+					return;
+				}
+				// Remove tooltips from other blocks
+				for (const b of heatmapBlocks) {
+					const tip = b.querySelector(".heatmap-tooltip");
+					if (tip) tip.remove();
+				}
+				const idx = Number(el.dataset.syncReadIdx);
+				const recentReads = syncReadLog.slice(-100);
+				const entry = recentReads[idx];
+				if (!entry) return;
+				const queryName = queryNamesForClick[entry.queryType] ?? `query:${entry.queryType}`;
+				const tooltip = document.createElement("div");
+				tooltip.className = "heatmap-tooltip";
+				tooltip.textContent = `${queryName} node=${entry.nodeId} ${entry.latencyMs.toFixed(1)}ms ${entry.result}`;
+				el.appendChild(tooltip);
+			});
+		}
 
 		// Wire flush button
 		const flushBtn = perfContent.querySelector("#flush-btn");

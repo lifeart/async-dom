@@ -214,6 +214,7 @@ export class MutationCollector {
 			appId: this.appId,
 			uid: this.uidCounter,
 			mutations: batch,
+			sentAt: Date.now(),
 		};
 
 		this.transport.send(message);

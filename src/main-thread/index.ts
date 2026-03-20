@@ -319,6 +319,9 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 	// Handle incoming messages from workers
 	threadManager.onMessage((appId: AppId, message: Message) => {
 		if (isMutationMessage(message)) {
+			if (message.sentAt != null) {
+				scheduler.recordWorkerLatency(message.sentAt);
+			}
 			scheduler.enqueue(message.mutations, appId, message.priority ?? "normal", message.uid);
 			return;
 		}

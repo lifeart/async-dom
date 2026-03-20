@@ -104,6 +104,28 @@ describe("MutationCollector", () => {
 	});
 });
 
+describe("MutationCollector sentAt", () => {
+	it("flush() sets sentAt on the outgoing MutationMessage", () => {
+		const transport = createMockTransport();
+		const collector = new MutationCollector(createAppId("test"));
+		collector.setTransport(transport);
+
+		const before = Date.now();
+		collector.add({ action: "createNode", id: createNodeId(), tag: "div" });
+		collector.flushSync();
+		const after = Date.now();
+
+		expect(transport.sent).toHaveLength(1);
+		const msg = transport.sent[0];
+		expect(msg.type).toBe("mutation");
+		if (msg.type === "mutation") {
+			expect(msg.sentAt).toBeDefined();
+			expect(msg.sentAt).toBeGreaterThanOrEqual(before);
+			expect(msg.sentAt).toBeLessThanOrEqual(after);
+		}
+	});
+});
+
 describe("MutationCollector coalescing", () => {
 	it("deduplicates repeated setStyle on same (id, property)", () => {
 		const transport = createMockTransport();
