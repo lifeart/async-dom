@@ -1513,10 +1513,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			const data = allData[appId];
 			if (!data?.perTypeCoalesced) continue;
 
-			const ptc = data.perTypeCoalesced as Record<
-				string,
-				{ added: number; coalesced: number }
-			>;
+			const ptc = data.perTypeCoalesced as Record<string, { added: number; coalesced: number }>;
 			const actions = Object.keys(ptc);
 			if (actions.length === 0) continue;
 
@@ -1580,6 +1577,61 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		logAutoScrollBtn.classList.toggle("active", autoScroll);
 	});
 
+	function getActionColorClass(action: string): string {
+		switch (action) {
+			case "createNode":
+			case "createComment":
+			case "appendChild":
+			case "bodyAppendChild":
+			case "headAppendChild":
+			case "insertBefore":
+				return "color-green";
+			case "setAttribute":
+			case "removeAttribute":
+			case "setStyle":
+			case "setClassName":
+			case "setProperty":
+			case "setTextContent":
+			case "setHTML":
+			case "insertAdjacentHTML":
+				return "color-blue";
+			case "removeNode":
+			case "removeChild":
+				return "color-red";
+			default:
+				return "";
+		}
+	}
+
+	function buildLogEntryDiv(entry: MutationLogEntry): HTMLDivElement {
+		const div = document.createElement("div");
+		const colorClass = getActionColorClass(entry.action);
+		div.className = `log-entry${colorClass ? ` ${colorClass}` : ""}`;
+
+		const timeSpan = document.createElement("span");
+		timeSpan.className = "log-time";
+		timeSpan.textContent = formatTime(entry.timestamp);
+		div.appendChild(timeSpan);
+
+		const actionSpan = document.createElement("span");
+		actionSpan.className = "log-action";
+		actionSpan.textContent = entry.action;
+		div.appendChild(actionSpan);
+
+		const detailSpan = document.createElement("span");
+		detailSpan.className = "log-detail";
+		const nodeId = "id" in entry.mutation ? entry.mutation.id : undefined;
+		let detail = nodeId != null ? `#${nodeId}` : "";
+		const m = entry.mutation as Record<string, unknown>;
+		if (m.tag) detail += ` tag=${m.tag}`;
+		if (m.name && entry.action !== "addEventListener") detail += ` ${m.name}`;
+		if (m.property) detail += ` ${m.property}`;
+		detailSpan.textContent = detail;
+		div.appendChild(detailSpan);
+
+		return div;
+	}
+
 	function renderLogTab(): void {
 		logCountSpan.textContent = String(mutationLog.length);
 
@@ -1594,35 +1646,72 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		const filterText = logFilter.value.toLowerCase().trim();
 		const fragment = document.createDocumentFragment();
 
+		// Group mutations by batchUid
+		interface BatchGroup {
+			batchUid: number | undefined;
+			entries: MutationLogEntry[];
+		}
+		const groups: BatchGroup[] = [];
+		let currentGroup: BatchGroup | null = null;
+
 		for (const entry of mutationLog) {
 			if (filterText && !entry.action.toLowerCase().includes(filterText)) continue;
 
-			const div = document.createElement("div");
-			div.className = "log-entry";
+			const uid = entry.batchUid;
+			if (uid != null && currentGroup !== null && currentGroup.batchUid === uid) {
+				currentGroup.entries.push(entry);
+			} else {
+				currentGroup = { batchUid: uid, entries: [entry] };
+				groups.push(currentGroup);
+			}
+		}
 
-			const timeSpan = document.createElement("span");
-			timeSpan.className = "log-time";
-			timeSpan.textContent = formatTime(entry.timestamp);
-			div.appendChild(timeSpan);
+		for (const group of groups) {
+			// If no batchUid or only one entry, render flat
+			if (group.batchUid == null || group.entries.length <= 1) {
+				for (const entry of group.entries) {
+					fragment.appendChild(buildLogEntryDiv(entry));
+				}
+				continue;
+			}
 
-			const actionSpan = document.createElement("span");
-			actionSpan.className = "log-action";
-			actionSpan.textContent = entry.action;
-			div.appendChild(actionSpan);
+			// Render as collapsible batch group
+			const batchDiv = document.createElement("div");
+			batchDiv.className = "batch-group";
 
-			const detailSpan = document.createElement("span");
-			detailSpan.className = "log-detail";
-			const nodeId = "id" in entry.mutation ? entry.mutation.id : undefined;
-			let detail = nodeId != null ? `#${nodeId}` : "";
-			// Add extra detail based on mutation type
-			const m = entry.mutation as Record<string, unknown>;
-			if (m.tag) detail += ` tag=${m.tag}`;
-			if (m.name && entry.action !== "addEventListener") detail += ` ${m.name}`;
-			if (m.property) detail += ` ${m.property}`;
-			detailSpan.textContent = detail;
-			div.appendChild(detailSpan);
+			const header = document.createElement("div");
+			header.className = "batch-header";
 
-			fragment.appendChild(div);
+			const toggle = document.createElement("span");
+			toggle.className = "batch-toggle";
+			toggle.textContent = "\u25B6";
+			header.appendChild(toggle);
+
+			const uidSpan = document.createElement("span");
+			uidSpan.className = "batch-uid";
+			uidSpan.textContent = `Batch #${group.batchUid}`;
+			header.appendChild(uidSpan);
+
+			const countSpan = document.createElement("span");
+			countSpan.className = "batch-count";
+			countSpan.textContent = `\u2014 ${group.entries.length} mutations`;
+			header.appendChild(countSpan);
+
+			header.addEventListener("click", () => {
+				batchDiv.classList.toggle("expanded");
+				toggle.textContent = batchDiv.classList.contains("expanded") ? "\u25BC" : "\u25B6";
+			});
+
+			batchDiv.appendChild(header);
+
+			const entriesDiv = document.createElement("div");
+			entriesDiv.className = "batch-entries";
+			for (const entry of group.entries) {
+				entriesDiv.appendChild(buildLogEntryDiv(entry));
+			}
+			batchDiv.appendChild(entriesDiv);
+
+			fragment.appendChild(batchDiv);
 		}
 
 		logList.innerHTML = "";
@@ -1643,7 +1732,6 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 				const recent = traces.slice(-20);
 				for (const trace of recent) {
-					// Count mutations that arrived shortly after this event
 					const eventTime = trace.timestamp;
 					const mutCount = mutationLog.filter(
 						(m) => m.timestamp >= eventTime && m.timestamp <= eventTime + 100,

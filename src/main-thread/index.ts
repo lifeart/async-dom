@@ -17,6 +17,33 @@ import { EventBridge } from "./event-bridge.ts";
 import { DomRenderer, type RendererRoot } from "./renderer.ts";
 import { ThreadManager } from "./thread-manager.ts";
 
+// Allowlist of safe window properties accessible via sync channel.
+// Prevents workers from reading sensitive data like document.cookie.
+const ALLOWED_WINDOW_PROPERTIES = new Set([
+	"innerWidth",
+	"innerHeight",
+	"outerWidth",
+	"outerHeight",
+	"devicePixelRatio",
+	"screen.width",
+	"screen.height",
+	"screen.availWidth",
+	"screen.availHeight",
+	"screen.colorDepth",
+	"screen.pixelDepth",
+	"screen.orientation.type",
+	"scrollX",
+	"scrollY",
+	"visualViewport.width",
+	"visualViewport.height",
+	"navigator.language",
+	"navigator.languages",
+	"navigator.userAgent",
+	"navigator.hardwareConcurrency",
+	"document.visibilityState",
+	"document.hidden",
+]);
+
 export interface AsyncDomConfig {
 	target: Element;
 	worker?: Worker;
@@ -171,6 +198,8 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				}
 				case QueryType.WindowProperty: {
 					if (!property) return null;
+					// Allowlist of safe window properties to prevent data exfiltration
+					if (!ALLOWED_WINDOW_PROPERTIES.has(property)) return null;
 					// Support dotted paths like "screen.width"
 					const parts = property.split(".");
 					let current: unknown = window;
