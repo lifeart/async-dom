@@ -134,9 +134,9 @@ describe("Worker → Main Thread roundtrip", () => {
 
 		const realParent = renderer.getNode(parent._nodeId) as HTMLElement;
 		expect(realParent?.children.length).toBe(3);
-		expect(realParent?.children[0]?.getAttribute("data-async-dom-id")).toBe(String(a._nodeId));
-		expect(realParent?.children[1]?.getAttribute("data-async-dom-id")).toBe(String(b._nodeId));
-		expect(realParent?.children[2]?.getAttribute("data-async-dom-id")).toBe(String(c._nodeId));
+		expect(realParent?.children[0]).toBe(renderer.getNode(a._nodeId));
+		expect(realParent?.children[1]).toBe(renderer.getNode(b._nodeId));
+		expect(realParent?.children[2]).toBe(renderer.getNode(c._nodeId));
 	});
 
 	it("className is reflected in real DOM", () => {

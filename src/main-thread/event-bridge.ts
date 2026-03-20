@@ -92,7 +92,7 @@ export class EventBridge {
 					domEvent.preventDefault();
 				}
 				const serializeStart = performance.now();
-				const serialized = serializeEvent(domEvent);
+				const serialized = serializeEvent(domEvent, this.nodeCache);
 				const serializeMs = performance.now() - serializeStart;
 				const sentAt = Date.now();
 				this.eventTraces.push({
@@ -193,24 +193,26 @@ function isPassiveEvent(name: string): boolean {
 	return PASSIVE_EVENTS.has(name);
 }
 
-function getNodeId(el: Element | null): string | null {
+function getNodeId(el: Element | null, cache?: NodeCache): string | null {
 	if (!el) return null;
-	const asyncId = (el as unknown as Record<string, unknown>).__asyncDomId;
-	if (asyncId != null) return String(asyncId);
-	return el.getAttribute("data-async-dom-id") ?? el.id ?? null;
+	if (cache) {
+		const id = cache.getId(el);
+		if (id != null) return String(id);
+	}
+	return el.id ?? null;
 }
 
 /**
  * Serialize a DOM event to a plain object that can be transferred via postMessage.
  * Only includes properties relevant to the event type.
  */
-function serializeEvent(e: Event): SerializedEvent {
+function serializeEvent(e: Event, cache?: NodeCache): SerializedEvent {
 	// Use composedPath()[0] for correct target when events cross shadow boundaries
 	const composedTarget = (e.composedPath?.()[0] ?? e.target) as Element;
 	const base: SerializedEvent = {
 		type: e.type,
-		target: getNodeId(composedTarget),
-		currentTarget: getNodeId(e.currentTarget as Element),
+		target: getNodeId(composedTarget, cache),
+		currentTarget: getNodeId(e.currentTarget as Element, cache),
 		bubbles: e.bubbles,
 		cancelable: e.cancelable,
 		composed: e.composed,
@@ -241,7 +243,7 @@ function serializeEvent(e: Event): SerializedEvent {
 		base.ctrlKey = e.ctrlKey;
 		base.metaKey = e.metaKey;
 		base.shiftKey = e.shiftKey;
-		base.relatedTarget = getNodeId(e.relatedTarget as Element);
+		base.relatedTarget = getNodeId(e.relatedTarget as Element, cache);
 		base.detail = e.detail;
 	}
 
@@ -283,7 +285,8 @@ function serializeEvent(e: Event): SerializedEvent {
 	}
 
 	if (e instanceof FocusEvent) {
-		base.relatedTarget = e.relatedTarget instanceof Element ? getNodeId(e.relatedTarget) : null;
+		base.relatedTarget =
+			e.relatedTarget instanceof Element ? getNodeId(e.relatedTarget, cache) : null;
 	}
 
 	if (e instanceof WheelEvent) {

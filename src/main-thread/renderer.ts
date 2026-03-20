@@ -333,10 +333,6 @@ export class DomRenderer {
 			node = document.createElement(tag);
 		}
 
-		// Store internal nodeId for lookup — don't set node.id (would pollute HTML with internal IDs)
-		const idStr = String(id);
-		node.setAttribute("data-async-dom-id", idStr);
-		(node as unknown as Record<string, unknown>).__asyncDomId = id;
 		if (textContent) {
 			node.textContent = textContent;
 		}
@@ -545,9 +541,7 @@ export class DomRenderer {
 			const el = node as Element;
 			for (let i = 0; i < el.children.length; i++) {
 				const child = el.children[i];
-				const childId = (child as unknown as Record<string, unknown>).__asyncDomId as
-					| NodeId
-					| undefined;
+				const childId = this.nodeCache.getId(child);
 				if (childId) {
 					this._cleanupSubtreeListeners(child, childId);
 					this.nodeCache.delete(childId);
