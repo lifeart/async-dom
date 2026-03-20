@@ -39,6 +39,7 @@ var SharedWorkerTransport = class {
 	};
 	_heartbeatInterval = null;
 	_heartbeatTimeout = null;
+	_awaitingPong = false;
 	onError;
 	onClose;
 	constructor(port) {
@@ -46,6 +47,7 @@ var SharedWorkerTransport = class {
 		port.onmessage = (e) => {
 			const data = e.data;
 			if (data && typeof data === "object" && data.type === "pong") {
+				this._awaitingPong = false;
 				this._clearHeartbeatTimeout();
 				return;
 			}
@@ -76,6 +78,8 @@ var SharedWorkerTransport = class {
 				this._stopHeartbeat();
 				return;
 			}
+			if (this._awaitingPong) return;
+			this._awaitingPong = true;
 			this.port.postMessage({ type: "ping" });
 			this._heartbeatTimeout = setTimeout(() => {
 				if (this._readyState !== "closed") {

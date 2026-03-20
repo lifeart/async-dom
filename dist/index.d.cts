@@ -284,6 +284,8 @@ declare class ThreadManager {
   onMessage(handler: (appId: AppId, message: Message) => void): void;
   getTransport(appId: AppId): Transport | null;
   private notifyHandlers;
+  /** Generate a unique AppId, appending a suffix if the name already exists. */
+  private _uniqueAppId;
 }
 //# sourceMappingURL=thread-manager.d.ts.map
 //#endregion

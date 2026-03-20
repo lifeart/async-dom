@@ -13,19 +13,22 @@ const require_ws_server_transport = require("./ws-server-transport.cjs");
 function createServerApp(options) {
 	const { transport, appModule } = options;
 	const dom = require_worker_thread.createWorkerDom({ transport });
+	let ready;
 	try {
 		const result = appModule(dom);
-		if (result && typeof result === "object" && "catch" in result) result.catch((err) => {
+		ready = result instanceof Promise ? result.catch((err) => {
 			console.error("[async-dom] Server app module error:", err);
-		});
+		}) : Promise.resolve();
 	} catch (err) {
 		console.error("[async-dom] Server app module error:", err);
+		ready = Promise.resolve();
 	}
-	return { destroy() {
-		const domAny = dom;
-		if (typeof domAny.destroy === "function") domAny.destroy();
-		else transport.close();
-	} };
+	return {
+		ready,
+		destroy() {
+			dom.destroy();
+		}
+	};
 }
 //#endregion
 exports.WebSocketServerTransport = require_ws_server_transport.WebSocketServerTransport;

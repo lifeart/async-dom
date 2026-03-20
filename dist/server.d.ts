@@ -17,6 +17,7 @@ interface ServerAppOptions {
  */
 declare function createServerApp(options: ServerAppOptions): {
   destroy: () => void;
+  ready: Promise<void>;
 };
 //# sourceMappingURL=runner.d.ts.map
 //#endregion

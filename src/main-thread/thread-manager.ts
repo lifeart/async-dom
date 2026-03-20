@@ -38,7 +38,7 @@ export class ThreadManager {
 	private messageHandlers: Array<(appId: AppId, message: Message) => void> = [];
 
 	createWorkerThread(config: WorkerConfig): AppId {
-		const appId = generateAppId(config.name);
+		const appId = this._uniqueAppId(config.name);
 		const useBinary = typeof __ASYNC_DOM_BINARY__ !== "undefined" && __ASYNC_DOM_BINARY__;
 		const transport =
 			config.transport ??
@@ -53,7 +53,7 @@ export class ThreadManager {
 	}
 
 	createRemoteThread(config: RemoteConfig): AppId {
-		const appId = generateAppId(config.name);
+		const appId = this._uniqueAppId(config.name);
 		const transport = config.transport;
 
 		transport.onMessage((message) => {
@@ -65,7 +65,7 @@ export class ThreadManager {
 	}
 
 	createWebSocketThread(config: WebSocketConfig): AppId {
-		const appId = generateAppId(config.name);
+		const appId = this._uniqueAppId(config.name);
 		const transport = new WebSocketTransport(config.url, config.options);
 
 		transport.onMessage((message) => {
@@ -116,9 +116,18 @@ export class ThreadManager {
 			handler(appId, message);
 		}
 	}
-}
 
-function generateAppId(name?: string): AppId {
-	if (name) return createAppId(name);
-	return createAppId(Math.random().toString(36).slice(2, 7));
+	/** Generate a unique AppId, appending a suffix if the name already exists. */
+	private _uniqueAppId(name?: string): AppId {
+		if (!name) {
+			return createAppId(Math.random().toString(36).slice(2, 7));
+		}
+		let appId = createAppId(name);
+		if (!this.threads.has(appId)) return appId;
+		// Name collision — append a suffix
+		let i = 2;
+		while (this.threads.has(createAppId(`${name}-${i}`))) i++;
+		appId = createAppId(`${name}-${i}`);
+		return appId;
+	}
 }

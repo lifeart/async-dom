@@ -1987,6 +1987,7 @@ var VirtualDocument = class {
 	* Clears element registries, listener maps, and resets counters.
 	*/
 	destroy() {
+		this.collector.flushSync();
 		this._ids.clear();
 		this._nodeIdToElement.clear();
 		this._listenerMap.clear();

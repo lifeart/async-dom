@@ -17,6 +17,7 @@ export class SharedWorkerTransport implements Transport {
 	};
 	private _heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 	private _heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
+	private _awaitingPong = false;
 	onError?: (error: Error) => void;
 	onClose?: () => void;
 
@@ -25,6 +26,7 @@ export class SharedWorkerTransport implements Transport {
 			const data = e.data;
 			// Handle pong responses for heartbeat — don't forward to app handlers
 			if (data && typeof data === "object" && data.type === "pong") {
+				this._awaitingPong = false;
 				this._clearHeartbeatTimeout();
 				return;
 			}
@@ -64,6 +66,9 @@ export class SharedWorkerTransport implements Transport {
 				this._stopHeartbeat();
 				return;
 			}
+			// Only send a new ping if we're not still waiting for a pong
+			if (this._awaitingPong) return;
+			this._awaitingPong = true;
 			this.port.postMessage({ type: "ping" });
 			this._heartbeatTimeout = setTimeout(() => {
 				if (this._readyState !== "closed") {

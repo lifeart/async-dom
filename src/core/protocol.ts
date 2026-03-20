@@ -173,7 +173,7 @@ export interface EventMessage {
 	appId: AppId;
 	listenerId: string;
 	event: SerializedEvent;
-	clientId?: string;
+	clientId?: ClientId;
 }
 
 // Serialized location data
@@ -230,9 +230,9 @@ export type SystemMessage =
 	| { type: "perfEntries"; appId: AppId; entries: PerfEntryData[] }
 	| { type: "ping" }
 	| { type: "pong" }
-	| { type: "ack"; lastUid: number }
-	| { type: "clientConnect"; clientId: string; metadata?: Record<string, unknown> }
-	| { type: "clientDisconnect"; clientId: string }
+	| { type: "ack"; appId: AppId; lastUid: number }
+	| { type: "clientConnect"; clientId: ClientId; metadata?: Record<string, unknown> }
+	| { type: "clientDisconnect"; clientId: ClientId }
 	| { type: "snapshotComplete" };
 
 /** Serialized performance entry sent from worker to main thread (Feature 16). */

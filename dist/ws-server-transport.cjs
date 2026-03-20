@@ -5,6 +5,8 @@ const HIGH_WATER_MARK = 1024 * 1024;
 const LOW_WATER_MARK = 256 * 1024;
 /** Interval for checking bufferedAmount drain (ms) */
 const DRAIN_CHECK_INTERVAL = 50;
+/** Maximum queued messages before dropping (backpressure safety valve) */
+const MAX_QUEUE_SIZE = 1e4;
 /**
 * Server-side WebSocket transport for async-dom.
 *
@@ -63,6 +65,7 @@ var WebSocketServerTransport = class {
 	send(message) {
 		if (this._readyState === "closed") return;
 		if (this.socket.bufferedAmount > HIGH_WATER_MARK) {
+			if (this.messageQueue.length >= MAX_QUEUE_SIZE) this.messageQueue.shift();
 			this.messageQueue.push(message);
 			this.startDrainCheck();
 			return;

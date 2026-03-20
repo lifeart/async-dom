@@ -15,35 +15,34 @@ export interface ServerAppOptions {
  *
  * Note: No SharedArrayBuffer is used — the async query fallback is used instead.
  */
-export function createServerApp(options: ServerAppOptions): { destroy: () => void } {
+export function createServerApp(options: ServerAppOptions): {
+	destroy: () => void;
+	ready: Promise<void>;
+} {
 	const { transport, appModule } = options;
 
 	const dom = createWorkerDom({ transport });
 
 	// Run the user's app module, catching errors so one connection
 	// failure doesn't crash the server process
+	let ready: Promise<void>;
 	try {
 		const result = appModule(dom);
-		// Handle async app modules
-		if (result && typeof result === "object" && "catch" in result) {
-			(result as Promise<void>).catch((err) => {
-				console.error("[async-dom] Server app module error:", err);
-			});
-		}
+		ready =
+			result instanceof Promise
+				? result.catch((err) => {
+						console.error("[async-dom] Server app module error:", err);
+					})
+				: Promise.resolve();
 	} catch (err) {
 		console.error("[async-dom] Server app module error:", err);
+		ready = Promise.resolve();
 	}
 
 	return {
+		ready,
 		destroy() {
-			// If dom.destroy() exists (added in Phase 3.4 of transport plan), use it
-			const domAny = dom as unknown as Record<string, unknown>;
-			if (typeof domAny.destroy === "function") {
-				(domAny.destroy as () => void)();
-			} else {
-				// Fallback: close the transport directly
-				transport.close();
-			}
+			dom.destroy();
 		},
 	};
 }

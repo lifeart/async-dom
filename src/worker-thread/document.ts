@@ -495,6 +495,8 @@ export class VirtualDocument {
 	 * Clears element registries, listener maps, and resets counters.
 	 */
 	destroy(): void {
+		// Flush any pending mutations before teardown
+		this.collector.flushSync();
 		this._ids.clear();
 		this._nodeIdToElement.clear();
 		this._listenerMap.clear();

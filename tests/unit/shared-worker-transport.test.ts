@@ -214,10 +214,10 @@ describe("SharedWorkerTransport", () => {
 			const closeCalls: boolean[] = [];
 			transport.onClose = () => closeCalls.push(true);
 
-			// Trigger ping
-			vi.advanceTimersByTime(5_000);
-			// Do NOT respond with pong — wait for timeout
-			vi.advanceTimersByTime(15_000);
+			// At 5s: ping sent, _awaitingPong=true, timeout at 20s.
+			// Subsequent intervals skip because _awaitingPong is true.
+			// At 20s: timeout fires, transport closes.
+			vi.advanceTimersByTime(5_000 + 15_000);
 
 			expect(transport.readyState).toBe("closed");
 			expect(closeCalls).toHaveLength(1);

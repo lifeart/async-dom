@@ -39,6 +39,7 @@ declare class SharedWorkerTransport implements Transport {
   private _stats;
   private _heartbeatInterval;
   private _heartbeatTimeout;
+  private _awaitingPong;
   onError?: (error: Error) => void;
   onClose?: () => void;
   constructor(port: MessagePort);

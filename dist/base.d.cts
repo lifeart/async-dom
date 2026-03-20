@@ -198,7 +198,7 @@ interface EventMessage {
   appId: AppId;
   listenerId: string;
   event: SerializedEvent;
-  clientId?: string;
+  clientId?: ClientId;
 }
 interface SerializedLocation {
   hash: string;
@@ -272,14 +272,15 @@ type SystemMessage = {
   type: "pong";
 } | {
   type: "ack";
+  appId: AppId;
   lastUid: number;
 } | {
   type: "clientConnect";
-  clientId: string;
+  clientId: ClientId;
   metadata?: Record<string, unknown>;
 } | {
   type: "clientDisconnect";
-  clientId: string;
+  clientId: ClientId;
 } | {
   type: "snapshotComplete";
 };

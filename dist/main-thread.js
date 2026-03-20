@@ -4403,7 +4403,7 @@ var ThreadManager = class {
 	threads = /* @__PURE__ */ new Map();
 	messageHandlers = [];
 	createWorkerThread(config) {
-		const appId = generateAppId(config.name);
+		const appId = this._uniqueAppId(config.name);
 		const useBinary = typeof __ASYNC_DOM_BINARY__ !== "undefined" && __ASYNC_DOM_BINARY__;
 		const transport = config.transport ?? (useBinary ? new BinaryWorkerTransport(config.worker) : new WorkerTransport(config.worker));
 		transport.onMessage((message) => {
@@ -4416,7 +4416,7 @@ var ThreadManager = class {
 		return appId;
 	}
 	createRemoteThread(config) {
-		const appId = generateAppId(config.name);
+		const appId = this._uniqueAppId(config.name);
 		const transport = config.transport;
 		transport.onMessage((message) => {
 			this.notifyHandlers(appId, message);
@@ -4428,7 +4428,7 @@ var ThreadManager = class {
 		return appId;
 	}
 	createWebSocketThread(config) {
-		const appId = generateAppId(config.name);
+		const appId = this._uniqueAppId(config.name);
 		const transport = new WebSocketTransport(config.url, config.options);
 		transport.onMessage((message) => {
 			this.notifyHandlers(appId, message);
@@ -4465,11 +4465,17 @@ var ThreadManager = class {
 	notifyHandlers(appId, message) {
 		for (const handler of this.messageHandlers) handler(appId, message);
 	}
+	/** Generate a unique AppId, appending a suffix if the name already exists. */
+	_uniqueAppId(name) {
+		if (!name) return createAppId(Math.random().toString(36).slice(2, 7));
+		let appId = createAppId(name);
+		if (!this.threads.has(appId)) return appId;
+		let i = 2;
+		while (this.threads.has(createAppId(`${name}-${i}`))) i++;
+		appId = createAppId(`${name}-${i}`);
+		return appId;
+	}
 };
-function generateAppId(name) {
-	if (name) return createAppId(name);
-	return createAppId(Math.random().toString(36).slice(2, 7));
-}
 //#endregion
 //#region src/main-thread/index.ts
 var main_thread_exports = /* @__PURE__ */ __exportAll({ createAsyncDom: () => createAsyncDom });
