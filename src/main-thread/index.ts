@@ -12,6 +12,7 @@ import {
 } from "../core/protocol.ts";
 import { FrameScheduler, type SchedulerConfig } from "../core/scheduler.ts";
 import { QueryType, SyncChannelHost } from "../core/sync-channel.ts";
+import { captureMutation, captureWarning, createDevtoolsPanel } from "../debug/devtools-panel.ts";
 import { EventBridge } from "./event-bridge.ts";
 import { DomRenderer, type RendererRoot } from "./renderer.ts";
 import { ThreadManager } from "./thread-manager.ts";
@@ -37,6 +38,63 @@ export interface AsyncDomInstance {
 	destroy(): void;
 	addApp(config: AppConfig): AppId;
 	removeApp(appId: AppId): void;
+}
+
+interface TreeSnapshot {
+	type: "element" | "text" | "comment";
+	tag?: string;
+	id?: number;
+	className?: string;
+	attributes?: Record<string, string>;
+	text?: string;
+	children?: TreeSnapshot[];
+}
+
+function buildTreeSnapshot(node: Node, depth = 0): TreeSnapshot | null {
+	if (depth > 30) return null;
+
+	if (node.nodeType === 3) {
+		const text = node.textContent ?? "";
+		if (!text.trim()) return null;
+		return {
+			type: "text",
+			text,
+			id: (node as unknown as Record<string, unknown>).__asyncDomId as number | undefined,
+		};
+	}
+
+	if (node.nodeType === 8) {
+		return { type: "comment", text: (node as Comment).data };
+	}
+
+	if (node.nodeType !== 1) return null;
+
+	const el = node as Element;
+	// Skip the devtools panel itself
+	if (el.id === "__async-dom-devtools__") return null;
+
+	const attrs: Record<string, string> = {};
+	for (let i = 0; i < el.attributes.length; i++) {
+		const attr = el.attributes[i];
+		if (attr.name !== "data-async-dom-id") {
+			attrs[attr.name] = attr.value;
+		}
+	}
+
+	const children: TreeSnapshot[] = [];
+	for (let i = 0; i < el.childNodes.length; i++) {
+		const child = buildTreeSnapshot(el.childNodes[i], depth + 1);
+		if (child) children.push(child);
+	}
+
+	return {
+		type: "element",
+		tag: el.tagName,
+		id: (el as unknown as Record<string, unknown>).__asyncDomId as number | undefined,
+		className: el.className || undefined,
+		attributes: Object.keys(attrs).length > 0 ? attrs : undefined,
+		children: children.length > 0 ? children : undefined,
+	};
 }
 
 /**
@@ -414,6 +472,8 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		return appId;
 	}
 
+	let devtoolsPanelHandle: { destroy: () => void } | null = null;
+
 	if (config.debug?.exposeDevtools) {
 		(globalThis as Record<string, unknown>).__ASYNC_DOM_DEVTOOLS__ = {
 			scheduler: {
@@ -436,6 +496,36 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				}
 				return info;
 			},
+			tree: () => {
+				// Build tree from the first renderer's body
+				for (const r of renderers.values()) {
+					const root = r.getRoot();
+					const body = root.body;
+					if (body) {
+						return buildTreeSnapshot(body as unknown as Node);
+					}
+				}
+				return null;
+			},
+		};
+
+		// Inject the in-page devtools panel
+		if (typeof document !== "undefined") {
+			devtoolsPanelHandle = createDevtoolsPanel();
+		}
+	}
+
+	// Wire mutation/warning capture for the devtools panel
+	if (config.debug?.exposeDevtools) {
+		const origOnMutation = debugHooks.onMutation;
+		const origOnWarning = debugHooks.onWarning;
+		debugHooks.onMutation = (entry) => {
+			origOnMutation?.(entry);
+			captureMutation(entry);
+		};
+		debugHooks.onWarning = (entry) => {
+			origOnWarning?.(entry);
+			captureWarning(entry);
 		};
 	}
 
@@ -481,6 +571,10 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			syncHosts.clear();
 			document.removeEventListener("visibilitychange", visibilityHandler);
 			threadManager.destroyAll();
+			if (devtoolsPanelHandle) {
+				devtoolsPanelHandle.destroy();
+				devtoolsPanelHandle = null;
+			}
 		},
 
 		addApp(appConfig: AppConfig): AppId {

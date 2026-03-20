@@ -39,7 +39,21 @@
     <a href="https://github.com/lifeart/async-dom" target="_blank">
       async-dom — 7000 DOM Nodes from Worker — 60 FPS
     </a>
+    <button id="debug-toggle" style="margin-left:16px;padding:4px 12px;cursor:pointer;background:#444;color:#fff;border:1px solid #666;border-radius:4px;font-size:12px">
+      🛠 DevTools
+    </button>
   </div>
+  <script>
+    document.getElementById('debug-toggle').addEventListener('click', function() {
+      var url = new URL(window.location);
+      if (url.searchParams.has('debug')) {
+        url.searchParams.delete('debug');
+      } else {
+        url.searchParams.set('debug', '');
+      }
+      window.location = url;
+    });
+  </script>
   <div id="app"></div>
   <script type="module" src="./main.ts"></script>
 </body>
