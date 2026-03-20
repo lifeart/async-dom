@@ -5,13 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>async-dom — Run UI Frameworks in Web Workers</title>
   <meta name="description" content="Move React, Vue, and Svelte into Web Workers. Protect content from AI scrapers, keep the main thread at 60fps, and isolate business logic — structurally.">
-  <meta property="og:title" content="async-dom — Your DOM is just a projection">
+  <meta property="og:title" content="async-dom — Run React, Vue & Svelte in Web Workers">
   <meta property="og:description" content="Move entire UI frameworks into Web Workers. Structural content protection, 60fps rendering, multi-framework isolation.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://lifeart.github.io/async-dom/">
+  <meta property="og:site_name" content="@lifeart/async-dom">
+  <meta property="og:image" content="https://lifeart.github.io/async-dom/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="async-dom — Your DOM is just a projection">
+  <meta name="twitter:title" content="async-dom — Run React, Vue & Svelte in Web Workers">
   <meta name="twitter:description" content="Run React, Vue, Svelte in Web Workers. AI scraping defense, 60fps performance, zero framework runtime on main thread.">
+  <meta name="twitter:image" content="https://lifeart.github.io/async-dom/og-image.png">
+  <link rel="canonical" href="https://lifeart.github.io/async-dom/">
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,7 +32,7 @@
       --border-hover: #3b82f6;
       --text: #e2e8f0;
       --text-muted: #94a3b8;
-      --text-dim: #64748b;
+      --text-dim: #7a8a9e;
       --accent: #3b82f6;
       --accent-glow: rgba(59, 130, 246, 0.15);
       --green: #10b981;
@@ -341,6 +345,15 @@
     .footer a:hover { color: var(--text); }
     .footer-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 12px; }
 
+    /* ── Accessibility ── */
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .skip-link {
+      position: absolute; top: -100%; left: 16px; z-index: 200;
+      background: var(--accent); color: #fff; padding: 8px 16px; border-radius: 6px;
+      font-size: 0.85rem; font-weight: 600; text-decoration: none;
+    }
+    .skip-link:focus { top: 8px; }
+
     /* ── Responsive ── */
     @media (max-width: 640px) {
       .section { padding: 64px 16px; }
@@ -352,11 +365,32 @@
       .how-grid { grid-template-columns: 1fr 1fr; }
     }
   </style>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "@lifeart/async-dom",
+    "description": "Run React, Vue, and Svelte UI frameworks in Web Workers with frame-budgeted 60fps rendering, structural content protection, and multi-app isolation.",
+    "url": "https://lifeart.github.io/async-dom/",
+    "codeRepository": "https://github.com/lifeart/async-dom",
+    "programmingLanguage": "TypeScript",
+    "license": "https://opensource.org/licenses/MIT",
+    "author": {
+      "@type": "Person",
+      "name": "Aleksandr Kanunnikov",
+      "url": "https://github.com/lifeart"
+    },
+    "runtimePlatform": "Web Browser",
+    "applicationCategory": "DeveloperApplication"
+  }
+  </script>
 </head>
 <body>
 
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
 <!-- ── Navigation ── -->
-<nav class="nav">
+<nav class="nav" aria-label="Main navigation">
   <div class="nav-inner">
     <a href="#" class="nav-logo"><span>async</span>-dom</a>
     <div class="nav-links">
@@ -370,23 +404,28 @@
 </nav>
 
 <!-- ── Hero ── -->
+<main id="main-content">
 <section class="hero">
   <div class="hero-badge">
     <span class="dot"></span>
     v2.0 alpha — React, Vue, Svelte adapters
   </div>
-  <h1>Your DOM is just <em>a projection</em></h1>
+  <h1>Run React, Vue & Svelte in <em>Web Workers</em></h1>
+  <p style="font-size:1.3rem;color:var(--text);font-weight:500;margin-bottom:8px;letter-spacing:-0.01em;">Your DOM is just a projection.</p>
   <p class="hero-sub">
     Move your entire UI framework into a Web Worker. The main thread receives only
     serialized mutations. Content is structurally invisible to scrapers, bots, and AI crawlers.
   </p>
   <div class="hero-actions">
-    <a href="#demos" class="btn btn-primary">See Live Demos</a>
-    <a href="https://github.com/lifeart/async-dom" class="btn btn-secondary">View on GitHub</a>
+    <a href="https://github.com/lifeart/async-dom" class="btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      Star on GitHub
+    </a>
+    <a href="#demos" class="btn btn-secondary">See Live Demos</a>
   </div>
   <div class="hero-install">
-    <code>npm install async-dom</code>
-    <button class="copy-btn" onclick="navigator.clipboard.writeText('npm install async-dom')" title="Copy">
+    <code>npm install @lifeart/async-dom</code>
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('npm install @lifeart/async-dom')" title="Copy" aria-label="Copy install command">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 10.5V3a1.5 1.5 0 011.5-1.5H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
     </button>
   </div>
@@ -416,6 +455,14 @@
   </div>
 </div>
 
+<!-- ── Social proof ── -->
+<div class="stats-bar" style="gap: 24px; padding: 24px;">
+  <a href="https://github.com/lifeart/async-dom" style="text-decoration:none;"><img src="https://img.shields.io/github/stars/lifeart/async-dom?style=social" alt="GitHub stars" loading="lazy"></a>
+  <a href="https://www.npmjs.com/package/@lifeart/async-dom" style="text-decoration:none;"><img src="https://img.shields.io/npm/dw/@lifeart/async-dom" alt="npm weekly downloads" loading="lazy"></a>
+  <a href="https://www.npmjs.com/package/@lifeart/async-dom" style="text-decoration:none;"><img src="https://img.shields.io/npm/v/@lifeart/async-dom" alt="npm version" loading="lazy"></a>
+  <a href="https://bundlephobia.com/package/@lifeart/async-dom" style="text-decoration:none;"><img src="https://img.shields.io/bundlephobia/minzip/@lifeart/async-dom" alt="bundle size" loading="lazy"></a>
+</div>
+
 <!-- ── Problem ── -->
 <section class="section" id="problems">
   <div class="container">
@@ -428,7 +475,7 @@
     <div class="problems-grid">
       <div class="problem-card">
         <div class="problem-icon" style="background: rgba(239,68,68,0.1); color: var(--red);">
-          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </div>
         <h3>AI scrapers ignore your rules</h3>
         <p>
@@ -439,7 +486,7 @@
       </div>
       <div class="problem-card">
         <div class="problem-icon" style="background: rgba(245,158,11,0.1); color: var(--orange);">
-          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
         </div>
         <h3>The main thread is a bottleneck</h3>
         <p>
@@ -450,45 +497,13 @@
       </div>
       <div class="problem-card">
         <div class="problem-icon" style="background: rgba(168,85,247,0.1); color: var(--purple);">
-          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke="currentColor" stroke-width="2"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke="currentColor" stroke-width="2"/></svg>
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke="currentColor" stroke-width="2"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke="currentColor" stroke-width="2"/></svg>
         </div>
         <h3>Everything is exposed</h3>
         <p>
           Source code in bundles. Data structures in the DOM. Auth tokens accessible to XSS.
           Business logic readable by anyone with DevTools. Browser extensions with full access.
           <span class="stat-highlight">There's no architectural boundary.</span>
-        </p>
-      </div>
-      <div class="problem-card">
-        <div class="problem-icon" style="background: rgba(16,185,129,0.1); color: var(--green);">
-          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M9 12h6m-3-3v6m-7 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        </div>
-        <h3>Copyright has no technical enforcement</h3>
-        <p>
-          The NYT sued OpenAI. Danish publishers followed. The <span class="stat-highlight">$236 billion DRM market</span>
-          proves demand for protection. But web content has none. <code>robots.txt</code> is a polite request, not a wall.
-        </p>
-      </div>
-      <div class="problem-card">
-        <div class="problem-icon" style="background: rgba(59,130,246,0.1); color: var(--accent);">
-          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zm0 8a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2z" stroke="currentColor" stroke-width="2"/></svg>
-        </div>
-        <h3>Micro-frontends need real isolation</h3>
-        <p>
-          iframes are slow and limited. Shared globals collide. CSS leaks across boundaries.
-          Running multiple frameworks on one page is a hack.
-          <span class="stat-highlight">Teams need true sandboxing.</span>
-        </p>
-      </div>
-      <div class="problem-card">
-        <div class="problem-icon" style="background: rgba(236,72,153,0.1); color: #ec4899;">
-          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
-        <h3>Low-power devices can't keep up</h3>
-        <p>
-          Smart TVs, kiosks, IoT displays, and budget phones choke on modern frameworks.
-          <span class="stat-highlight">You can't ship lighter code.</span> But you can move computation
-          to a more capable machine and stream only the rendering instructions.
         </p>
       </div>
     </div>
@@ -552,182 +567,6 @@
   </div>
 </section>
 
-<!-- ── Audience-specific value props ── -->
-<section class="section audience-section" id="audiences">
-  <div class="container">
-    <span class="section-label">Who is this for</span>
-    <h2 class="section-title">Built for every stakeholder</h2>
-    <p class="section-subtitle">
-      Different roles, different priorities. async-dom addresses them all.
-    </p>
-    <div class="audience-tabs" role="tablist">
-      <button class="audience-tab active" data-tab="security" role="tab">Security Teams</button>
-      <button class="audience-tab" data-tab="cto" role="tab">CTOs & Architects</button>
-      <button class="audience-tab" data-tab="dev" role="tab">Developers</button>
-      <button class="audience-tab" data-tab="seo" role="tab">SEO & Marketing</button>
-      <button class="audience-tab" data-tab="legal" role="tab">Legal & Compliance</button>
-    </div>
-    <div class="audience-panels">
-
-      <!-- Security -->
-      <div class="audience-panel active" data-panel="security">
-        <h3>Structural defense, not configuration</h3>
-        <p class="lead">
-          Worker isolation is enforced at the browser engine level. No <code>shadowRoot</code> workaround,
-          no extension bypass, no polite requests to behave. This is architecture, not policy.
-        </p>
-        <ul class="benefit-list">
-          <li>
-            <span class="icon">&#128274;</span>
-            <div><strong>XSS containment.</strong> <span>Malicious scripts on the main thread cannot reach worker internal state. All data passes through postMessage — a natural serialization boundary.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128272;</span>
-            <div><strong>Token isolation.</strong> <span>Auth tokens, session state, and API keys stored in the worker are inaccessible to compromised main-thread scripts or browser extensions.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128736;</span>
-            <div><strong>Anti-scraping by architecture.</strong> <span>Empty HTML payload. Procedural DOM structure. Dynamic class names. Honeypot injection. Behavioral gating. Not a cat-and-mouse game — a structural barrier.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128737;</span>
-            <div><strong>Built-in sanitization.</strong> <span>HTML sanitizer strips scripts, iframes, on* handlers, javascript: URIs. Property allowlist. Attribute filtering. Defense in depth.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#129302;</span>
-            <div><strong>Bot detection at the app layer.</strong> <span>The worker controls rendering. Detect non-human patterns (no mouse events, impossibly fast navigation) and alter output in real-time.</span></div>
-          </li>
-        </ul>
-      </div>
-
-      <!-- CTO -->
-      <div class="audience-panel" data-panel="cto">
-        <h3>Ship faster. Scale smarter. Sleep better.</h3>
-        <p class="lead">
-          One library. Three framework adapters. Zero framework runtime on the main thread.
-          Multi-core utilization without the complexity of manual worker management.
-        </p>
-        <ul class="benefit-list">
-          <li>
-            <span class="icon">&#9889;</span>
-            <div><strong>Core Web Vitals improvement.</strong> <span>Moving framework execution off the main thread directly improves INP, FID, and TBT. Google rewards this in search rankings.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#127959;</span>
-            <div><strong>True micro-frontend isolation.</strong> <span>Each team ships a worker. CSS is encapsulated via shadow DOM. No shared globals. Independent deployment. React 18 and React 19 on the same page — zero conflicts.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128187;</span>
-            <div><strong>Remote rendering via WebSocket.</strong> <span>Run the app on a server, stream DOM updates to Smart TVs, kiosks, IoT devices, or thin clients. One codebase, any screen.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128176;</span>
-            <div><strong>Protect proprietary UI logic.</strong> <span>NDA demos, premium features, competitive algorithms — keep them in a worker or on a server, not in client bundles.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128200;</span>
-            <div><strong>634 tests. TypeScript. MIT license.</strong> <span>Production-ready with strict types, Biome linting, CI pipeline, Vite plugin, CLI scaffolding, and Chrome DevTools extension.</span></div>
-          </li>
-        </ul>
-      </div>
-
-      <!-- Developer -->
-      <div class="audience-panel" data-panel="dev">
-        <h3>Write normal code. It just runs in a Worker.</h3>
-        <p class="lead">
-          No new framework to learn. The virtual DOM API is comprehensive — your existing React, Vue,
-          or Svelte code works without modification. First-class DX with DevTools, error reporting, and hot reload.
-        </p>
-        <ul class="benefit-list">
-          <li>
-            <span class="icon">&#128230;</span>
-            <div><strong>Drop-in framework adapters.</strong> <span>&lt;AsyncDom&gt; component for React/Vue. use:asyncDom action for Svelte. useAsyncDom hooks/composables. Fallback, onReady, onError — all wired up.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128269;</span>
-            <div><strong>Built-in DevTools panel.</strong> <span>5-tab debug panel: virtual DOM tree with inspector, frame-budget flamechart, P50/P95/P99 latency, mutation log with time-travel replay, causality graph.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128268;</span>
-            <div><strong>Synchronous DOM reads.</strong> <span>getBoundingClientRect(), offsetWidth, getComputedStyle() return real values via SharedArrayBuffer. No async workarounds.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128295;</span>
-            <div><strong>Vite plugin with zero config.</strong> <span>COOP/COEP headers, binary transport in production, worker error overlay, debug defines — all automatic.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#9997;</span>
-            <div><strong>CLI scaffolding.</strong> <span><code>npx async-dom init my-app --template react-ts</code> — running in under a minute with vanilla, React, or Vue templates.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128679;</span>
-            <div><strong>Sandbox mode for third-party scripts.</strong> <span>Patch worker globals or use Proxy + eval sandbox. Third-party analytics, ads, and widgets "just work" inside the worker.</span></div>
-          </li>
-        </ul>
-      </div>
-
-      <!-- SEO & Marketing -->
-      <div class="audience-panel" data-panel="seo">
-        <h3>Faster pages. Better rankings. Protected content.</h3>
-        <p class="lead">
-          Google uses Core Web Vitals as a ranking signal. async-dom moves heavy computation
-          off the main thread, directly improving the metrics that matter for SEO.
-        </p>
-        <ul class="benefit-list">
-          <li>
-            <span class="icon">&#128200;</span>
-            <div><strong>Better INP and TBT.</strong> <span>Interaction to Next Paint and Total Blocking Time improve when the main thread isn't running your framework. Google measures this.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128065;</span>
-            <div><strong>Real-time UX broadcasting.</strong> <span>WebSocket transport lets you observe exactly what users experience, live. Session replay at the mutation level, not pixel approximation.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128170;</span>
-            <div><strong>Content stays yours.</strong> <span>AI crawlers get an empty HTML shell. Your premium content, paywalled articles, and proprietary data don't end up in training datasets.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#129518;</span>
-            <div><strong>Invisible watermarking.</strong> <span>The worker controls rendering. Inject per-user, per-session watermarks that are invisible to readers but traceable if content leaks.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128106;</span>
-            <div><strong>Collaborative demos.</strong> <span>Multi-user events via WebSocket. Build interactive product demos where multiple users interact with the same live UI.</span></div>
-          </li>
-        </ul>
-      </div>
-
-      <!-- Legal -->
-      <div class="audience-panel" data-panel="legal">
-        <h3>Technical enforcement for legal rights</h3>
-        <p class="lead">
-          The NYT sued OpenAI. The IAB proposed the AI Accountability for Publishers Act.
-          But legal remedies are slow. async-dom gives your legal team a technical backstop.
-        </p>
-        <ul class="benefit-list">
-          <li>
-            <span class="icon">&#128220;</span>
-            <div><strong>Content never in source.</strong> <span>Structured content stays in the worker. The DOM receives procedural rendering instructions, not your data model. Scraping requires reverse-engineering a binary protocol.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128373;</span>
-            <div><strong>Traceable leaks.</strong> <span>Per-session rendering watermarks let you prove which session leaked content — useful evidence for DMCA and copyright claims.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128274;</span>
-            <div><strong>Access control at render time.</strong> <span>The worker can enforce licensing rules: time-limited viewing, user-specific rendering, geographic restrictions — without relying on server-side paywalls that AI scrapers circumvent.</span></div>
-          </li>
-          <li>
-            <span class="icon">&#128466;</span>
-            <div><strong>Copy-paste control.</strong> <span>Clipboard operations pass through the worker's abstraction layer. Intercept, modify, or log copy events without degrading the reading experience.</span></div>
-          </li>
-        </ul>
-      </div>
-
-    </div>
-  </div>
-</section>
-
 <!-- ── Code Preview ── -->
 <section class="section code-section" id="code">
   <div class="container">
@@ -743,7 +582,7 @@
     <div class="code-panels">
       <div class="code-panel active" data-codepanel="vanilla">
         <div class="code-block"><pre><span class="cm">// main.ts</span>
-<span class="kw">import</span> { createAsyncDom } <span class="kw">from</span> <span class="str">"async-dom"</span>;
+<span class="kw">import</span> { createAsyncDom } <span class="kw">from</span> <span class="str">"@lifeart/async-dom"</span>;
 
 <span class="kw">const</span> dom = <span class="fn">createAsyncDom</span>({
   <span class="attr">target</span>: document.<span class="fn">getElementById</span>(<span class="str">"app"</span>),
@@ -752,7 +591,7 @@
 dom.<span class="fn">start</span>();
 
 <span class="cm">// worker.ts</span>
-<span class="kw">import</span> { createWorkerDom } <span class="kw">from</span> <span class="str">"async-dom/worker"</span>;
+<span class="kw">import</span> { createWorkerDom } <span class="kw">from</span> <span class="str">"@lifeart/async-dom/worker"</span>;
 <span class="kw">const</span> { document } = <span class="fn">createWorkerDom</span>();
 
 <span class="kw">const</span> div = document.<span class="fn">createElement</span>(<span class="str">"div"</span>);
@@ -760,7 +599,7 @@ div.textContent = <span class="str">"Hello from a Web Worker!"</span>;
 document.body.<span class="fn">appendChild</span>(div);</pre></div>
       </div>
       <div class="code-panel" data-codepanel="react">
-        <div class="code-block"><pre><span class="kw">import</span> { <span class="tag">AsyncDom</span> } <span class="kw">from</span> <span class="str">"async-dom/react"</span>;
+        <div class="code-block"><pre><span class="kw">import</span> { <span class="tag">AsyncDom</span> } <span class="kw">from</span> <span class="str">"@lifeart/async-dom/react"</span>;
 
 <span class="kw">function</span> <span class="fn">App</span>() {
   <span class="kw">return</span> (
@@ -783,17 +622,193 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
 &lt;/<span class="tag">template</span>&gt;
 
 &lt;<span class="tag">script</span> <span class="attr">setup</span>&gt;
-<span class="kw">import</span> { <span class="tag">AsyncDom</span> } <span class="kw">from</span> <span class="str">"async-dom/vue"</span>;
+<span class="kw">import</span> { <span class="tag">AsyncDom</span> } <span class="kw">from</span> <span class="str">"@lifeart/async-dom/vue"</span>;
 &lt;/<span class="tag">script</span>&gt;</pre></div>
       </div>
       <div class="code-panel" data-codepanel="svelte">
         <div class="code-block"><pre><span class="cm">&lt;!-- App.svelte --&gt;</span>
 &lt;<span class="tag">script</span>&gt;
-  <span class="kw">import</span> { asyncDom } <span class="kw">from</span> <span class="str">"async-dom/svelte"</span>;
+  <span class="kw">import</span> { asyncDom } <span class="kw">from</span> <span class="str">"@lifeart/async-dom/svelte"</span>;
 &lt;/<span class="tag">script</span>&gt;
 
 &lt;<span class="tag">div</span> <span class="kw">use</span>:<span class="fn">asyncDom</span>={{ <span class="attr">worker</span>: <span class="str">"./app.worker.ts"</span> }} /&gt;</pre></div>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Audience-specific value props ── -->
+<section class="section audience-section" id="audiences">
+  <div class="container">
+    <span class="section-label">Who is this for</span>
+    <h2 class="section-title">Built for every stakeholder</h2>
+    <p class="section-subtitle">
+      Different roles, different priorities. async-dom addresses them all.
+    </p>
+    <div class="audience-tabs" role="tablist">
+      <button class="audience-tab" data-tab="security" role="tab">Security Teams</button>
+      <button class="audience-tab" data-tab="cto" role="tab">CTOs & Architects</button>
+      <button class="audience-tab active" data-tab="dev" role="tab">Developers</button>
+      <button class="audience-tab" data-tab="seo" role="tab">SEO & Marketing</button>
+      <button class="audience-tab" data-tab="legal" role="tab">Legal & Compliance</button>
+    </div>
+    <div class="audience-panels">
+
+      <!-- Security -->
+      <div class="audience-panel" data-panel="security">
+        <h3>Structural defense, not configuration</h3>
+        <p class="lead">
+          Worker isolation is enforced at the browser engine level. No <code>shadowRoot</code> workaround,
+          no extension bypass, no polite requests to behave. This is architecture, not policy.
+        </p>
+        <ul class="benefit-list">
+          <li>
+            <span class="icon" aria-hidden="true">&#128274;</span>
+            <div><strong>XSS containment.</strong> <span>Malicious scripts on the main thread cannot reach worker internal state. All data passes through postMessage — a natural serialization boundary.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128272;</span>
+            <div><strong>Token isolation.</strong> <span>Auth tokens, session state, and API keys stored in the worker are inaccessible to compromised main-thread scripts or browser extensions.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128736;</span>
+            <div><strong>Anti-scraping by architecture.</strong> <span>Empty HTML payload. Procedural DOM structure. Dynamic class names. Honeypot injection. Behavioral gating. Not a cat-and-mouse game — a structural barrier.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128737;</span>
+            <div><strong>Built-in sanitization.</strong> <span>HTML sanitizer strips scripts, iframes, on* handlers, javascript: URIs. Property allowlist. Attribute filtering. Defense in depth.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#129302;</span>
+            <div><strong>Bot detection at the app layer.</strong> <span>The worker controls rendering. Detect non-human patterns (no mouse events, impossibly fast navigation) and alter output in real-time.</span></div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- CTO -->
+      <div class="audience-panel" data-panel="cto">
+        <h3>Ship faster. Scale smarter. Sleep better.</h3>
+        <p class="lead">
+          One library. Three framework adapters. Zero framework runtime on the main thread.
+          Multi-core utilization without the complexity of manual worker management.
+        </p>
+        <ul class="benefit-list">
+          <li>
+            <span class="icon" aria-hidden="true">&#9889;</span>
+            <div><strong>Core Web Vitals improvement.</strong> <span>Moving framework execution off the main thread directly improves INP, FID, and TBT. Google rewards this in search rankings.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#127959;</span>
+            <div><strong>True micro-frontend isolation.</strong> <span>Each team ships a worker. CSS is encapsulated via shadow DOM. No shared globals. Independent deployment. React 18 and React 19 on the same page — zero conflicts.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128187;</span>
+            <div><strong>Remote rendering via WebSocket.</strong> <span>Run the app on a server, stream DOM updates to Smart TVs, kiosks, IoT devices, or thin clients. One codebase, any screen.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128176;</span>
+            <div><strong>Protect proprietary UI logic.</strong> <span>NDA demos, premium features, competitive algorithms — keep them in a worker or on a server, not in client bundles.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128200;</span>
+            <div><strong>634 tests. TypeScript. MIT license.</strong> <span>Production-ready with strict types, Biome linting, CI pipeline, Vite plugin, CLI scaffolding, and Chrome DevTools extension.</span></div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Developer -->
+      <div class="audience-panel active" data-panel="dev">
+        <h3>Write normal code. It just runs in a Worker.</h3>
+        <p class="lead">
+          No new framework to learn. The virtual DOM API is comprehensive — your existing React, Vue,
+          or Svelte code works without modification. First-class DX with DevTools, error reporting, and hot reload.
+        </p>
+        <ul class="benefit-list">
+          <li>
+            <span class="icon" aria-hidden="true">&#128230;</span>
+            <div><strong>Drop-in framework adapters.</strong> <span>&lt;AsyncDom&gt; component for React/Vue. use:asyncDom action for Svelte. useAsyncDom hooks/composables. Fallback, onReady, onError — all wired up.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128269;</span>
+            <div><strong>Built-in DevTools panel.</strong> <span>5-tab debug panel: virtual DOM tree with inspector, frame-budget flamechart, P50/P95/P99 latency, mutation log with time-travel replay, causality graph.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128268;</span>
+            <div><strong>Synchronous DOM reads.</strong> <span>getBoundingClientRect(), offsetWidth, getComputedStyle() return real values via SharedArrayBuffer. No async workarounds.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128295;</span>
+            <div><strong>Vite plugin with zero config.</strong> <span>COOP/COEP headers, binary transport in production, worker error overlay, debug defines — all automatic.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#9997;</span>
+            <div><strong>CLI scaffolding.</strong> <span><code>npx @lifeart/async-dom init my-app --template react-ts</code> — running in under a minute with vanilla, React, or Vue templates.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128679;</span>
+            <div><strong>Sandbox mode for third-party scripts.</strong> <span>Patch worker globals or use Proxy + eval sandbox. Third-party analytics, ads, and widgets "just work" inside the worker.</span></div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- SEO & Marketing -->
+      <div class="audience-panel" data-panel="seo">
+        <h3>Faster pages. Better rankings. Protected content.</h3>
+        <p class="lead">
+          Google uses Core Web Vitals as a ranking signal. async-dom moves heavy computation
+          off the main thread, directly improving the metrics that matter for SEO.
+        </p>
+        <ul class="benefit-list">
+          <li>
+            <span class="icon" aria-hidden="true">&#128200;</span>
+            <div><strong>Better INP and TBT.</strong> <span>Interaction to Next Paint and Total Blocking Time improve when the main thread isn't running your framework. Google measures this.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128065;</span>
+            <div><strong>Real-time UX broadcasting.</strong> <span>WebSocket transport lets you observe exactly what users experience, live. Session replay at the mutation level, not pixel approximation.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128170;</span>
+            <div><strong>Content stays yours.</strong> <span>AI crawlers get an empty HTML shell. Your premium content, paywalled articles, and proprietary data don't end up in training datasets.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#129518;</span>
+            <div><strong>Invisible watermarking.</strong> <span>The worker controls rendering. Inject per-user, per-session watermarks that are invisible to readers but traceable if content leaks.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128106;</span>
+            <div><strong>Collaborative demos.</strong> <span>Multi-user events via WebSocket. Build interactive product demos where multiple users interact with the same live UI.</span></div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Legal -->
+      <div class="audience-panel" data-panel="legal">
+        <h3>Technical enforcement for legal rights</h3>
+        <p class="lead">
+          The NYT sued OpenAI. The IAB proposed the AI Accountability for Publishers Act.
+          But legal remedies are slow. async-dom gives your legal team a technical backstop.
+        </p>
+        <ul class="benefit-list">
+          <li>
+            <span class="icon" aria-hidden="true">&#128220;</span>
+            <div><strong>Content never in source.</strong> <span>Structured content stays in the worker. The DOM receives procedural rendering instructions, not your data model. Scraping requires reverse-engineering a binary protocol.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128373;</span>
+            <div><strong>Traceable leaks.</strong> <span>Per-session rendering watermarks let you prove which session leaked content — useful evidence for DMCA and copyright claims.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128274;</span>
+            <div><strong>Access control at render time.</strong> <span>The worker can enforce licensing rules: time-limited viewing, user-specific rendering, geographic restrictions — without relying on server-side paywalls that AI scrapers circumvent.</span></div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">&#128466;</span>
+            <div><strong>Copy-paste control.</strong> <span>Clipboard operations pass through the worker's abstraction layer. Intercept, modify, or log copy events without degrading the reading experience.</span></div>
+          </li>
+        </ul>
+      </div>
+
     </div>
   </div>
 </section>
@@ -905,6 +920,18 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
   </div>
 </section>
 
+<!-- ── Mid-page CTA ── -->
+<div style="text-align:center;padding:48px 24px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+  <p style="color:var(--text-muted);font-size:1rem;margin-bottom:16px;">Ready to try it?</p>
+  <div class="hero-install" style="margin-bottom:16px;">
+    <code>npx @lifeart/async-dom init my-app</code>
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('npx @lifeart/async-dom init my-app')" title="Copy" aria-label="Copy scaffold command">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 10.5V3a1.5 1.5 0 011.5-1.5H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <p style="color:var(--text-dim);font-size:0.85rem;">Templates: <code>vanilla-ts</code> &middot; <code>react-ts</code> &middot; <code>vue-ts</code></p>
+</div>
+
 <!-- ── Comparison ── -->
 <section class="section" id="comparison">
   <div class="container">
@@ -1002,35 +1029,143 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
   </div>
 </section>
 
+<!-- ── More Use Cases ── -->
+<section class="section" id="more-use-cases" style="background: var(--bg-surface);">
+  <div class="container">
+    <span class="section-label">More Use Cases</span>
+    <h2 class="section-title">Beyond performance and security</h2>
+    <div class="problems-grid" style="margin-top: 32px;">
+      <div class="problem-card">
+        <div class="problem-icon" style="background: rgba(16,185,129,0.1); color: var(--green);">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12h6m-3-3v6m-7 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <h3>Copyright & DRM enforcement</h3>
+        <p>
+          The NYT sued OpenAI. The <span class="stat-highlight">$236 billion DRM market</span> proves demand.
+          async-dom keeps content in the worker — the DOM receives rendering instructions, not your data model.
+          Per-session watermarking traces leaks.
+        </p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-icon" style="background: rgba(59,130,246,0.1); color: var(--accent);">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zm0 8a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2z" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <h3>Micro-frontend isolation</h3>
+        <p>
+          Each team ships a worker. CSS is encapsulated via shadow DOM. No shared globals.
+          Run React 18 and React 19 side by side — <span class="stat-highlight">zero conflicts, no iframes.</span>
+        </p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-icon" style="background: rgba(236,72,153,0.1); color: #ec4899;">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3>Remote & IoT rendering</h3>
+        <p>
+          Run the app on a server. Stream DOM updates via WebSocket to Smart TVs, kiosks, or budget phones.
+          <span class="stat-highlight">One codebase, any screen.</span> The device only needs a thin renderer.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FAQ ── -->
+<section class="section" id="faq">
+  <div class="container">
+    <span class="section-label">FAQ</span>
+    <h2 class="section-title">Common questions</h2>
+    <div style="margin-top: 32px; display: grid; gap: 16px; max-width: 760px;">
+      <details style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;">
+        <summary style="cursor:pointer;font-weight:600;font-size:0.95rem;color:var(--text);">Won't Google fail to index an empty HTML page?</summary>
+        <p style="color:var(--text-muted);font-size:0.9rem;line-height:1.7;margin-top:12px;">
+          async-dom is designed for <strong>authenticated app shells</strong>, not public marketing pages. Use it for dashboards,
+          admin panels, premium content, and interactive apps — behind a login or where indexing is unwanted.
+          For SEO-critical public pages, keep server-side rendering and apply async-dom selectively to the interactive parts.
+        </p>
+      </details>
+      <details style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;">
+        <summary style="cursor:pointer;font-weight:600;font-size:0.95rem;color:var(--text);">What happens without SharedArrayBuffer (no COOP/COEP headers)?</summary>
+        <p style="color:var(--text-muted);font-size:0.9rem;line-height:1.7;margin-top:12px;">
+          Everything works — rendering, events, mutations, multi-app isolation. Only synchronous DOM reads
+          (<code>getBoundingClientRect()</code>, <code>offsetWidth</code>, <code>getComputedStyle()</code>) fall back to
+          default values. Most applications don't need sync reads. The Vite plugin adds the headers automatically for dev.
+        </p>
+      </details>
+      <details style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;">
+        <summary style="cursor:pointer;font-weight:600;font-size:0.95rem;color:var(--text);">Does it work with third-party scripts (Stripe, analytics, etc.)?</summary>
+        <p style="color:var(--text-muted);font-size:0.9rem;line-height:1.7;margin-top:12px;">
+          Third-party scripts that need real DOM access (Stripe Elements, Google Maps) should stay on the main thread.
+          async-dom's per-app isolation means they coexist naturally — your worker app renders alongside main-thread widgets.
+          Analytics scripts can run in the worker via <code>sandbox: "global"</code> mode.
+        </p>
+      </details>
+      <details style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;">
+        <summary style="cursor:pointer;font-weight:600;font-size:0.95rem;color:var(--text);">What's the event round-trip latency?</summary>
+        <p style="color:var(--text-muted);font-size:0.9rem;line-height:1.7;margin-top:12px;">
+          Typical postMessage round-trip is under 1ms. The binary transport adds negligible overhead.
+          For most interactions (clicks, form input, navigation) this is imperceptible.
+          For sub-frame-budget interactions (drag-and-drop, canvas painting), keep those handlers on the main thread
+          and let async-dom handle the rest of the UI.
+        </p>
+      </details>
+      <details style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;">
+        <summary style="cursor:pointer;font-weight:600;font-size:0.95rem;color:var(--text);">How is this different from an iframe?</summary>
+        <p style="color:var(--text-muted);font-size:0.9rem;line-height:1.7;margin-top:12px;">
+          Iframes create separate browsing contexts with independent rendering pipelines, heavy memory overhead,
+          and limited communication. async-dom workers share the same rendering pipeline, communicate via zero-copy
+          binary messages, and render into the parent document's DOM (or shadow DOM). No cross-origin restrictions,
+          no layout limitations, dramatically lower overhead.
+        </p>
+      </details>
+      <details style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;">
+        <summary style="cursor:pointer;font-weight:600;font-size:0.95rem;color:var(--text);">Can I migrate incrementally?</summary>
+        <p style="color:var(--text-muted);font-size:0.9rem;line-height:1.7;margin-top:12px;">
+          Yes. Use <code>addApp()</code> to mount one worker-powered component alongside your existing main-thread code.
+          Migrate section by section. Each worker app is isolated — it doesn't affect the rest of your page.
+        </p>
+      </details>
+    </div>
+  </div>
+</section>
+
 <!-- ── CTA ── -->
 <section class="section cta-section">
   <div class="container">
-    <span class="section-label">Get started</span>
-    <h2 class="section-title">Move your UI off the main thread today</h2>
-    <p class="section-subtitle">
-      MIT licensed. TypeScript strict. 634 tests. React, Vue, and Svelte adapters.
-      Vite plugin. CLI scaffolding. Chrome DevTools extension.
+    <span class="section-label">Get started in 60 seconds</span>
+    <h2 class="section-title">Scaffold a project now</h2>
+    <div class="hero-install" style="margin: 24px auto; font-size: 1rem;">
+      <code>npx @lifeart/async-dom init my-app --template react-ts</code>
+      <button class="copy-btn" onclick="navigator.clipboard.writeText('npx @lifeart/async-dom init my-app --template react-ts')" title="Copy" aria-label="Copy scaffold command">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 10.5V3a1.5 1.5 0 011.5-1.5H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <p class="section-subtitle" style="margin: 0 auto 24px; text-align: center;">
+      MIT licensed. TypeScript strict. 634 tests. React, Vue, Svelte adapters. Vite plugin. Chrome DevTools extension.
     </p>
-    <div class="hero-actions" style="margin-top: 32px;">
+    <div class="hero-actions" style="margin-top: 24px;">
       <a href="https://github.com/lifeart/async-dom" class="btn btn-primary">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         View on GitHub
       </a>
-      <a href="https://www.npmjs.com/package/async-dom" class="btn btn-secondary">npm install async-dom</a>
+      <a href="https://www.npmjs.com/package/@lifeart/async-dom" class="btn btn-secondary">View on npm</a>
     </div>
     <div class="cta-links">
       <a href="https://github.com/lifeart/async-dom/issues">Report an issue</a>
+      <a href="https://github.com/lifeart/async-dom/discussions">Discussions</a>
       <a href="https://github.com/lifeart/async-dom/blob/master/CHANGELOG.md">Changelog</a>
       <a href="https://github.com/lifeart/async-dom/blob/master/LICENSE">MIT License</a>
     </div>
   </div>
 </section>
 
+</main>
+
 <!-- ── Footer ── -->
 <footer class="footer">
   <div class="footer-links">
     <a href="https://github.com/lifeart/async-dom">GitHub</a>
-    <a href="https://www.npmjs.com/package/async-dom">npm</a>
+    <a href="https://www.npmjs.com/package/@lifeart/async-dom">npm</a>
     <a href="https://github.com/lifeart/async-dom/blob/master/LICENSE">MIT License</a>
   </div>
   <p>Built by <a href="https://github.com/lifeart">Aleksandr Kanunnikov</a></p>
