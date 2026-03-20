@@ -1,7 +1,7 @@
 import type { MutationLogEntry, WarningLogEntry } from "../core/debug.ts";
 
 /**
- * The shape of __ASYNC_DOM_DEVTOOLS__ exposed on globalThis.
+ * The shape of __ASYNC_DOM_DEVTOOLS__ exposed on globalThis (main thread).
  */
 interface DevtoolsAPI {
 	scheduler: {
@@ -19,7 +19,14 @@ interface DevtoolsAPI {
 	findRealNode: (nodeId: number) => Node | null;
 	apps: () => string[];
 	renderers: () => Record<string, { root: unknown }>;
-	tree?: () => TreeNode | null;
+	refreshDebugData: () => void;
+	getAppData: (appId: string) => AppDebugData | undefined;
+	getAllAppsData: () => Record<string, AppDebugData>;
+}
+
+interface AppDebugData {
+	tree: unknown;
+	workerStats: unknown;
 }
 
 interface TreeNode {
@@ -32,7 +39,7 @@ interface TreeNode {
 	children?: TreeNode[];
 }
 
-const MAX_LOG_ENTRIES = 100;
+const MAX_LOG_ENTRIES = 200;
 const MAX_WARNING_ENTRIES = 200;
 
 // ---- Mutation / Warning capture ----
@@ -41,8 +48,10 @@ const mutationLog: MutationLogEntry[] = [];
 const warningLog: WarningLogEntry[] = [];
 let warningBadgeCount = 0;
 let onWarningBadgeUpdate: (() => void) | null = null;
+let logPaused = false;
 
 export function captureMutation(entry: MutationLogEntry): void {
+	if (logPaused) return;
 	mutationLog.push(entry);
 	if (mutationLog.length > MAX_LOG_ENTRIES) mutationLog.shift();
 }
@@ -52,56 +61,6 @@ export function captureWarning(entry: WarningLogEntry): void {
 	if (warningLog.length > MAX_WARNING_ENTRIES) warningLog.shift();
 	warningBadgeCount++;
 	onWarningBadgeUpdate?.();
-}
-
-// ---- Tree builder ----
-
-function buildTree(node: Node, depth: number): TreeNode | null {
-	if (depth > 30) return null;
-
-	if (node.nodeType === 3) {
-		const text = node.textContent ?? "";
-		if (!text.trim()) return null;
-		return {
-			type: "text",
-			text,
-			id: (node as unknown as Record<string, unknown>).__asyncDomId as number | undefined,
-		};
-	}
-
-	if (node.nodeType === 8) {
-		return {
-			type: "comment",
-			text: (node as Comment).data,
-		};
-	}
-
-	if (node.nodeType !== 1) return null;
-
-	const el = node as Element;
-	const tag = el.tagName;
-	const attrs: Record<string, string> = {};
-	for (let i = 0; i < el.attributes.length; i++) {
-		const attr = el.attributes[i];
-		if (attr.name !== "data-async-dom-id") {
-			attrs[attr.name] = attr.value;
-		}
-	}
-
-	const children: TreeNode[] = [];
-	for (let i = 0; i < el.childNodes.length; i++) {
-		const child = buildTree(el.childNodes[i], depth + 1);
-		if (child) children.push(child);
-	}
-
-	return {
-		type: "element",
-		tag,
-		id: (el as unknown as Record<string, unknown>).__asyncDomId as number | undefined,
-		className: el.className || undefined,
-		attributes: Object.keys(attrs).length > 0 ? attrs : undefined,
-		children: children.length > 0 ? children : undefined,
-	};
 }
 
 // ---- CSS ----
@@ -131,8 +90,8 @@ const PANEL_CSS = `
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  width: 420px;
-  height: 370px;
+  width: 450px;
+  height: 400px;
   resize: both;
   min-width: 300px;
   min-height: 200px;
@@ -165,6 +124,7 @@ const PANEL_CSS = `
   display: block;
 }
 
+.panel.collapsed .app-bar,
 .panel.collapsed .tab-bar,
 .panel.collapsed .tab-content,
 .panel.collapsed .header-bar {
@@ -188,16 +148,64 @@ const PANEL_CSS = `
   color: #cccccc;
 }
 
-.header-close {
+.header-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.header-btn {
   background: none;
   border: none;
   color: #808080;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px;
   padding: 0 4px;
   font-family: inherit;
 }
-.header-close:hover { color: #d4d4d4; }
+.header-btn:hover { color: #d4d4d4; }
+
+/* ---- App bar (multi-app) ---- */
+
+.app-bar {
+  display: none;
+  background: #252526;
+  border-bottom: 1px solid #3c3c3c;
+  flex-shrink: 0;
+  padding: 0 4px;
+  gap: 2px;
+  align-items: center;
+  height: 24px;
+  overflow-x: auto;
+}
+.app-bar.visible { display: flex; }
+
+.app-btn {
+  padding: 2px 8px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #808080;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.app-btn:hover { color: #cccccc; }
+.app-btn.active {
+  color: #d4d4d4;
+  background: #37373d;
+  border-color: #007acc;
+}
+
+.app-label {
+  color: #555;
+  font-size: 10px;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+/* ---- Tab bar ---- */
 
 .tab-bar {
   display: flex;
@@ -246,6 +254,32 @@ const PANEL_CSS = `
 
 /* ---- Tree tab ---- */
 
+.tree-refresh-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #2d2d2d;
+  margin-bottom: 4px;
+}
+
+.tree-refresh-btn {
+  background: #3c3c3c;
+  border: 1px solid #555;
+  color: #d4d4d4;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  border-radius: 3px;
+}
+.tree-refresh-btn:hover { background: #505050; }
+
+.tree-status {
+  color: #555;
+  font-size: 10px;
+}
+
 .tree-node { padding-left: 14px; }
 .tree-line {
   display: flex;
@@ -279,6 +313,16 @@ const PANEL_CSS = `
 
 /* ---- Performance tab ---- */
 
+.perf-section-title {
+  color: #007acc;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 0 3px;
+  border-bottom: 1px solid #2d2d2d;
+  margin-bottom: 2px;
+}
+.perf-section-title:first-child { padding-top: 0; }
+
 .perf-row {
   display: flex;
   justify-content: space-between;
@@ -290,6 +334,12 @@ const PANEL_CSS = `
 .perf-value.red { color: #f44747; }
 .perf-value.yellow { color: #d7ba7d; }
 .perf-value.green { color: #4ec9b0; }
+
+.perf-sparkline {
+  color: #555;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
 
 /* ---- Log tab ---- */
 
@@ -315,7 +365,7 @@ const PANEL_CSS = `
 }
 .log-filter:focus { border-color: #007acc; }
 
-.log-clear {
+.log-btn {
   background: #3c3c3c;
   border: 1px solid #555;
   color: #d4d4d4;
@@ -324,8 +374,16 @@ const PANEL_CSS = `
   font-family: inherit;
   font-size: 11px;
   border-radius: 3px;
+  white-space: nowrap;
 }
-.log-clear:hover { background: #505050; }
+.log-btn:hover { background: #505050; }
+.log-btn.active { background: #007acc; border-color: #007acc; }
+
+.log-count {
+  color: #555;
+  font-size: 10px;
+  flex-shrink: 0;
+}
 
 .log-list {
   overflow-y: auto;
@@ -339,9 +397,9 @@ const PANEL_CSS = `
   border-bottom: 1px solid #2a2a2a;
   font-size: 11px;
 }
-.log-time { color: #555; flex-shrink: 0; width: 75px; }
-.log-action { color: #569cd6; flex-shrink: 0; width: 110px; overflow: hidden; text-overflow: ellipsis; }
-.log-nodeid { color: #808080; }
+.log-time { color: #555; flex-shrink: 0; width: 80px; }
+.log-action { color: #569cd6; flex-shrink: 0; width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.log-detail { color: #808080; overflow: hidden; text-overflow: ellipsis; }
 
 .log-empty { color: #808080; padding: 16px; text-align: center; }
 
@@ -354,19 +412,18 @@ const PANEL_CSS = `
 }
 .warn-time { color: #555; margin-right: 6px; }
 .warn-code {
-  color: #d7ba7d;
   font-weight: 600;
   margin-right: 6px;
 }
+.warn-code.ASYNC_DOM_MISSING_NODE { color: #f44747; }
+.warn-code.ASYNC_DOM_SYNC_TIMEOUT { color: #f44747; }
+.warn-code.ASYNC_DOM_LISTENER_NOT_FOUND { color: #d7ba7d; }
+.warn-code.ASYNC_DOM_EVENT_ATTACH_FAILED { color: #d7ba7d; }
+.warn-code.ASYNC_DOM_TRANSPORT_NOT_OPEN { color: #d7ba7d; }
+.warn-code.ASYNC_DOM_BLOCKED_PROPERTY { color: #d7ba7d; }
+
 .warn-msg { color: #d4d4d4; }
-
 .warn-empty { color: #808080; padding: 16px; text-align: center; }
-
-/* Flash highlight */
-@keyframes async-dom-flash {
-  0% { outline: 3px solid #007acc; outline-offset: 2px; }
-  100% { outline: 3px solid transparent; outline-offset: 2px; }
-}
 `;
 
 // ---- Helpers ----
@@ -382,7 +439,6 @@ function escapeHtml(str: string): string {
 function formatTime(ts: number): string {
 	const d = new Date(ts);
 	if (Number.isNaN(d.getTime())) {
-		// performance.now() value — use current time
 		const now = new Date();
 		const h = String(now.getHours()).padStart(2, "0");
 		const m = String(now.getMinutes()).padStart(2, "0");
@@ -400,6 +456,16 @@ function truncate(str: string, max: number): string {
 	return str.length > max ? `${str.slice(0, max)}...` : str;
 }
 
+// ASCII sparkline from an array of numbers
+function sparkline(data: number[]): string {
+	if (data.length === 0) return "";
+	const chars = "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588";
+	const max = Math.max(...data);
+	const min = Math.min(...data);
+	const range = max - min || 1;
+	return data.map((v) => chars[Math.min(Math.floor(((v - min) / range) * 7), 7)]).join("");
+}
+
 // ---- Panel creation ----
 
 export function createDevtoolsPanel(): { destroy: () => void } {
@@ -407,12 +473,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	host.id = "__async-dom-devtools__";
 	const shadow = host.attachShadow({ mode: "open" });
 
-	// Styles
 	const style = document.createElement("style");
 	style.textContent = PANEL_CSS;
 	shadow.appendChild(style);
 
-	// Panel container
 	const panel = document.createElement("div");
 	panel.className = "panel collapsed";
 
@@ -431,12 +495,30 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	headerTitle.textContent = "async-dom devtools";
 	headerBar.appendChild(headerTitle);
 
+	const headerActions = document.createElement("div");
+	headerActions.className = "header-actions";
+
+	const refreshBtn = document.createElement("button");
+	refreshBtn.className = "header-btn";
+	refreshBtn.textContent = "\u21BB";
+	refreshBtn.title = "Refresh data from workers";
+	headerActions.appendChild(refreshBtn);
+
 	const closeBtn = document.createElement("button");
-	closeBtn.className = "header-close";
+	closeBtn.className = "header-btn";
 	closeBtn.textContent = "\u25BC";
 	closeBtn.title = "Collapse";
-	headerBar.appendChild(closeBtn);
+	headerActions.appendChild(closeBtn);
+
+	headerBar.appendChild(headerActions);
 	panel.appendChild(headerBar);
+
+	// App bar (multi-app support)
+	const appBar = document.createElement("div");
+	appBar.className = "app-bar";
+	panel.appendChild(appBar);
+
+	let selectedAppId: string | null = null;
 
 	// Tab bar
 	const tabBar = document.createElement("div");
@@ -475,6 +557,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			warningBadgeCount = 0;
 			updateWarningBadge();
 		}
+		renderActiveTab();
 	}
 
 	for (const tabName of tabs) {
@@ -484,7 +567,8 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	// ---- Tree content ----
 	const treeContent = document.createElement("div");
 	treeContent.className = "tab-content active";
-	treeContent.innerHTML = '<div class="tree-empty">Waiting for data...</div>';
+	treeContent.innerHTML =
+		'<div class="tree-empty">Click refresh to load virtual DOM tree from worker.</div>';
 	tabPanels.Tree = treeContent as HTMLDivElement;
 	panel.appendChild(treeContent);
 
@@ -504,14 +588,30 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 	const logFilter = document.createElement("input");
 	logFilter.className = "log-filter";
-	logFilter.placeholder = "Filter by action...";
+	logFilter.placeholder = "Filter...";
 	logFilter.type = "text";
 	logToolbar.appendChild(logFilter);
 
+	const logCountSpan = document.createElement("span");
+	logCountSpan.className = "log-count";
+	logCountSpan.textContent = "0";
+	logToolbar.appendChild(logCountSpan);
+
+	const logPauseBtn = document.createElement("button");
+	logPauseBtn.className = "log-btn";
+	logPauseBtn.textContent = "Pause";
+	logToolbar.appendChild(logPauseBtn);
+
+	const logAutoScrollBtn = document.createElement("button");
+	logAutoScrollBtn.className = "log-btn active";
+	logAutoScrollBtn.textContent = "Auto-scroll";
+	logToolbar.appendChild(logAutoScrollBtn);
+
 	const logClearBtn = document.createElement("button");
-	logClearBtn.className = "log-clear";
+	logClearBtn.className = "log-btn";
 	logClearBtn.textContent = "Clear";
 	logToolbar.appendChild(logClearBtn);
+
 	logContent.appendChild(logToolbar);
 
 	const logList = document.createElement("div");
@@ -530,7 +630,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	warnToolbar.className = "log-toolbar";
 
 	const warnClearBtn = document.createElement("button");
-	warnClearBtn.className = "log-clear";
+	warnClearBtn.className = "log-btn";
 	warnClearBtn.textContent = "Clear";
 	warnToolbar.appendChild(warnClearBtn);
 	warnContent.appendChild(warnToolbar);
@@ -549,10 +649,14 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	shadow.appendChild(panel);
 	document.body.appendChild(host);
 
-	// ---- Polling state ----
+	// ---- State ----
 	let treePollTimer: ReturnType<typeof setInterval> | null = null;
 	let perfPollTimer: ReturnType<typeof setInterval> | null = null;
 	let logRenderTimer: ReturnType<typeof setInterval> | null = null;
+	let autoScroll = true;
+	const queueHistory: number[] = [];
+	const MAX_HISTORY = 30;
+
 	function getDevtools(): DevtoolsAPI | null {
 		return (globalThis as Record<string, unknown>).__ASYNC_DOM_DEVTOOLS__ as DevtoolsAPI | null;
 	}
@@ -561,6 +665,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 	function expand(): void {
 		panel.classList.remove("collapsed");
+		requestTreeRefresh();
 		startPolling();
 	}
 
@@ -572,7 +677,65 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	toggleTab.addEventListener("click", expand);
 	closeBtn.addEventListener("click", collapse);
 
-	// ---- Tree rendering ----
+	// ---- Refresh: request data from workers ----
+
+	function requestTreeRefresh(): void {
+		const dt = getDevtools();
+		if (!dt) return;
+		dt.refreshDebugData();
+		// Render after a short delay to let the response arrive
+		setTimeout(() => {
+			updateAppBar();
+			renderActiveTab();
+		}, 250);
+	}
+
+	refreshBtn.addEventListener("click", requestTreeRefresh);
+
+	// ---- App bar ----
+
+	function updateAppBar(): void {
+		const dt = getDevtools();
+		if (!dt) return;
+		const apps = dt.apps();
+		if (apps.length <= 1) {
+			appBar.classList.remove("visible");
+			selectedAppId = apps[0] ?? null;
+			return;
+		}
+		appBar.classList.add("visible");
+		appBar.innerHTML = "";
+
+		const label = document.createElement("span");
+		label.className = "app-label";
+		label.textContent = "Apps:";
+		appBar.appendChild(label);
+
+		if (selectedAppId === null || !apps.includes(selectedAppId)) {
+			selectedAppId = apps[0];
+		}
+
+		for (const id of apps) {
+			const btn = document.createElement("button");
+			btn.className = `app-btn${id === selectedAppId ? " active" : ""}`;
+			btn.textContent = id;
+			btn.addEventListener("click", () => {
+				selectedAppId = id;
+				updateAppBar();
+				renderActiveTab();
+			});
+			appBar.appendChild(btn);
+		}
+	}
+
+	function renderActiveTab(): void {
+		if (activeTab === "Tree") renderTreeTab();
+		else if (activeTab === "Performance") renderPerfTab();
+		else if (activeTab === "Log") renderLogTab();
+		else if (activeTab === "Warnings") renderWarningsTab();
+	}
+
+	// ---- Tree rendering (VIRTUAL DOM from worker) ----
 
 	function renderTreeTab(): void {
 		const dt = getDevtools();
@@ -581,24 +744,38 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			return;
 		}
 
-		let tree: TreeNode | null = null;
-		if (typeof dt.tree === "function") {
-			tree = dt.tree();
-		} else {
-			// Fallback: build tree from findRealNode(2) = body
-			const body = dt.findRealNode(2);
-			if (body) {
-				tree = buildTree(body, 0);
-			}
-		}
+		const allData = dt.getAllAppsData();
+		const appIds = Object.keys(allData);
 
-		if (!tree) {
-			treeContent.innerHTML = '<div class="tree-empty">No tree data available.</div>';
+		if (appIds.length === 0) {
+			treeContent.innerHTML =
+				'<div class="tree-empty">No apps registered. Click \u21BB to refresh.</div>';
 			return;
 		}
 
+		// If multi-app, show selected app; if single, show only one
+		const targetAppId = selectedAppId && allData[selectedAppId] ? selectedAppId : appIds[0];
+		const data = allData[targetAppId];
+
+		if (!data || !data.tree) {
+			treeContent.innerHTML =
+				'<div class="tree-empty">No virtual DOM tree received yet. Click \u21BB to refresh.</div>';
+			return;
+		}
+
+		const tree = data.tree as TreeNode;
 		const container = document.createElement("div");
-		buildTreeDOM(container, tree, 0, true);
+
+		// Status line
+		const statusLine = document.createElement("div");
+		statusLine.className = "tree-refresh-bar";
+		const statusText = document.createElement("span");
+		statusText.className = "tree-status";
+		statusText.textContent = `Virtual DOM for app: ${targetAppId}`;
+		statusLine.appendChild(statusText);
+		container.appendChild(statusLine);
+
+		buildTreeDOM(container, tree, 0, true, dt);
 		treeContent.innerHTML = "";
 		treeContent.appendChild(container);
 	}
@@ -608,6 +785,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		node: TreeNode,
 		depth: number,
 		expanded: boolean,
+		dt: DevtoolsAPI,
 	): void {
 		const wrapper = document.createElement("div");
 		wrapper.className = `tree-node${expanded ? " expanded" : ""}`;
@@ -629,7 +807,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			if (node.id != null) {
 				const idSpan = document.createElement("span");
 				idSpan.className = "tree-nodeid";
-				idSpan.textContent = `#${node.id}`;
+				idSpan.textContent = `_${node.id}`;
 				line.appendChild(idSpan);
 			}
 
@@ -662,7 +840,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		toggleEl.textContent = hasChildren ? (expanded ? "\u25BC" : "\u25B6") : " ";
 		line.appendChild(toggleEl);
 
-		// Build tag string
+		// Build tag string: <tag .className #id>
 		const tag = (node.tag ?? "???").toLowerCase();
 		const tagSpan = document.createElement("span");
 		let html = `<span class="tree-tag">&lt;${escapeHtml(tag)}</span>`;
@@ -692,34 +870,30 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		if (node.id != null) {
 			const nidSpan = document.createElement("span");
 			nidSpan.className = "tree-nodeid";
-			nidSpan.textContent = `#${node.id}`;
+			nidSpan.textContent = `_${node.id}`;
 			line.appendChild(nidSpan);
 		}
 
-		// Click: toggle or highlight node
+		// Click: toggle children or highlight real DOM node
 		line.addEventListener("click", (e: MouseEvent) => {
 			if (hasChildren && e.target === toggleEl) {
 				wrapper.classList.toggle("expanded");
 				toggleEl.textContent = wrapper.classList.contains("expanded") ? "\u25BC" : "\u25B6";
 				return;
 			}
-			// Highlight real node
+			// Highlight real DOM node via findRealNode
 			if (node.id != null) {
-				const dt = getDevtools();
-				if (dt) {
-					const realNode = dt.findRealNode(node.id) as HTMLElement | null;
-					if (realNode && "scrollIntoView" in realNode) {
-						realNode.scrollIntoView({ behavior: "smooth", block: "center" });
-						// Apply flash highlight directly (outside shadow DOM)
-						const prev = realNode.style.outline;
-						const prevOffset = realNode.style.outlineOffset;
-						realNode.style.outline = "3px solid #007acc";
-						realNode.style.outlineOffset = "2px";
-						setTimeout(() => {
-							realNode.style.outline = prev;
-							realNode.style.outlineOffset = prevOffset;
-						}, 1500);
-					}
+				const realNode = dt.findRealNode(node.id) as HTMLElement | null;
+				if (realNode && "scrollIntoView" in realNode) {
+					realNode.scrollIntoView({ behavior: "smooth", block: "center" });
+					const prev = realNode.style.outline;
+					const prevOffset = realNode.style.outlineOffset;
+					realNode.style.outline = "3px solid #007acc";
+					realNode.style.outlineOffset = "2px";
+					setTimeout(() => {
+						realNode.style.outline = prev;
+						realNode.style.outlineOffset = prevOffset;
+					}, 1500);
 				}
 			}
 		});
@@ -730,7 +904,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			const childrenDiv = document.createElement("div");
 			childrenDiv.className = "tree-children";
 			for (const child of children) {
-				buildTreeDOM(childrenDiv, child, depth + 1, depth < 2);
+				buildTreeDOM(childrenDiv, child, depth + 1, depth < 2, dt);
 			}
 			wrapper.appendChild(childrenDiv);
 		}
@@ -751,12 +925,20 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		const stats = dt.scheduler.stats();
 		const pending = stats.pending;
 
+		// Track queue depth history
+		queueHistory.push(pending);
+		if (queueHistory.length > MAX_HISTORY) queueHistory.shift();
+
+		let html = "";
+
+		// Scheduler section
+		html += '<div class="perf-section-title">Scheduler</div>';
+
 		let pendingClass = "";
 		if (pending > 1000) pendingClass = "red";
 		else if (pending > 100) pendingClass = "yellow";
 		else pendingClass = "green";
 
-		let html = "";
 		html += `<div class="perf-row"><span class="perf-label">Pending</span><span class="perf-value ${pendingClass}">${pending}</span></div>`;
 		html += `<div class="perf-row"><span class="perf-label">Frame ID</span><span class="perf-value">${stats.frameId}</span></div>`;
 
@@ -771,9 +953,36 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 		html += `<div class="perf-row"><span class="perf-label">Last Tick</span><span class="perf-value">${stats.lastTickTime > 0 ? `${stats.lastTickTime.toFixed(0)}ms` : "N/A"}</span></div>`;
 
-		// Apps
+		// Queue depth sparkline
+		if (queueHistory.length > 1) {
+			html += `<div class="perf-row"><span class="perf-label">Queue (${MAX_HISTORY}f)</span><span class="perf-sparkline">${sparkline(queueHistory)}</span></div>`;
+		}
+
+		// Apps section
 		const apps = dt.apps();
-		html += `<div class="perf-row"><span class="perf-label">Apps</span><span class="perf-value">${apps.length} (${apps.join(", ")})</span></div>`;
+		html += `<div class="perf-row"><span class="perf-label">Apps</span><span class="perf-value">${apps.length}</span></div>`;
+
+		// Worker stats per app (from cached debug data)
+		const allData = dt.getAllAppsData();
+		for (const appId of apps) {
+			const data = allData[appId];
+			if (!data?.workerStats) continue;
+
+			const ws = data.workerStats as { added: number; coalesced: number; flushed: number };
+			html += `<div class="perf-section-title">Worker: ${escapeHtml(appId)}</div>`;
+			html += `<div class="perf-row"><span class="perf-label">Mutations Added</span><span class="perf-value">${ws.added}</span></div>`;
+			html += `<div class="perf-row"><span class="perf-label">Mutations Coalesced</span><span class="perf-value">${ws.coalesced}</span></div>`;
+			html += `<div class="perf-row"><span class="perf-label">Mutations Flushed</span><span class="perf-value">${ws.flushed}</span></div>`;
+
+			const coalescingRatio = ws.added > 0 ? ((ws.coalesced / ws.added) * 100).toFixed(1) : "0.0";
+			const ratioClass =
+				Number.parseFloat(coalescingRatio) > 50
+					? "green"
+					: Number.parseFloat(coalescingRatio) > 20
+						? "yellow"
+						: "";
+			html += `<div class="perf-row"><span class="perf-label">Coalescing Ratio</span><span class="perf-value ${ratioClass}">${coalescingRatio}%</span></div>`;
+		}
 
 		perfContent.innerHTML = html;
 	}
@@ -782,7 +991,20 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 	let lastRenderedLogLength = 0;
 
+	logPauseBtn.addEventListener("click", () => {
+		logPaused = !logPaused;
+		logPauseBtn.textContent = logPaused ? "Resume" : "Pause";
+		logPauseBtn.classList.toggle("active", logPaused);
+	});
+
+	logAutoScrollBtn.addEventListener("click", () => {
+		autoScroll = !autoScroll;
+		logAutoScrollBtn.classList.toggle("active", autoScroll);
+	});
+
 	function renderLogTab(): void {
+		logCountSpan.textContent = String(mutationLog.length);
+
 		if (mutationLog.length === 0) {
 			if (lastRenderedLogLength !== 0) {
 				logList.innerHTML = '<div class="log-empty">No mutations captured yet.</div>';
@@ -810,18 +1032,26 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			actionSpan.textContent = entry.action;
 			div.appendChild(actionSpan);
 
-			const nodeIdSpan = document.createElement("span");
-			nodeIdSpan.className = "log-nodeid";
+			const detailSpan = document.createElement("span");
+			detailSpan.className = "log-detail";
 			const nodeId = "id" in entry.mutation ? entry.mutation.id : undefined;
-			nodeIdSpan.textContent = nodeId != null ? `node:${nodeId}` : "";
-			div.appendChild(nodeIdSpan);
+			let detail = nodeId != null ? `#${nodeId}` : "";
+			// Add extra detail based on mutation type
+			const m = entry.mutation as Record<string, unknown>;
+			if (m.tag) detail += ` tag=${m.tag}`;
+			if (m.name && entry.action !== "addEventListener") detail += ` ${m.name}`;
+			if (m.property) detail += ` ${m.property}`;
+			detailSpan.textContent = detail;
+			div.appendChild(detailSpan);
 
 			fragment.appendChild(div);
 		}
 
 		logList.innerHTML = "";
 		logList.appendChild(fragment);
-		logList.scrollTop = logList.scrollHeight;
+		if (autoScroll) {
+			logList.scrollTop = logList.scrollHeight;
+		}
 		lastRenderedLogLength = mutationLog.length;
 	}
 
@@ -831,6 +1061,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		mutationLog.length = 0;
 		lastRenderedLogLength = 0;
 		logList.innerHTML = '<div class="log-empty">No mutations captured yet.</div>';
+		logCountSpan.textContent = "0";
 	});
 
 	// ---- Warnings rendering ----
@@ -860,7 +1091,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			div.appendChild(timeSpan);
 
 			const codeSpan = document.createElement("span");
-			codeSpan.className = "warn-code";
+			codeSpan.className = `warn-code ${entry.code}`;
 			codeSpan.textContent = entry.code;
 			div.appendChild(codeSpan);
 
@@ -895,6 +1126,11 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		} else {
 			warningBadge.style.display = "none";
 		}
+		// Update collapsed tab text
+		toggleTab.textContent =
+			warningBadgeCount > 0
+				? `async-dom (${warningBadgeCount > 99 ? "99+" : warningBadgeCount}) \u25B2`
+				: "async-dom \u25B2";
 	}
 
 	onWarningBadgeUpdate = updateWarningBadge;
@@ -904,14 +1140,22 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	function startPolling(): void {
 		stopPolling();
 
-		// Tree: poll every 2 seconds
+		// Tree: request + render every 2 seconds
 		treePollTimer = setInterval(() => {
-			if (activeTab === "Tree") renderTreeTab();
+			if (activeTab === "Tree") {
+				const dt = getDevtools();
+				if (dt) dt.refreshDebugData();
+				setTimeout(renderTreeTab, 250);
+			}
 		}, 2000);
 
-		// Performance: poll every 1 second
+		// Performance: poll every 1 second (also refresh worker stats)
 		perfPollTimer = setInterval(() => {
-			if (activeTab === "Performance") renderPerfTab();
+			if (activeTab === "Performance") {
+				const dt = getDevtools();
+				if (dt) dt.refreshDebugData();
+				setTimeout(renderPerfTab, 250);
+			}
 		}, 1000);
 
 		// Log + warnings: poll every 500ms
@@ -921,10 +1165,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		}, 500);
 
 		// Render current tab immediately
-		if (activeTab === "Tree") renderTreeTab();
-		else if (activeTab === "Performance") renderPerfTab();
-		else if (activeTab === "Log") renderLogTab();
-		else if (activeTab === "Warnings") renderWarningsTab();
+		renderActiveTab();
 	}
 
 	function stopPolling(): void {

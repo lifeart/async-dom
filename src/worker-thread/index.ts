@@ -82,6 +82,21 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 
 	// Route incoming events from main thread to virtual DOM
 	transport.onMessage((message) => {
+		// Handle debug queries from the main thread devtools panel
+		if (isSystemMessage(message) && message.type === "debugQuery") {
+			const debugMsg = message as { type: "debugQuery"; query: string };
+			let result: unknown = null;
+			if (debugMsg.query === "tree") {
+				result = doc.toJSON();
+			} else if (debugMsg.query === "stats") {
+				result = doc.collector.getStats();
+			} else if (debugMsg.query === "pendingCount") {
+				result = doc.collector.pendingCount;
+			}
+			transport.send({ type: "debugResult", query: debugMsg.query, result });
+			return;
+		}
+
 		// Handle init messages with location data
 		if (isSystemMessage(message) && message.type === "init" && "location" in message) {
 			const initMsg = message as { location: SerializedLocation; sharedBuffer?: SharedArrayBuffer };

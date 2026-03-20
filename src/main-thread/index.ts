@@ -40,63 +40,6 @@ export interface AsyncDomInstance {
 	removeApp(appId: AppId): void;
 }
 
-interface TreeSnapshot {
-	type: "element" | "text" | "comment";
-	tag?: string;
-	id?: number;
-	className?: string;
-	attributes?: Record<string, string>;
-	text?: string;
-	children?: TreeSnapshot[];
-}
-
-function buildTreeSnapshot(node: Node, depth = 0): TreeSnapshot | null {
-	if (depth > 30) return null;
-
-	if (node.nodeType === 3) {
-		const text = node.textContent ?? "";
-		if (!text.trim()) return null;
-		return {
-			type: "text",
-			text,
-			id: (node as unknown as Record<string, unknown>).__asyncDomId as number | undefined,
-		};
-	}
-
-	if (node.nodeType === 8) {
-		return { type: "comment", text: (node as Comment).data };
-	}
-
-	if (node.nodeType !== 1) return null;
-
-	const el = node as Element;
-	// Skip the devtools panel itself
-	if (el.id === "__async-dom-devtools__") return null;
-
-	const attrs: Record<string, string> = {};
-	for (let i = 0; i < el.attributes.length; i++) {
-		const attr = el.attributes[i];
-		if (attr.name !== "data-async-dom-id") {
-			attrs[attr.name] = attr.value;
-		}
-	}
-
-	const children: TreeSnapshot[] = [];
-	for (let i = 0; i < el.childNodes.length; i++) {
-		const child = buildTreeSnapshot(el.childNodes[i], depth + 1);
-		if (child) children.push(child);
-	}
-
-	return {
-		type: "element",
-		tag: el.tagName,
-		id: (el as unknown as Record<string, unknown>).__asyncDomId as number | undefined,
-		className: el.className || undefined,
-		attributes: Object.keys(attrs).length > 0 ? attrs : undefined,
-		children: children.length > 0 ? children : undefined,
-	};
-}
-
 /**
  * Creates a new async-dom instance on the main thread.
  *
@@ -117,6 +60,14 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 	const renderers = new Map<AppId, DomRenderer>();
 	let lastRenderer: DomRenderer | null = null;
 	let lastAppId: AppId | null = null;
+
+	// Debug data cache: stores virtual DOM trees and worker stats received from workers
+	const debugData = new Map<AppId, { tree: unknown; workerStats: unknown }>();
+
+	function requestDebugData(appId: AppId): void {
+		threadManager.sendToThread(appId, { type: "debugQuery", query: "tree" });
+		threadManager.sendToThread(appId, { type: "debugQuery", query: "stats" });
+	}
 
 	function handleSyncQuery(
 		appRenderer: DomRenderer,
@@ -282,6 +233,15 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 	threadManager.onMessage((appId: AppId, message: Message) => {
 		if (isMutationMessage(message)) {
 			scheduler.enqueue(message.mutations, appId, message.priority ?? "normal");
+			return;
+		}
+		// Cache debug results from worker threads
+		if (isSystemMessage(message) && message.type === "debugResult") {
+			const debugMsg = message as { type: "debugResult"; query: string; result: unknown };
+			const data = debugData.get(appId) ?? { tree: null, workerStats: null };
+			if (debugMsg.query === "tree") data.tree = debugMsg.result;
+			if (debugMsg.query === "stats") data.workerStats = debugMsg.result;
+			debugData.set(appId, data);
 		}
 	});
 
@@ -403,6 +363,17 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 						error: import("../core/protocol.ts").SerializedError;
 					};
 					onError?.(errMsg.error, appId);
+					// Route worker errors to devtools panel as formatted warnings
+					const err = errMsg.error;
+					const location = err.filename
+						? ` at ${err.filename}:${err.lineno ?? "?"}:${err.colno ?? "?"}`
+						: "";
+					captureWarning({
+						code: err.isUnhandledRejection ? "WORKER_UNHANDLED_REJECTION" : "WORKER_ERROR",
+						message: `[${String(appId)}] ${err.name ?? "Error"}: ${err.message}${location}${err.stack ? `\n${err.stack}` : ""}`,
+						context: { appId: String(appId), error: err },
+						timestamp: performance.now(),
+					});
 				}
 			});
 		}
@@ -496,16 +467,21 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				}
 				return info;
 			},
-			tree: () => {
-				// Build tree from the first renderer's body
-				for (const r of renderers.values()) {
-					const root = r.getRoot();
-					const body = root.body;
-					if (body) {
-						return buildTreeSnapshot(body as unknown as Node);
-					}
+			// Request fresh virtual DOM tree + stats from all worker threads
+			refreshDebugData: () => {
+				for (const appId of renderers.keys()) {
+					requestDebugData(appId);
 				}
-				return null;
+			},
+			// Get cached debug data for a specific app
+			getAppData: (appId: string) => debugData.get(appId as AppId),
+			// Get all apps' cached debug data
+			getAllAppsData: () => {
+				const result: Record<string, { tree: unknown; workerStats: unknown }> = {};
+				for (const [appId, data] of debugData) {
+					result[String(appId)] = data;
+				}
+				return result;
 			},
 		};
 

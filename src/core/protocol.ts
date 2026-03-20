@@ -200,7 +200,9 @@ export type SystemMessage =
 			query: "boundingRect" | "computedStyle" | "nodeProperty" | "windowProperty";
 			property?: string;
 	  }
-	| { type: "queryResult"; uid: number; result: unknown };
+	| { type: "queryResult"; uid: number; result: unknown }
+	| { type: "debugQuery"; query: string }
+	| { type: "debugResult"; query: string; result: unknown };
 
 export type Message = MutationMessage | EventMessage | SystemMessage;
 
