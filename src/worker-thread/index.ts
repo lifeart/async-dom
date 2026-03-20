@@ -92,6 +92,10 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 				result = doc.collector.getStats();
 			} else if (debugMsg.query === "pendingCount") {
 				result = doc.collector.pendingCount;
+			} else if (debugMsg.query === "coalescedLog") {
+				result = doc.collector.getCoalescedLog();
+			} else if (debugMsg.query === "perTypeCoalesced") {
+				result = doc.collector.getPerTypeCoalesced();
 			}
 			transport.send({ type: "debugResult", query: debugMsg.query, result });
 			return;

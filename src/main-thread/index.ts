@@ -62,11 +62,15 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 	let lastAppId: AppId | null = null;
 
 	// Debug data cache: stores virtual DOM trees and worker stats received from workers
-	const debugData = new Map<AppId, { tree: unknown; workerStats: unknown }>();
+	const debugData = new Map<
+		AppId,
+		{ tree: unknown; workerStats: unknown; perTypeCoalesced: unknown }
+	>();
 
 	function requestDebugData(appId: AppId): void {
 		threadManager.sendToThread(appId, { type: "debugQuery", query: "tree" });
 		threadManager.sendToThread(appId, { type: "debugQuery", query: "stats" });
+		threadManager.sendToThread(appId, { type: "debugQuery", query: "perTypeCoalesced" });
 	}
 
 	function handleSyncQuery(
@@ -186,7 +190,7 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 
 	// Wire scheduler to renderer — appId is used to route mutations
 	// to the correct per-app renderer and event bridge
-	scheduler.setApplier((mutation: DomMutation, appId: AppId) => {
+	scheduler.setApplier((mutation: DomMutation, appId: AppId, batchUid?: number) => {
 		// Handle addEventListener specially — route to the owning app's EventBridge
 		if (mutation.action === "addEventListener") {
 			const bridge = eventBridges.get(appId);
@@ -225,22 +229,27 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			}
 		}
 		if (renderer) {
-			renderer.apply(mutation);
+			renderer.apply(mutation, batchUid);
 		}
 	});
 
 	// Handle incoming messages from workers
 	threadManager.onMessage((appId: AppId, message: Message) => {
 		if (isMutationMessage(message)) {
-			scheduler.enqueue(message.mutations, appId, message.priority ?? "normal");
+			scheduler.enqueue(message.mutations, appId, message.priority ?? "normal", message.uid);
 			return;
 		}
 		// Cache debug results from worker threads
 		if (isSystemMessage(message) && message.type === "debugResult") {
 			const debugMsg = message as { type: "debugResult"; query: string; result: unknown };
-			const data = debugData.get(appId) ?? { tree: null, workerStats: null };
+			const data = debugData.get(appId) ?? {
+				tree: null,
+				workerStats: null,
+				perTypeCoalesced: null,
+			};
 			if (debugMsg.query === "tree") data.tree = debugMsg.result;
 			if (debugMsg.query === "stats") data.workerStats = debugMsg.result;
+			if (debugMsg.query === "perTypeCoalesced") data.perTypeCoalesced = debugMsg.result;
 			debugData.set(appId, data);
 		}
 	});
@@ -450,7 +459,20 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			scheduler: {
 				pending: () => scheduler.pendingCount,
 				stats: () => scheduler.getStats(),
+				frameLog: () => scheduler.getFrameLog(),
 				flush: () => scheduler.flush(),
+			},
+			getEventTraces: () => {
+				const traces: Array<{
+					eventType: string;
+					serializeMs: number;
+					timestamp: number;
+				}> = [];
+				for (const bridge of eventBridges.values()) {
+					traces.push(...bridge.getEventTraces());
+				}
+				traces.sort((a, b) => a.timestamp - b.timestamp);
+				return traces;
 			},
 			enableHighlightUpdates: (enabled: boolean) => {
 				for (const r of renderers.values()) {
@@ -482,7 +504,10 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			getAppData: (appId: string) => debugData.get(appId as AppId),
 			// Get all apps' cached debug data
 			getAllAppsData: () => {
-				const result: Record<string, { tree: unknown; workerStats: unknown }> = {};
+				const result: Record<
+					string,
+					{ tree: unknown; workerStats: unknown; perTypeCoalesced: unknown }
+				> = {};
 				for (const [appId, data] of debugData) {
 					result[String(appId)] = data;
 				}

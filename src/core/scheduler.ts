@@ -13,14 +13,24 @@ export interface SchedulerConfig {
 	enablePrioritySkipping?: boolean;
 }
 
+export interface FrameLogEntry {
+	frameId: number;
+	totalMs: number;
+	actionCount: number;
+	timingBreakdown: Map<string, number>;
+}
+
+const MAX_FRAME_LOG = 30;
+
 interface PrioritizedMutation {
 	mutation: DomMutation;
 	priority: Priority;
 	uid: number;
 	appId: AppId;
+	batchUid?: number;
 }
 
-export type MutationApplier = (mutation: DomMutation, appId: AppId) => void;
+export type MutationApplier = (mutation: DomMutation, appId: AppId, batchUid?: number) => void;
 
 /**
  * Frame-budget scheduler that processes DOM mutations within requestAnimationFrame
@@ -71,6 +81,9 @@ export class FrameScheduler {
 	// Latency tracking: time from enqueue to next tick completion
 	private lastEnqueueTime = 0;
 
+	// Frame log for devtools flamechart
+	private frameLog: FrameLogEntry[] = [];
+
 	constructor(config: SchedulerConfig = {}) {
 		this.frameBudgetMs = config.frameBudgetMs ?? DEFAULT_FRAME_BUDGET_MS;
 		this.enableViewportCulling = config.enableViewportCulling ?? true;
@@ -85,11 +98,16 @@ export class FrameScheduler {
 		this.appCount = count;
 	}
 
-	enqueue(mutations: DomMutation[], appId: AppId, priority: Priority = "normal"): void {
+	enqueue(
+		mutations: DomMutation[],
+		appId: AppId,
+		priority: Priority = "normal",
+		batchUid?: number,
+	): void {
 		this.lastEnqueueTime = performance.now();
 		for (const mutation of mutations) {
 			this.uidCounter++;
-			this.queue.push({ mutation, priority, uid: this.uidCounter, appId });
+			this.queue.push({ mutation, priority, uid: this.uidCounter, appId, batchUid });
 		}
 
 		// Always warn on queue overflow — this is always a bug
@@ -163,7 +181,7 @@ export class FrameScheduler {
 		if (!applier) return;
 		this.queue.sort(prioritySort);
 		for (const item of this.queue) {
-			applier(item.mutation, item.appId);
+			applier(item.mutation, item.appId, item.batchUid);
 		}
 		this.queue.length = 0;
 	}
@@ -195,6 +213,10 @@ export class FrameScheduler {
 		};
 	}
 
+	getFrameLog(): FrameLogEntry[] {
+		return this.frameLog.slice();
+	}
+
 	private tick(_timestamp: number): void {
 		if (!this.running) return;
 
@@ -215,6 +237,7 @@ export class FrameScheduler {
 		let processed = 0;
 		const maxActions = this.getActionsForFrame();
 		const deferred: PrioritizedMutation[] = [];
+		const frameTimingBreakdown = new Map<string, number>();
 
 		// Reset per-app budgets at the start of each frame when multi-app
 		if (this.appCount > 1) {
@@ -249,9 +272,13 @@ export class FrameScheduler {
 			}
 
 			const actionStart = performance.now();
-			applier(item.mutation, item.appId);
+			applier(item.mutation, item.appId, item.batchUid);
 			const actionTime = performance.now() - actionStart;
 			this.recordTiming(item.mutation.action, actionTime);
+			frameTimingBreakdown.set(
+				item.mutation.action,
+				(frameTimingBreakdown.get(item.mutation.action) ?? 0) + actionTime,
+			);
 			processed++;
 		}
 
@@ -271,6 +298,15 @@ export class FrameScheduler {
 		if (processed > 0) {
 			this.timePerLastFrame = delta;
 			this.totalActionsLastFrame = processed;
+			this.frameLog.push({
+				frameId: this.frameId,
+				totalMs: delta,
+				actionCount: processed,
+				timingBreakdown: frameTimingBreakdown,
+			});
+			if (this.frameLog.length > MAX_FRAME_LOG) {
+				this.frameLog.shift();
+			}
 		}
 
 		this.scheduleNext(start);

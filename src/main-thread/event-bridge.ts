@@ -2,6 +2,14 @@ import { NodeCache } from "../core/node-cache.ts";
 import type { AppId, NodeId, SerializedEvent } from "../core/protocol.ts";
 import type { Transport } from "../transport/base.ts";
 
+export interface EventTraceEntry {
+	eventType: string;
+	serializeMs: number;
+	timestamp: number;
+}
+
+const MAX_EVENT_TRACES = 100;
+
 /**
  * Bridges real DOM events on the main thread to the worker thread.
  * Uses AbortController for clean listener removal.
@@ -15,6 +23,7 @@ export class EventBridge {
 	private nodeCache: NodeCache;
 	private transport: Transport | null = null;
 	private appId: AppId;
+	private eventTraces: EventTraceEntry[] = [];
 
 	constructor(appId: AppId, nodeCache?: NodeCache) {
 		this.appId = appId;
@@ -67,7 +76,17 @@ export class EventBridge {
 				if (config?.preventDefault) {
 					domEvent.preventDefault();
 				}
+				const serializeStart = performance.now();
 				const serialized = serializeEvent(domEvent);
+				const serializeMs = performance.now() - serializeStart;
+				this.eventTraces.push({
+					eventType: domEvent.type,
+					serializeMs,
+					timestamp: performance.now(),
+				});
+				if (this.eventTraces.length > MAX_EVENT_TRACES) {
+					this.eventTraces.shift();
+				}
 				this.transport?.send({
 					type: "event",
 					appId: this.appId,
@@ -94,6 +113,10 @@ export class EventBridge {
 				this.listeners.delete(listenerId);
 			}
 		}
+	}
+
+	getEventTraces(): EventTraceEntry[] {
+		return this.eventTraces.slice();
 	}
 
 	detachAll(): void {

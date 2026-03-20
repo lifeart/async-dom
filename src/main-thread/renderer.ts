@@ -167,13 +167,14 @@ export class DomRenderer {
 		};
 	}
 
-	apply(mutation: DomMutation): void {
+	apply(mutation: DomMutation, batchUid?: number): void {
 		if (this._onMutation) {
 			this._onMutation({
 				side: "main",
 				action: mutation.action,
 				mutation,
 				timestamp: performance.now(),
+				batchUid,
 			});
 		}
 		switch (mutation.action) {

@@ -1,6 +1,15 @@
 import type { AppId, DomMutation, MutationMessage, NodeId } from "../core/protocol.ts";
 import type { Transport } from "../transport/base.ts";
 
+/** Entry recording a coalesced (eliminated) mutation. */
+export interface CoalescedLogEntry {
+	action: string;
+	key: string;
+	timestamp: number;
+}
+
+const MAX_COALESCED_LOG = 50;
+
 /**
  * Collects DOM mutations during synchronous execution and flushes them
  * as a batched message at the end of the current microtask.
@@ -12,9 +21,23 @@ export class MutationCollector {
 	private transport: Transport | null = null;
 	private _coalesceEnabled = true;
 	private _stats = { added: 0, coalesced: 0, flushed: 0 };
+	private _coalescedLog: CoalescedLogEntry[] = [];
+	private _perTypeCoalesced = new Map<string, { added: number; coalesced: number }>();
 
 	getStats(): { added: number; coalesced: number; flushed: number } {
 		return { ...this._stats };
+	}
+
+	getCoalescedLog(): CoalescedLogEntry[] {
+		return this._coalescedLog.slice();
+	}
+
+	getPerTypeCoalesced(): Record<string, { added: number; coalesced: number }> {
+		const result: Record<string, { added: number; coalesced: number }> = {};
+		for (const [action, counts] of this._perTypeCoalesced) {
+			result[action] = { ...counts };
+		}
+		return result;
 	}
 
 	constructor(private appId: AppId) {}
@@ -29,6 +52,12 @@ export class MutationCollector {
 
 	add(mutation: DomMutation): void {
 		this._stats.added++;
+		const counts = this._perTypeCoalesced.get(mutation.action);
+		if (counts) {
+			counts.added++;
+		} else {
+			this._perTypeCoalesced.set(mutation.action, { added: 1, coalesced: 0 });
+		}
 		this.queue.push(mutation);
 		if (!this.scheduled) {
 			this.scheduled = true;
@@ -114,8 +143,49 @@ export class MutationCollector {
 			}
 		}
 
+		// Record coalesced mutations into the log and per-type stats
+		if (toRemove.size > 0) {
+			const now = Date.now();
+			for (const idx of toRemove) {
+				const removed = mutations[idx];
+				const action = removed.action;
+				const entry: CoalescedLogEntry = {
+					action,
+					key: this._buildKey(removed),
+					timestamp: now,
+				};
+				this._coalescedLog.push(entry);
+				if (this._coalescedLog.length > MAX_COALESCED_LOG) {
+					this._coalescedLog.shift();
+				}
+				const counts = this._perTypeCoalesced.get(action);
+				if (counts) {
+					counts.coalesced++;
+				}
+			}
+		}
+
 		if (toRemove.size === 0) return mutations;
 		return mutations.filter((_, i) => !toRemove.has(i));
+	}
+
+	private _buildKey(m: DomMutation): string {
+		switch (m.action) {
+			case "setStyle":
+				return `setStyle:${m.id}:${m.property}`;
+			case "setAttribute":
+				return `setAttribute:${m.id}:${m.name}`;
+			case "setClassName":
+				return `setClassName:${m.id}`;
+			case "setTextContent":
+				return `setTextContent:${m.id}`;
+			case "setProperty":
+				return `setProperty:${m.id}:${m.property}`;
+			case "setHTML":
+				return `setHTML:${m.id}`;
+			default:
+				return `${m.action}:${"id" in m ? (m as { id: NodeId }).id : "?"}`;
+		}
 	}
 
 	flush(): void {

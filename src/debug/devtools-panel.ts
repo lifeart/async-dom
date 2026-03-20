@@ -3,6 +3,19 @@ import type { MutationLogEntry, WarningLogEntry } from "../core/debug.ts";
 /**
  * The shape of __ASYNC_DOM_DEVTOOLS__ exposed on globalThis (main thread).
  */
+interface FrameLogEntry {
+	frameId: number;
+	totalMs: number;
+	actionCount: number;
+	timingBreakdown: Map<string, number>;
+}
+
+interface EventTraceEntry {
+	eventType: string;
+	serializeMs: number;
+	timestamp: number;
+}
+
 interface DevtoolsAPI {
 	scheduler: {
 		pending: () => number;
@@ -15,8 +28,10 @@ interface DevtoolsAPI {
 			lastTickTime: number;
 			enqueueToApplyMs: number;
 		};
+		frameLog: () => FrameLogEntry[];
 		flush: () => void;
 	};
+	getEventTraces: () => EventTraceEntry[];
 	enableHighlightUpdates: (enabled: boolean) => void;
 	findRealNode: (nodeId: number) => Node | null;
 	apps: () => string[];
@@ -29,6 +44,7 @@ interface DevtoolsAPI {
 interface AppDebugData {
 	tree: unknown;
 	workerStats: unknown;
+	perTypeCoalesced: unknown;
 }
 
 interface TreeNode {
@@ -433,6 +449,257 @@ const PANEL_CSS = `
 .warn-code.WORKER_ERROR, .warn-code.WORKER_UNHANDLED_REJECTION { color: #f44747; }
 .warn-empty { color: #808080; padding: 16px; text-align: center; }
 
+/* ---- Frame flamechart ---- */
+
+.frame-section-title {
+  color: #007acc;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 0 3px;
+  border-bottom: 1px solid #2d2d2d;
+  margin-bottom: 4px;
+}
+
+.frame-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 11px;
+  cursor: pointer;
+}
+.frame-bar-row:hover { background: #2a2d2e; }
+
+.frame-label {
+  color: #808080;
+  flex-shrink: 0;
+  width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.frame-bar-track {
+  flex: 1;
+  height: 14px;
+  background: #2d2d2d;
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.frame-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.15s;
+}
+.frame-bar-fill.green { background: #4ec9b0; }
+.frame-bar-fill.yellow { background: #d7ba7d; }
+.frame-bar-fill.red { background: #f44747; }
+
+.frame-info {
+  color: #808080;
+  flex-shrink: 0;
+  width: 130px;
+  text-align: right;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.frame-detail {
+  padding: 4px 8px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 3px;
+  margin: 2px 0 4px 0;
+  font-size: 10px;
+  color: #d4d4d4;
+}
+
+.frame-detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 1px 0;
+}
+.frame-detail-action { color: #569cd6; }
+.frame-detail-time { color: #d4d4d4; }
+
+/* ---- Event tracer ---- */
+
+.event-trace-section {
+  margin-top: 8px;
+  border-top: 1px solid #2d2d2d;
+  padding-top: 4px;
+}
+
+.event-trace-title {
+  color: #007acc;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 0 3px;
+}
+
+.event-trace-entry {
+  font-size: 11px;
+  padding: 2px 0;
+  border-bottom: 1px solid #2a2a2a;
+  color: #808080;
+}
+.event-trace-type { color: #569cd6; font-weight: 600; }
+.event-trace-time { color: #d7ba7d; }
+
+/* ---- Node Inspector Sidebar ---- */
+
+.tree-with-sidebar {
+  display: flex;
+  height: 100%;
+}
+
+.tree-main {
+  flex: 1;
+  overflow: auto;
+  min-width: 0;
+}
+
+.node-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  border-left: 1px solid #3c3c3c;
+  overflow-y: auto;
+  padding: 6px;
+  background: #1e1e1e;
+  font-size: 11px;
+  display: none;
+}
+.node-sidebar.visible { display: block; }
+
+.sidebar-title {
+  color: #007acc;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 0 2px;
+  border-bottom: 1px solid #2d2d2d;
+  margin-bottom: 2px;
+}
+.sidebar-title:first-child { padding-top: 0; }
+
+.sidebar-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 1px 0;
+  gap: 4px;
+}
+.sidebar-key { color: #9cdcfe; word-break: break-all; }
+.sidebar-val { color: #ce9178; word-break: break-all; text-align: right; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+
+.sidebar-empty { color: #555; font-style: italic; padding: 2px 0; }
+
+.sidebar-mutation {
+  padding: 2px 0;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 10px;
+}
+.sidebar-mut-action { color: #569cd6; }
+.sidebar-mut-time { color: #555; }
+
+.tree-line.selected { background: #094771; }
+
+/* ---- Batch Diff View (Log tab) ---- */
+
+.batch-group {
+  margin: 2px 0;
+  border: 1px solid #2d2d2d;
+  border-radius: 3px;
+}
+
+.batch-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  background: #252526;
+  cursor: pointer;
+  font-size: 11px;
+  user-select: none;
+}
+.batch-header:hover { background: #2a2d2e; }
+
+.batch-toggle {
+  color: #808080;
+  font-size: 9px;
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.batch-uid { color: #569cd6; font-weight: 600; }
+.batch-count { color: #808080; }
+
+.batch-entries {
+  display: none;
+  padding: 0 4px 2px 18px;
+}
+.batch-group.expanded .batch-entries { display: block; }
+
+.log-entry.color-green .log-action { color: #4ec9b0; }
+.log-entry.color-blue .log-action { color: #569cd6; }
+.log-entry.color-red .log-action { color: #f44747; }
+
+/* ---- Mutation Type Chart (Performance tab) ---- */
+
+.chart-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 11px;
+}
+
+.chart-bar-label {
+  color: #808080;
+  flex-shrink: 0;
+  width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-bar-track {
+  flex: 1;
+  height: 12px;
+  background: #2d2d2d;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.chart-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: #569cd6;
+  transition: width 0.15s;
+}
+
+.chart-bar-value {
+  color: #d4d4d4;
+  flex-shrink: 0;
+  width: 50px;
+  text-align: right;
+  font-size: 10px;
+}
+
+/* ---- Coalescing Visualizer (Performance tab) ---- */
+
+.coalesce-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 11px;
+}
+.coalesce-action { color: #569cd6; width: 120px; flex-shrink: 0; }
+.coalesce-detail { color: #808080; flex: 1; }
+.coalesce-pct { color: #d7ba7d; flex-shrink: 0; width: 60px; text-align: right; }
+
 /* Responsive / mobile-friendly */
 @media (max-width: 600px) {
   .panel { width: calc(100vw - 16px) !important; height: 50vh !important; left: 8px; right: 8px; bottom: 8px; }
@@ -702,6 +969,8 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	const queueHistory: number[] = [];
 	const MAX_HISTORY = 30;
 	let highlightUpdatesEnabled = false;
+	let selectedNodeForSidebar: TreeNode | null = null;
+	let expandedFrameId: number | null = null;
 
 	// ---- Feature 1: Queue pressure health dot (polls even when collapsed) ----
 	function updateHealthDot(): void {
@@ -800,6 +1069,130 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 	// ---- Tree rendering (VIRTUAL DOM from worker) ----
 
+	function renderNodeSidebar(sidebar: HTMLDivElement, node: TreeNode): void {
+		sidebar.innerHTML = "";
+
+		// Node ID
+		if (node.id != null) {
+			const title0 = document.createElement("div");
+			title0.className = "sidebar-title";
+			title0.textContent = "Node";
+			sidebar.appendChild(title0);
+
+			const row0 = document.createElement("div");
+			row0.className = "sidebar-row";
+			row0.innerHTML = `<span class="sidebar-key">_nodeId</span><span class="sidebar-val">${node.id}</span>`;
+			sidebar.appendChild(row0);
+		}
+
+		// Type + tag
+		const typeRow = document.createElement("div");
+		typeRow.className = "sidebar-row";
+		typeRow.innerHTML = `<span class="sidebar-key">type</span><span class="sidebar-val">${escapeHtml(node.type)}</span>`;
+		sidebar.appendChild(typeRow);
+
+		if (node.tag) {
+			const tagRow = document.createElement("div");
+			tagRow.className = "sidebar-row";
+			tagRow.innerHTML = `<span class="sidebar-key">tag</span><span class="sidebar-val">${escapeHtml(node.tag)}</span>`;
+			sidebar.appendChild(tagRow);
+		}
+
+		// Children count
+		const childCount = node.children?.length ?? 0;
+		const childRow = document.createElement("div");
+		childRow.className = "sidebar-row";
+		childRow.innerHTML = `<span class="sidebar-key">children</span><span class="sidebar-val">${childCount}</span>`;
+		sidebar.appendChild(childRow);
+
+		// isConnected (check via findRealNode)
+		const dt = getDevtools();
+		if (dt && node.id != null) {
+			const realNode = dt.findRealNode(node.id);
+			const connected = realNode ? (realNode as Element).isConnected : false;
+			const connRow = document.createElement("div");
+			connRow.className = "sidebar-row";
+			connRow.innerHTML = `<span class="sidebar-key">isConnected</span><span class="sidebar-val">${connected}</span>`;
+			sidebar.appendChild(connRow);
+		}
+
+		// Attributes
+		const attrs = node.attributes ?? {};
+		const attrKeys = Object.keys(attrs);
+		if (attrKeys.length > 0) {
+			const attrTitle = document.createElement("div");
+			attrTitle.className = "sidebar-title";
+			attrTitle.textContent = "Attributes";
+			sidebar.appendChild(attrTitle);
+
+			for (const key of attrKeys) {
+				const row = document.createElement("div");
+				row.className = "sidebar-row";
+				row.innerHTML = `<span class="sidebar-key">${escapeHtml(key)}</span><span class="sidebar-val" title="${escapeHtml(attrs[key])}">${escapeHtml(truncate(attrs[key], 30))}</span>`;
+				sidebar.appendChild(row);
+			}
+		} else if (node.type === "element") {
+			const attrTitle = document.createElement("div");
+			attrTitle.className = "sidebar-title";
+			attrTitle.textContent = "Attributes";
+			sidebar.appendChild(attrTitle);
+			const emptyAttr = document.createElement("div");
+			emptyAttr.className = "sidebar-empty";
+			emptyAttr.textContent = "none";
+			sidebar.appendChild(emptyAttr);
+		}
+
+		// Inline styles (from style attribute)
+		if (attrs.style) {
+			const styleTitle = document.createElement("div");
+			styleTitle.className = "sidebar-title";
+			styleTitle.textContent = "Inline Styles";
+			sidebar.appendChild(styleTitle);
+
+			const parts = attrs.style.split(";").filter((s) => s.trim());
+			for (const part of parts) {
+				const colonIdx = part.indexOf(":");
+				if (colonIdx === -1) continue;
+				const prop = part.slice(0, colonIdx).trim();
+				const val = part.slice(colonIdx + 1).trim();
+				const row = document.createElement("div");
+				row.className = "sidebar-row";
+				row.innerHTML = `<span class="sidebar-key">${escapeHtml(prop)}</span><span class="sidebar-val">${escapeHtml(val)}</span>`;
+				sidebar.appendChild(row);
+			}
+		}
+
+		// Recent mutations targeting this node
+		if (node.id != null) {
+			const nodeId = node.id;
+			const recentMuts = mutationLog.filter((entry) => {
+				const m = entry.mutation as Record<string, unknown>;
+				return m.id === nodeId;
+			});
+			const mutTitle = document.createElement("div");
+			mutTitle.className = "sidebar-title";
+			mutTitle.textContent = `Mutations (${recentMuts.length})`;
+			sidebar.appendChild(mutTitle);
+
+			if (recentMuts.length === 0) {
+				const emptyMut = document.createElement("div");
+				emptyMut.className = "sidebar-empty";
+				emptyMut.textContent = "none captured";
+				sidebar.appendChild(emptyMut);
+			} else {
+				const last10 = recentMuts.slice(-10);
+				for (const entry of last10) {
+					const div = document.createElement("div");
+					div.className = "sidebar-mutation";
+					div.innerHTML = `<span class="sidebar-mut-time">${formatTime(entry.timestamp)}</span> <span class="sidebar-mut-action">${escapeHtml(entry.action)}</span>`;
+					sidebar.appendChild(div);
+				}
+			}
+		}
+
+		sidebar.classList.add("visible");
+	}
+
 	function renderTreeTab(): void {
 		const dt = getDevtools();
 		if (!dt) {
@@ -827,7 +1220,13 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		}
 
 		const tree = data.tree as TreeNode;
-		const container = document.createElement("div");
+
+		// Layout: tree + sidebar
+		const layout = document.createElement("div");
+		layout.className = "tree-with-sidebar";
+
+		const treeMain = document.createElement("div");
+		treeMain.className = "tree-main";
 
 		// Status line
 		const statusLine = document.createElement("div");
@@ -836,11 +1235,23 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		statusText.className = "tree-status";
 		statusText.textContent = `Virtual DOM for app: ${targetAppId}`;
 		statusLine.appendChild(statusText);
-		container.appendChild(statusLine);
+		treeMain.appendChild(statusLine);
 
-		buildTreeDOM(container, tree, 0, true, dt);
+		const sidebar = document.createElement("div") as HTMLDivElement;
+		sidebar.className = "node-sidebar";
+
+		buildTreeDOM(treeMain, tree, 0, true, dt, sidebar);
+
+		layout.appendChild(treeMain);
+		layout.appendChild(sidebar);
+
 		treeContent.innerHTML = "";
-		treeContent.appendChild(container);
+		treeContent.appendChild(layout);
+
+		// If we had a selected node, try to render sidebar for it
+		if (selectedNodeForSidebar) {
+			renderNodeSidebar(sidebar, selectedNodeForSidebar);
+		}
 	}
 
 	function buildTreeDOM(
@@ -849,6 +1260,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		depth: number,
 		expanded: boolean,
 		dt: DevtoolsAPI,
+		sidebar: HTMLDivElement,
 	): void {
 		const wrapper = document.createElement("div");
 		wrapper.className = `tree-node${expanded ? " expanded" : ""}`;
@@ -856,6 +1268,17 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		const line = document.createElement("div");
 		line.className = "tree-line";
 		line.style.paddingLeft = `${depth * 14}px`;
+
+		// Helper to select node in sidebar
+		function selectForSidebar(): void {
+			// Remove previous selection highlight
+			const prev = parent.closest(".tree-with-sidebar")?.querySelector(".tree-line.selected");
+			if (prev) prev.classList.remove("selected");
+			line.classList.add("selected");
+
+			selectedNodeForSidebar = node;
+			renderNodeSidebar(sidebar, node);
+		}
 
 		if (node.type === "text") {
 			const toggle = document.createElement("span");
@@ -874,6 +1297,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 				line.appendChild(idSpan);
 			}
 
+			line.addEventListener("click", selectForSidebar);
 			wrapper.appendChild(line);
 			parent.appendChild(wrapper);
 			return;
@@ -889,6 +1313,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			commentSpan.textContent = `<!-- ${truncate(node.text ?? "", 40)} -->`;
 			line.appendChild(commentSpan);
 
+			line.addEventListener("click", selectForSidebar);
 			wrapper.appendChild(line);
 			parent.appendChild(wrapper);
 			return;
@@ -937,14 +1362,16 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			line.appendChild(nidSpan);
 		}
 
-		// Click: toggle children or highlight real DOM node
+		// Click: toggle children, select for sidebar, or highlight real DOM node
 		line.addEventListener("click", (e: MouseEvent) => {
 			if (hasChildren && e.target === toggleEl) {
 				wrapper.classList.toggle("expanded");
 				toggleEl.textContent = wrapper.classList.contains("expanded") ? "\u25BC" : "\u25B6";
 				return;
 			}
-			// Highlight real DOM node via findRealNode
+			// Select for sidebar inspection
+			selectForSidebar();
+			// Also highlight real DOM node via findRealNode
 			if (node.id != null) {
 				const realNode = dt.findRealNode(node.id) as HTMLElement | null;
 				if (realNode && "scrollIntoView" in realNode) {
@@ -967,7 +1394,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			const childrenDiv = document.createElement("div");
 			childrenDiv.className = "tree-children";
 			for (const child of children) {
-				buildTreeDOM(childrenDiv, child, depth + 1, depth < 2, dt);
+				buildTreeDOM(childrenDiv, child, depth + 1, depth < 2, dt, sidebar);
 			}
 			wrapper.appendChild(childrenDiv);
 		}
@@ -1052,7 +1479,90 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			html += `<div class="perf-row"><span class="perf-label">Coalescing Ratio</span><span class="perf-value ${ratioClass}">${coalescingRatio}%</span></div>`;
 		}
 
+		// Frame budget flamechart
+		const frameLog = dt.scheduler.frameLog();
+		if (frameLog.length > 0) {
+			html += '<div class="frame-section-title">Frames</div>';
+			const budget = 16;
+			for (const frame of frameLog) {
+				const pct = Math.min((frame.totalMs / budget) * 100, 100);
+				const ratio = frame.totalMs / budget;
+				let colorClass: string;
+				if (ratio > 1) colorClass = "red";
+				else if (ratio > 0.5) colorClass = "yellow";
+				else colorClass = "green";
+				const warn = frame.totalMs > budget ? " !" : "";
+				html += `<div class="frame-bar-row" data-frame-id="${frame.frameId}">`;
+				html += `<span class="frame-label">#${frame.frameId}</span>`;
+				html += `<span class="frame-bar-track"><span class="frame-bar-fill ${colorClass}" style="width:${pct.toFixed(1)}%"></span></span>`;
+				html += `<span class="frame-info">${frame.totalMs.toFixed(1)}ms / ${budget}ms (${frame.actionCount})${warn}</span>`;
+				html += "</div>";
+				if (expandedFrameId === frame.frameId) {
+					html += '<div class="frame-detail">';
+					const entries = [...frame.timingBreakdown.entries()].sort((a, b) => b[1] - a[1]);
+					for (const [action, ms] of entries) {
+						html += `<div class="frame-detail-row"><span class="frame-detail-action">${escapeHtml(action)}</span><span class="frame-detail-time">${ms.toFixed(2)}ms</span></div>`;
+					}
+					html += "</div>";
+				}
+			}
+		}
+
+		// Coalescing Visualizer: per-type breakdown
+		for (const appId of apps) {
+			const data = allData[appId];
+			if (!data?.perTypeCoalesced) continue;
+
+			const ptc = data.perTypeCoalesced as Record<
+				string,
+				{ added: number; coalesced: number }
+			>;
+			const actions = Object.keys(ptc);
+			if (actions.length === 0) continue;
+
+			html += `<div class="perf-section-title">Coalescing: ${escapeHtml(appId)}</div>`;
+			for (const action of actions) {
+				const c = ptc[action];
+				const pct = c.added > 0 ? ((c.coalesced / c.added) * 100).toFixed(0) : "0";
+				html += `<div class="coalesce-row">`;
+				html += `<span class="coalesce-action">${escapeHtml(action)}</span>`;
+				html += `<span class="coalesce-detail">${c.added} added, ${c.coalesced} coalesced</span>`;
+				html += `<span class="coalesce-pct">(${pct}%)</span>`;
+				html += "</div>";
+			}
+		}
+
+		// Mutation Type Chart: horizontal bar chart from mutation log
+		if (mutationLog.length > 0) {
+			const typeCounts = new Map<string, number>();
+			for (const entry of mutationLog) {
+				typeCounts.set(entry.action, (typeCounts.get(entry.action) ?? 0) + 1);
+			}
+			const sorted = [...typeCounts.entries()].sort((a, b) => b[1] - a[1]);
+			const maxCount = sorted.length > 0 ? sorted[0][1] : 1;
+
+			html += '<div class="perf-section-title">Mutation Types</div>';
+			for (const [action, count] of sorted) {
+				const pct = Math.max((count / maxCount) * 100, 2);
+				html += `<div class="chart-bar-row">`;
+				html += `<span class="chart-bar-label">${escapeHtml(action)}</span>`;
+				html += `<span class="chart-bar-track"><span class="chart-bar-fill" style="width:${pct.toFixed(1)}%"></span></span>`;
+				html += `<span class="chart-bar-value">${count}</span>`;
+				html += "</div>";
+			}
+		}
+
 		perfContent.innerHTML = html;
+
+		// Wire click handlers for frame rows
+		const frameRows = perfContent.querySelectorAll(".frame-bar-row");
+		for (const row of frameRows) {
+			row.addEventListener("click", () => {
+				const fid = Number((row as HTMLElement).dataset.frameId);
+				expandedFrameId = expandedFrameId === fid ? null : fid;
+				renderPerfTab();
+			});
+		}
 	}
 
 	// ---- Log rendering ----
@@ -1117,6 +1627,41 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 		logList.innerHTML = "";
 		logList.appendChild(fragment);
+
+		// Event round-trip tracer section
+		const dt = getDevtools();
+		if (dt) {
+			const traces = dt.getEventTraces();
+			if (traces.length > 0) {
+				const traceSection = document.createElement("div");
+				traceSection.className = "event-trace-section";
+
+				const traceTitle = document.createElement("div");
+				traceTitle.className = "event-trace-title";
+				traceTitle.textContent = `Events (${traces.length})`;
+				traceSection.appendChild(traceTitle);
+
+				const recent = traces.slice(-20);
+				for (const trace of recent) {
+					// Count mutations that arrived shortly after this event
+					const eventTime = trace.timestamp;
+					const mutCount = mutationLog.filter(
+						(m) => m.timestamp >= eventTime && m.timestamp <= eventTime + 100,
+					).length;
+					const div = document.createElement("div");
+					div.className = "event-trace-entry";
+					div.innerHTML =
+						`[<span class="event-trace-type">${escapeHtml(trace.eventType)}</span>]` +
+						` serialize <span class="event-trace-time">${trace.serializeMs.toFixed(1)}ms</span>` +
+						` transport dispatch` +
+						`${mutCount > 0 ? ` ${mutCount} mutations` : ""}`;
+					traceSection.appendChild(div);
+				}
+
+				logList.appendChild(traceSection);
+			}
+		}
+
 		if (autoScroll) {
 			logList.scrollTop = logList.scrollHeight;
 		}
