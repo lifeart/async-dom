@@ -78,6 +78,12 @@ export class EventBridge {
 		const node = this.nodeCache.get(nodeId) as EventTarget | null;
 		if (!node) return;
 
+		// Idempotent: if this listener already exists, abort the old one first
+		const existing = this.listeners.get(listenerId);
+		if (existing) {
+			existing.controller.abort();
+		}
+
 		const controller = new AbortController();
 		this.listeners.set(listenerId, { controller, nodeId, eventName });
 

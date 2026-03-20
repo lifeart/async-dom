@@ -78,11 +78,21 @@ export interface AppConfig {
 	onError?: (error: import("../core/protocol.ts").SerializedError, appId: AppId) => void;
 }
 
+export interface RemoteAppConfig {
+	transport: import("../transport/base.ts").Transport;
+	name?: string;
+	mountPoint?: string | Element;
+	shadow?: boolean | ShadowRootInit;
+	onError?: (error: import("../core/protocol.ts").SerializedError, appId: AppId) => void;
+	enableSyncChannel?: boolean;
+}
+
 export interface AsyncDomInstance {
 	start(): void;
 	stop(): void;
 	destroy(): void;
 	addApp(config: AppConfig): AppId;
+	addRemoteApp(config: RemoteAppConfig): AppId;
 	removeApp(appId: AppId): void;
 }
 
@@ -404,14 +414,22 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 	}
 
 	function addAppInternal(
-		worker: Worker,
+		worker: Worker | undefined,
 		mountPoint?: string | Element,
 		shadow?: boolean | ShadowRootInit,
 		customTransport?: import("../transport/base.ts").Transport,
 		onError?: (error: import("../core/protocol.ts").SerializedError, appId: AppId) => void,
 		name?: string,
+		enableSyncChannel?: boolean,
 	): AppId {
-		const appId = threadManager.createWorkerThread({ worker, transport: customTransport, name });
+		let appId: AppId;
+		if (worker) {
+			appId = threadManager.createWorkerThread({ worker, transport: customTransport, name });
+		} else if (customTransport) {
+			appId = threadManager.createRemoteThread({ transport: customTransport, name });
+		} else {
+			throw new Error("[async-dom] addAppInternal requires either a worker or a transport");
+		}
 
 		// Per-app NodeCache and DomRenderer for isolation
 		const appNodeCache = new NodeCache();
@@ -555,8 +573,10 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		scheduler.setAppCount(renderers.size);
 
 		// Create sync channel for synchronous DOM reads
+		// For remote apps (no worker), skip SAB unless explicitly enabled
+		const shouldCreateSyncChannel = worker ? true : (enableSyncChannel ?? false);
 		let sharedBuffer: SharedArrayBuffer | undefined;
-		if (typeof SharedArrayBuffer !== "undefined") {
+		if (shouldCreateSyncChannel && typeof SharedArrayBuffer !== "undefined") {
 			try {
 				sharedBuffer = new SharedArrayBuffer(65536);
 				const host = new SyncChannelHost(sharedBuffer);
@@ -839,6 +859,18 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			);
 		},
 
+		addRemoteApp(remoteConfig: RemoteAppConfig): AppId {
+			return addAppInternal(
+				undefined,
+				remoteConfig.mountPoint,
+				remoteConfig.shadow,
+				remoteConfig.transport,
+				remoteConfig.onError,
+				remoteConfig.name,
+				remoteConfig.enableSyncChannel,
+			);
+		},
+
 		removeApp(appId: AppId): void {
 			const bridge = eventBridges.get(appId);
 			if (bridge) {
@@ -868,5 +900,5 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 export { FrameScheduler, type SchedulerConfig } from "../core/scheduler.ts";
 export { EventBridge } from "./event-bridge.ts";
 export { DomRenderer, type RendererPermissions, type RendererRoot } from "./renderer.ts";
-export type { WebSocketConfig, WorkerConfig } from "./thread-manager.ts";
+export type { RemoteConfig, WebSocketConfig, WorkerConfig } from "./thread-manager.ts";
 export { ThreadManager } from "./thread-manager.ts";

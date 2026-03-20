@@ -8,6 +8,7 @@
 // Branded types for type safety
 export type NodeId = number & { readonly __brand: "NodeId" };
 export type AppId = string & { readonly __brand: "AppId" };
+export type ClientId = string & { readonly __brand: "ClientId" };
 
 // Reserved structural node IDs
 export const BODY_NODE_ID = 1 as NodeId;
@@ -33,6 +34,10 @@ export function _resetNodeIdCounter(): void {
 
 export function createAppId(id: string): AppId {
 	return id as AppId;
+}
+
+export function createClientId(id: string): ClientId {
+	return id as ClientId;
 }
 
 export type InsertPosition = "beforebegin" | "afterbegin" | "beforeend" | "afterend";
@@ -168,6 +173,7 @@ export interface EventMessage {
 	appId: AppId;
 	listenerId: string;
 	event: SerializedEvent;
+	clientId?: string;
 }
 
 // Serialized location data
@@ -221,7 +227,13 @@ export type SystemMessage =
 			mutationCount: number;
 			transportMs: number;
 	  }
-	| { type: "perfEntries"; appId: AppId; entries: PerfEntryData[] };
+	| { type: "perfEntries"; appId: AppId; entries: PerfEntryData[] }
+	| { type: "ping" }
+	| { type: "pong" }
+	| { type: "ack"; lastUid: number }
+	| { type: "clientConnect"; clientId: string; metadata?: Record<string, unknown> }
+	| { type: "clientDisconnect"; clientId: string }
+	| { type: "snapshotComplete" };
 
 /** Serialized performance entry sent from worker to main thread (Feature 16). */
 export interface PerfEntryData {

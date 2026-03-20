@@ -12,6 +12,11 @@ export interface WorkerConfig {
 	name?: string;
 }
 
+export interface RemoteConfig {
+	transport: Transport;
+	name?: string;
+}
+
 export interface WebSocketConfig {
 	url: string;
 	options?: WebSocketTransportOptions;
@@ -38,6 +43,18 @@ export class ThreadManager {
 		const transport =
 			config.transport ??
 			(useBinary ? new BinaryWorkerTransport(config.worker) : new WorkerTransport(config.worker));
+
+		transport.onMessage((message) => {
+			this.notifyHandlers(appId, message);
+		});
+
+		this.threads.set(appId, { transport, appId });
+		return appId;
+	}
+
+	createRemoteThread(config: RemoteConfig): AppId {
+		const appId = generateAppId(config.name);
+		const transport = config.transport;
 
 		transport.onMessage((message) => {
 			this.notifyHandlers(appId, message);

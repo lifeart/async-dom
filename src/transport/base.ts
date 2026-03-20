@@ -1,6 +1,6 @@
 import type { Message } from "../core/protocol.ts";
 
-export type TransportReadyState = "connecting" | "open" | "closed";
+export type TransportReadyState = "connecting" | "open" | "reconnecting" | "closed";
 
 export interface TransportStats {
 	messageCount: number;
@@ -18,4 +18,6 @@ export interface Transport {
 	onClose?: () => void;
 	getStats?(): TransportStats;
 	enableStats?(enabled: boolean): void;
+	maxMessageSize?: number;
+	bufferedAmount?: number;
 }

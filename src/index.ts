@@ -16,6 +16,7 @@ export { sanitizeHTML } from "./core/html-sanitizer.ts";
 // Re-export core types used across both threads
 export type {
 	AppId,
+	ClientId,
 	DomMutation,
 	EventMessage,
 	Message,
@@ -31,6 +32,7 @@ export type {
 export {
 	BODY_NODE_ID,
 	createAppId,
+	createClientId,
 	createNodeId,
 	DOCUMENT_NODE_ID,
 	HEAD_NODE_ID,
@@ -44,6 +46,8 @@ export {
 	DomRenderer,
 	EventBridge,
 	FrameScheduler,
+	type RemoteAppConfig,
+	type RemoteConfig,
 	type SchedulerConfig,
 	ThreadManager,
 	type WebSocketConfig,
