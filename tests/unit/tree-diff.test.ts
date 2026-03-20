@@ -35,11 +35,11 @@ describe("cloneSnapshot", () => {
 		expect(clone).not.toBe(original);
 		expect(clone.attributes).not.toBe(original.attributes);
 		expect(clone.children).not.toBe(original.children);
-		expect(clone.children![1]).not.toBe(original.children![1]);
+		expect(clone.children?.[1]).not.toBe(original.children?.[1]);
 
 		// Mutating the clone should not affect the original
 		clone.attributes!["data-x"] = "modified";
-		expect(original.attributes!["data-x"]).toBe("1");
+		expect(original.attributes?.["data-x"]).toBe("1");
 	});
 
 	it("handles nodes with no optional fields", () => {
@@ -65,10 +65,10 @@ describe("diffTrees", () => {
 
 		const diff = diffTrees(null, newNode);
 		expect(diff).not.toBeNull();
-		expect(diff!.diffType).toBe("added");
-		expect(diff!.node).toBe(newNode);
-		expect(diff!.children).toHaveLength(1);
-		expect(diff!.children![0].diffType).toBe("added");
+		expect(diff?.diffType).toBe("added");
+		expect(diff?.node).toBe(newNode);
+		expect(diff?.children).toHaveLength(1);
+		expect(diff?.children?.[0].diffType).toBe("added");
 	});
 
 	it("detects removed nodes", () => {
@@ -81,10 +81,10 @@ describe("diffTrees", () => {
 
 		const diff = diffTrees(oldNode, null);
 		expect(diff).not.toBeNull();
-		expect(diff!.diffType).toBe("removed");
-		expect(diff!.node).toBe(oldNode);
-		expect(diff!.children).toHaveLength(1);
-		expect(diff!.children![0].diffType).toBe("removed");
+		expect(diff?.diffType).toBe("removed");
+		expect(diff?.node).toBe(oldNode);
+		expect(diff?.children).toHaveLength(1);
+		expect(diff?.children?.[0].diffType).toBe("removed");
 	});
 
 	it("detects changed attributes", () => {
@@ -103,9 +103,9 @@ describe("diffTrees", () => {
 
 		const diff = diffTrees(oldTree, newTree);
 		expect(diff).not.toBeNull();
-		expect(diff!.diffType).toBe("changed");
-		expect(diff!.changes).toContain("attr:class");
-		expect(diff!.changes).not.toContain("attr:data-x");
+		expect(diff?.diffType).toBe("changed");
+		expect(diff?.changes).toContain("attr:class");
+		expect(diff?.changes).not.toContain("attr:data-x");
 	});
 
 	it("detects changed className", () => {
@@ -123,8 +123,8 @@ describe("diffTrees", () => {
 		};
 
 		const diff = diffTrees(oldTree, newTree);
-		expect(diff!.diffType).toBe("changed");
-		expect(diff!.changes).toContain("className");
+		expect(diff?.diffType).toBe("changed");
+		expect(diff?.changes).toContain("className");
 	});
 
 	it("detects changed text content", () => {
@@ -132,8 +132,8 @@ describe("diffTrees", () => {
 		const newTree: TreeSnapshot = { type: "text", text: "new" };
 
 		const diff = diffTrees(oldTree, newTree);
-		expect(diff!.diffType).toBe("changed");
-		expect(diff!.changes).toContain("text");
+		expect(diff?.diffType).toBe("changed");
+		expect(diff?.changes).toContain("text");
 	});
 
 	it("returns unchanged for identical trees", () => {
@@ -146,7 +146,7 @@ describe("diffTrees", () => {
 		};
 
 		const diff = diffTrees(tree, { ...tree, attributes: { class: "same" } });
-		expect(diff!.diffType).toBe("unchanged");
+		expect(diff?.diffType).toBe("unchanged");
 	});
 
 	it("handles replaced node (different type/tag)", () => {
@@ -154,12 +154,12 @@ describe("diffTrees", () => {
 		const newTree: TreeSnapshot = { type: "element", tag: "SPAN", id: 10 };
 
 		const diff = diffTrees(oldTree, newTree);
-		expect(diff!.diffType).toBe("changed");
-		expect(diff!.changes).toContain("replaced");
+		expect(diff?.diffType).toBe("changed");
+		expect(diff?.changes).toContain("replaced");
 		// Should have old (removed) and new (added) as children
-		expect(diff!.children).toHaveLength(2);
-		expect(diff!.children![0].diffType).toBe("removed");
-		expect(diff!.children![1].diffType).toBe("added");
+		expect(diff?.children).toHaveLength(2);
+		expect(diff?.children?.[0].diffType).toBe("removed");
+		expect(diff?.children?.[1].diffType).toBe("added");
 	});
 
 	it("detects added children by id matching", () => {
@@ -178,9 +178,9 @@ describe("diffTrees", () => {
 		};
 
 		const diff = diffTrees(oldTree, newTree);
-		expect(diff!.children).toHaveLength(2);
-		expect(diff!.children![0].diffType).toBe("unchanged");
-		expect(diff!.children![1].diffType).toBe("added");
+		expect(diff?.children).toHaveLength(2);
+		expect(diff?.children?.[0].diffType).toBe("unchanged");
+		expect(diff?.children?.[1].diffType).toBe("added");
 	});
 
 	it("detects removed children by id matching", () => {
@@ -199,7 +199,7 @@ describe("diffTrees", () => {
 		};
 
 		const diff = diffTrees(oldTree, newTree);
-		const removed = diff!.children!.filter((c) => c.diffType === "removed");
+		const removed = diff?.children?.filter((c) => c.diffType === "removed");
 		expect(removed).toHaveLength(1);
 		expect(removed[0].node.id).toBe(2);
 	});
@@ -217,8 +217,8 @@ describe("diffTrees", () => {
 		};
 
 		const diff = diffTrees(oldTree, newTree);
-		expect(diff!.diffType).toBe("changed");
-		expect(diff!.changes).toContain("attr:data-new");
+		expect(diff?.diffType).toBe("changed");
+		expect(diff?.changes).toContain("attr:data-new");
 	});
 });
 

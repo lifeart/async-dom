@@ -220,7 +220,12 @@ export class BinaryWorkerTransport implements Transport {
 	private strings = new StringStore();
 	private mutDecoder = new BinaryMutationDecoder(this.strings);
 	private _statsEnabled = false;
-	private _stats: TransportStats = { messageCount: 0, totalBytes: 0, largestMessageBytes: 0, lastMessageBytes: 0 };
+	private _stats: TransportStats = {
+		messageCount: 0,
+		totalBytes: 0,
+		largestMessageBytes: 0,
+		lastMessageBytes: 0,
+	};
 	onError?: (error: Error) => void;
 	onClose?: () => void;
 
@@ -327,7 +332,12 @@ export class BinaryWorkerSelfTransport implements Transport {
 	private strings = new StringStore();
 	private mutEncoder = new BinaryMutationEncoder(this.strings);
 	private _statsEnabled = false;
-	private _stats: TransportStats = { messageCount: 0, totalBytes: 0, largestMessageBytes: 0, lastMessageBytes: 0 };
+	private _stats: TransportStats = {
+		messageCount: 0,
+		totalBytes: 0,
+		largestMessageBytes: 0,
+		lastMessageBytes: 0,
+	};
 	onError?: (error: Error) => void;
 	onClose?: () => void;
 	private scope: {

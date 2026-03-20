@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MutationLogEntry, WarningLogEntry } from "../../src/core/debug.ts";
-import { DebugStats, resolveDebugHooks, WarningCode, WarningDescriptions } from "../../src/core/debug.ts";
+import {
+	DebugStats,
+	resolveDebugHooks,
+	WarningCode,
+	WarningDescriptions,
+} from "../../src/core/debug.ts";
 import { createAppId, createNodeId, HTML_NODE_ID, type Message } from "../../src/core/protocol.ts";
 import { DomRenderer } from "../../src/main-thread/renderer.ts";
 import type { Transport } from "../../src/transport/base.ts";

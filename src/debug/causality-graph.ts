@@ -49,7 +49,7 @@ export function buildCausalityGraph(batches: CausalBatch[]): CausalityGraph {
 			if (!eventMap.has(eventKey)) {
 				eventMap.set(eventKey, []);
 			}
-			eventMap.get(eventKey)!.push(batch);
+			eventMap.get(eventKey)?.push(batch);
 		} else {
 			orphanBatches.push(batch);
 		}

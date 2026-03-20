@@ -143,10 +143,7 @@ function compareNodes(oldNode: TreeSnapshot, newNode: TreeSnapshot): TreeDiffNod
 /**
  * Diff two child arrays using node IDs for matching where possible.
  */
-function diffChildArrays(
-	oldChildren: TreeSnapshot[],
-	newChildren: TreeSnapshot[],
-): TreeDiffNode[] {
+function diffChildArrays(oldChildren: TreeSnapshot[], newChildren: TreeSnapshot[]): TreeDiffNode[] {
 	const result: TreeDiffNode[] = [];
 
 	// Build index of old children by id for matching

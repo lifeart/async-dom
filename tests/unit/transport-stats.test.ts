@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-	createAppId,
-	createNodeId,
-	type MutationMessage,
-} from "../../src/core/protocol.ts";
+import { createAppId, createNodeId, type MutationMessage } from "../../src/core/protocol.ts";
 
 describe("WorkerTransport stats gating", () => {
 	function createMockWorker() {

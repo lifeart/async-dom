@@ -213,7 +213,14 @@ export type SystemMessage =
 	| { type: "queryResult"; uid: number; result: unknown }
 	| { type: "debugQuery"; query: string }
 	| { type: "debugResult"; query: string; result: unknown }
-	| { type: "eventTimingResult"; listenerId: string; eventType: string; dispatchMs: number; mutationCount: number; transportMs: number }
+	| {
+			type: "eventTimingResult";
+			listenerId: string;
+			eventType: string;
+			dispatchMs: number;
+			mutationCount: number;
+			transportMs: number;
+	  }
 	| { type: "perfEntries"; appId: AppId; entries: PerfEntryData[] };
 
 /** Serialized performance entry sent from worker to main thread (Feature 16). */

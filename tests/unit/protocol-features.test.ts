@@ -27,7 +27,7 @@ describe("Protocol types for Features 15-19", () => {
 
 			expect(isMutationMessage(msg as Message)).toBe(true);
 			expect(msg.causalEvent).toBeDefined();
-			expect(msg.causalEvent!.eventType).toBe("click");
+			expect(msg.causalEvent?.eventType).toBe("click");
 		});
 
 		it("causalEvent is optional", () => {

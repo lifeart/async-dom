@@ -1,33 +1,30 @@
 import type {
 	EventLogEntry,
-	MutationLogEntry,
 	MutationEventCorrelation,
+	MutationLogEntry,
 	SyncReadLogEntry,
 	WarningLogEntry,
 } from "../core/debug.ts";
 import { WarningDescriptions } from "../core/debug.ts";
 import type { PerfEntryData } from "../core/protocol.ts";
-import type { CausalityTracker, CausalityGraph } from "./causality-graph.ts";
-import { type TreeSnapshot, type TreeDiffNode, cloneSnapshot, diffTrees, hasChanges } from "./tree-diff.ts";
-import {
-	computePercentiles,
-	latencyColorClass,
-	syncReadColorClass,
-} from "./stats-helpers.ts";
+import type { CausalityGraph, CausalityTracker } from "./causality-graph.ts";
 import { formatBytes } from "./format-helpers.ts";
 import {
-	type ReplayState,
 	createReplayState,
-	replayStep,
-	replaySeek,
+	type ReplayState,
 	replayReset,
+	replaySeek,
+	replayStep,
 } from "./replay.ts";
+import { type DebugSession, downloadJson, exportSession, importSession } from "./session-export.ts";
+import { computePercentiles, latencyColorClass, syncReadColorClass } from "./stats-helpers.ts";
 import {
-	type DebugSession,
-	exportSession,
-	importSession,
-	downloadJson,
-} from "./session-export.ts";
+	cloneSnapshot,
+	diffTrees,
+	hasChanges,
+	type TreeDiffNode,
+	type TreeSnapshot,
+} from "./tree-diff.ts";
 
 /**
  * The shape of __ASYNC_DOM_DEVTOOLS__ exposed on globalThis (main thread).
@@ -77,7 +74,15 @@ interface DevtoolsAPI {
 	refreshDebugData: () => void;
 	getAppData: (appId: string) => AppDebugData | undefined;
 	getAllAppsData: () => Record<string, AppDebugData>;
-	getTransportStats: () => Record<string, { messageCount: number; totalBytes: number; largestMessageBytes: number; lastMessageBytes: number } | null>;
+	getTransportStats: () => Record<
+		string,
+		{
+			messageCount: number;
+			totalBytes: number;
+			largestMessageBytes: number;
+			lastMessageBytes: number;
+		} | null
+	>;
 	replayMutation: (mutation: import("../core/protocol.ts").DomMutation, appId: string) => void;
 	clearAndReapply: (
 		mutations: Array<{ mutation: import("../core/protocol.ts").DomMutation; batchUid?: number }>,
@@ -1178,7 +1183,6 @@ function sparkline(data: number[]): string {
 	return data.map((v) => chars[Math.min(Math.floor(((v - min) / range) * 7), 7)]).join("");
 }
 
-
 // ---- Panel creation ----
 
 export function createDevtoolsPanel(): { destroy: () => void } {
@@ -1474,7 +1478,8 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	// ---- Graph content (Feature 15: Causality Graph) ----
 	const graphContent = document.createElement("div");
 	graphContent.className = "tab-content";
-	graphContent.innerHTML = '<div class="graph-empty">No causality data yet. Interact with the app to generate event-mutation data.</div>';
+	graphContent.innerHTML =
+		'<div class="graph-empty">No causality data yet. Interact with the app to generate event-mutation data.</div>';
 	tabPanels.Graph = graphContent as HTMLDivElement;
 	panel.appendChild(graphContent);
 
@@ -1607,7 +1612,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			replayTimer = setInterval(() => {
 				if (!replayState || replayState.currentIndex >= replayState.entries.length) {
 					if (replayState) replayState.isPlaying = false;
-					if (replayTimer) { clearInterval(replayTimer); replayTimer = null; }
+					if (replayTimer) {
+						clearInterval(replayTimer);
+						replayTimer = null;
+					}
 					updateReplayUI();
 					return;
 				}
@@ -1617,7 +1625,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 				renderLogTab();
 			}, intervalMs);
 		} else {
-			if (replayTimer) { clearInterval(replayTimer); replayTimer = null; }
+			if (replayTimer) {
+				clearInterval(replayTimer);
+				replayTimer = null;
+			}
 		}
 		updateReplayUI();
 	}
@@ -1628,7 +1639,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		replaySpeedBtn.textContent = `${replaySpeedMultiplier}x`;
 		// Restart play interval if playing
 		if (replayState?.isPlaying) {
-			if (replayTimer) { clearInterval(replayTimer); replayTimer = null; }
+			if (replayTimer) {
+				clearInterval(replayTimer);
+				replayTimer = null;
+			}
 			replayState.isPlaying = false;
 			toggleReplayPlay();
 		}
@@ -1741,7 +1755,9 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		setImportControlsDisabled(true);
 
 		// Add a close-import button if not already present
-		let closeImportBtn = headerActions.querySelector(".close-import-btn") as HTMLButtonElement | null;
+		let closeImportBtn = headerActions.querySelector(
+			".close-import-btn",
+		) as HTMLButtonElement | null;
 		if (!closeImportBtn) {
 			closeImportBtn = document.createElement("button");
 			closeImportBtn.className = "header-btn close-import-btn";
@@ -2012,9 +2028,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 				sidebar.appendChild(styleTitle);
 
 				for (const prop of keyProps) {
-					const val = computed.getPropertyValue(
-						prop.replace(/([A-Z])/g, "-$1").toLowerCase(),
-					);
+					const val = computed.getPropertyValue(prop.replace(/([A-Z])/g, "-$1").toLowerCase());
 					if (val) {
 						const row = document.createElement("div");
 						row.className = "sidebar-row";
@@ -2061,7 +2075,9 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 					div.innerHTML =
 						`<span class="sidebar-mut-time">${formatTime(entry.timestamp)}</span> ` +
 						`<span class="sidebar-mut-action">${escapeHtml(entry.action)}</span>` +
-						(detail ? `<br><span style="color:#808080;font-size:9px;padding-left:4px">${escapeHtml(detail.trim())}</span>` : "");
+						(detail
+							? `<br><span style="color:#808080;font-size:9px;padding-left:4px">${escapeHtml(detail.trim())}</span>`
+							: "");
 					sidebar.appendChild(div);
 				}
 			}
@@ -2191,7 +2207,11 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 		const snapshotBtn = document.createElement("button");
 		snapshotBtn.className = "snapshot-btn";
-		snapshotBtn.textContent = snapshot1 ? (snapshot2 ? "Reset Snapshots" : "Snapshot B") : "Snapshot A";
+		snapshotBtn.textContent = snapshot1
+			? snapshot2
+				? "Reset Snapshots"
+				: "Snapshot B"
+			: "Snapshot A";
 		snapshotBtn.addEventListener("click", () => {
 			if (snapshot1 && snapshot2) {
 				// Reset
@@ -2755,7 +2775,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 				html += `<div class="worker-util"><span class="worker-util-label">Flush/coalesce: </span><span class="worker-util-value">${flushTotal.toFixed(1)}ms (${flushEntries.length} calls)</span></div>`;
 
 				// Show top entries by duration
-				const topEntries = entries.slice().sort((a, b) => b.duration - a.duration).slice(0, 10);
+				const topEntries = entries
+					.slice()
+					.sort((a, b) => b.duration - a.duration)
+					.slice(0, 10);
 				for (const entry of topEntries) {
 					const pct = maxDuration > 0 ? Math.max((entry.duration / maxDuration) * 100, 2) : 0;
 					const shortName = entry.name.replace("async-dom:", "");
@@ -2784,7 +2807,15 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 					}
 				}
 				const appColors18 = new Map<string, string>();
-				const palette = ["#569cd6", "#4ec9b0", "#d7ba7d", "#c586c0", "#f44747", "#ce9178", "#6a9955"];
+				const palette = [
+					"#569cd6",
+					"#4ec9b0",
+					"#d7ba7d",
+					"#c586c0",
+					"#f44747",
+					"#ce9178",
+					"#6a9955",
+				];
 				let colorIdx = 0;
 				for (const appKey of allAppIds18) {
 					appColors18.set(appKey, palette[colorIdx % palette.length]);
@@ -2796,7 +2827,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 				for (const [appKey, color] of appColors18) {
 					html += `<span class="multiapp-legend-item"><span class="multiapp-legend-dot" style="background:${color}"></span>${escapeHtml(appKey)}</span>`;
 				}
-				html += '</div>';
+				html += "</div>";
 
 				// Stacked bars per frame
 				for (const frame of framesWithPerApp.slice(-20)) {
@@ -2888,10 +2919,16 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 					const avgBytes = ts.messageCount > 0 ? Math.round(ts.totalBytes / ts.messageCount) : 0;
 					html += `<div class="perf-row"><span class="perf-label">Avg Message Size</span><span class="perf-value">${formatBytes(avgBytes)}</span></div>`;
 					const largestClass = ts.largestMessageBytes > 102400 ? "red" : "";
-					const largestWarn = ts.largestMessageBytes > 102400 ? '<span class="transport-warn">[!] exceeds 100KB</span>' : "";
+					const largestWarn =
+						ts.largestMessageBytes > 102400
+							? '<span class="transport-warn">[!] exceeds 100KB</span>'
+							: "";
 					html += `<div class="perf-row"><span class="perf-label">Largest Message</span><span class="perf-value ${largestClass}">${formatBytes(ts.largestMessageBytes)}${largestWarn}</span></div>`;
 					const lastClass = ts.lastMessageBytes > 102400 ? "red" : "";
-					const lastWarn = ts.lastMessageBytes > 102400 ? '<span class="transport-warn">[!] exceeds 100KB</span>' : "";
+					const lastWarn =
+						ts.lastMessageBytes > 102400
+							? '<span class="transport-warn">[!] exceeds 100KB</span>'
+							: "";
 					html += `<div class="perf-row"><span class="perf-label">Last Message</span><span class="perf-value ${lastClass}">${formatBytes(ts.lastMessageBytes)}${lastWarn}</span></div>`;
 				}
 			}
@@ -2963,7 +3000,8 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		const graph = tracker.buildGraph();
 
 		if (graph.roots.length === 0) {
-			graphContent.innerHTML = '<div class="graph-empty">No causality data yet. Interact with the app to generate event-to-mutation data.</div>';
+			graphContent.innerHTML =
+				'<div class="graph-empty">No causality data yet. Interact with the app to generate event-to-mutation data.</div>';
 			return;
 		}
 
@@ -3220,8 +3258,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 				// Compute max total time for scaling bars
 				let maxTotalMs = 1;
 				for (const trace of recent) {
-					const total =
-						trace.serializeMs + (trace.transportMs ?? 0) + (trace.dispatchMs ?? 0);
+					const total = trace.serializeMs + (trace.transportMs ?? 0) + (trace.dispatchMs ?? 0);
 					if (total > maxTotalMs) maxTotalMs = total;
 				}
 
@@ -3232,9 +3269,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 					const mutCount =
 						trace.mutationCount ??
 						mutationLog.filter(
-							(m) =>
-								m.timestamp >= trace.timestamp &&
-								m.timestamp <= trace.timestamp + 100,
+							(m) => m.timestamp >= trace.timestamp && m.timestamp <= trace.timestamp + 100,
 						).length;
 
 					const totalMs = serMs + trnMs + dspMs;
@@ -3247,7 +3282,8 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 					// Event type label
 					const typeLabel = document.createElement("span");
 					typeLabel.className = "event-trace-type";
-					typeLabel.style.cssText = "width:60px;flex-shrink:0;font-size:10px;overflow:hidden;text-overflow:ellipsis;";
+					typeLabel.style.cssText =
+						"width:60px;flex-shrink:0;font-size:10px;overflow:hidden;text-overflow:ellipsis;";
 					typeLabel.textContent = `[${trace.eventType}]`;
 					row.appendChild(typeLabel);
 
@@ -3749,7 +3785,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	return {
 		destroy(): void {
 			stopPolling();
-			if (replayTimer) { clearInterval(replayTimer); replayTimer = null; }
+			if (replayTimer) {
+				clearInterval(replayTimer);
+				replayTimer = null;
+			}
 			clearInterval(healthDotTimer);
 			onWarningBadgeUpdate = null;
 			// Reset module-level state for clean re-creation (e.g., HMR)

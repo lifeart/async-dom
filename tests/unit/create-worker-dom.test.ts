@@ -98,7 +98,7 @@ describe("createWorkerDom", () => {
 
 		const { window: win } = createWorkerDom({ transport });
 
-		messageHandler!({
+		messageHandler?.({
 			type: "init",
 			location: {
 				href: "https://example.com:8080/path?q=1#frag",

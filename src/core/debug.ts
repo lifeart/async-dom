@@ -72,18 +72,24 @@ export const WarningCode = {
 	WORKER_UNHANDLED_REJECTION: "WORKER_UNHANDLED_REJECTION",
 } as const;
 
-export const WarningDescriptions: Record<(typeof WarningCode)[keyof typeof WarningCode], { description: string; suggestion: string }> = {
+export const WarningDescriptions: Record<
+	(typeof WarningCode)[keyof typeof WarningCode],
+	{ description: string; suggestion: string }
+> = {
 	ASYNC_DOM_MISSING_NODE: {
 		description: "A DOM mutation referenced a node ID that doesn't exist in the node cache.",
-		suggestion: "Ensure nodes are created before being referenced. Check for race conditions between create and update mutations.",
+		suggestion:
+			"Ensure nodes are created before being referenced. Check for race conditions between create and update mutations.",
 	},
 	ASYNC_DOM_SYNC_TIMEOUT: {
-		description: "A synchronous read (getBoundingClientRect, computedStyle) timed out waiting for the main thread response.",
+		description:
+			"A synchronous read (getBoundingClientRect, computedStyle) timed out waiting for the main thread response.",
 		suggestion: "Reduce sync read frequency, increase timeout, or use cached values when possible.",
 	},
 	ASYNC_DOM_LISTENER_NOT_FOUND: {
 		description: "An event was received for a listener ID that is not registered.",
-		suggestion: "This may indicate a timing issue where a listener was removed before its event was processed.",
+		suggestion:
+			"This may indicate a timing issue where a listener was removed before its event was processed.",
 	},
 	ASYNC_DOM_EVENT_ATTACH_FAILED: {
 		description: "Failed to attach an event listener to a DOM node.",
@@ -95,15 +101,18 @@ export const WarningDescriptions: Record<(typeof WarningCode)[keyof typeof Warni
 	},
 	ASYNC_DOM_BLOCKED_PROPERTY: {
 		description: "A setProperty call was blocked because the property is not in the allowed list.",
-		suggestion: "Add the property to additionalAllowedProperties in the renderer permissions if it's safe.",
+		suggestion:
+			"Add the property to additionalAllowedProperties in the renderer permissions if it's safe.",
 	},
 	WORKER_ERROR: {
 		description: "An unhandled error occurred in the worker thread.",
-		suggestion: "Check the stack trace for the error source. Add error handling in your worker code.",
+		suggestion:
+			"Check the stack trace for the error source. Add error handling in your worker code.",
 	},
 	WORKER_UNHANDLED_REJECTION: {
 		description: "An unhandled promise rejection occurred in the worker thread.",
-		suggestion: "Add .catch() handlers to promises or use try/catch with async/await in your worker code.",
+		suggestion:
+			"Add .catch() handlers to promises or use try/catch with async/await in your worker code.",
 	},
 };
 
@@ -209,7 +218,8 @@ export class MutationEventCorrelation {
 		const nodeId = m.id as number | undefined;
 		if (nodeId == null) return;
 
-		const causalEvent = entry.batchUid != null ? this.batchEventMap.get(entry.batchUid) ?? null : null;
+		const causalEvent =
+			entry.batchUid != null ? (this.batchEventMap.get(entry.batchUid) ?? null) : null;
 
 		let list = this.nodeIndex.get(nodeId);
 		if (!list) {
@@ -228,9 +238,7 @@ export class MutationEventCorrelation {
 	}
 
 	/** Look up the chain: mutation -> batch -> event for a given nodeId. */
-	getWhyUpdated(
-		nodeId: number,
-	): Array<{
+	getWhyUpdated(nodeId: number): Array<{
 		batchUid: number | undefined;
 		action: string;
 		timestamp: number;

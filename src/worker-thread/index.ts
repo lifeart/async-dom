@@ -242,9 +242,9 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 	// Feature 16: Periodically send worker performance entries to main thread
 	const perfEntriesInterval = setInterval(() => {
 		if (typeof performance === "undefined" || !performance.getEntriesByType) return;
-		const measures = performance.getEntriesByType("measure").filter(
-			(e) => e.name.startsWith("async-dom:"),
-		);
+		const measures = performance
+			.getEntriesByType("measure")
+			.filter((e) => e.name.startsWith("async-dom:"));
 		if (measures.length === 0) return;
 		const entries = measures.map((e) => ({
 			name: e.name,

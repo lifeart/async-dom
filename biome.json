@@ -24,5 +24,10 @@
 	},
 	"files": {
 		"includes": ["src/**/*.ts", "tests/**/*.ts"]
+	},
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
 	}
 }

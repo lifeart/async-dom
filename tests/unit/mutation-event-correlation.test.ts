@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MutationEventCorrelation, type MutationLogEntry } from "../../src/core/debug.ts";
-import { createNodeId, type NodeId } from "../../src/core/protocol.ts";
+import { createNodeId } from "../../src/core/protocol.ts";
 
 describe("MutationEventCorrelation", () => {
 	it("indexMutation and getWhyUpdated work together", () => {
@@ -69,8 +69,8 @@ describe("MutationEventCorrelation", () => {
 
 		const result = correlation.getWhyUpdated(nodeId as number);
 		expect(result).toHaveLength(2);
-		expect(result[0].causalEvent!.eventType).toBe("click");
-		expect(result[1].causalEvent!.eventType).toBe("input");
+		expect(result[0].causalEvent?.eventType).toBe("click");
+		expect(result[1].causalEvent?.eventType).toBe("input");
 	});
 
 	it("returns empty array for unknown nodeId", () => {

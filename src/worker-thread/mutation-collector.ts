@@ -30,8 +30,7 @@ export class MutationCollector {
 	}
 
 	/** Feature 15: Current causal event tag for this flush cycle */
-	private _causalEvent: { eventType: string; listenerId: string; timestamp: number } | null =
-		null;
+	private _causalEvent: { eventType: string; listenerId: string; timestamp: number } | null = null;
 
 	getStats(): { added: number; coalesced: number; flushed: number } {
 		return { ...this._stats };
@@ -52,9 +51,7 @@ export class MutationCollector {
 	constructor(private appId: AppId) {}
 
 	/** Feature 15: Set the causal event for the current mutation cycle. */
-	setCausalEvent(
-		event: { eventType: string; listenerId: string; timestamp: number } | null,
-	): void {
+	setCausalEvent(event: { eventType: string; listenerId: string; timestamp: number } | null): void {
 		this._causalEvent = event;
 	}
 

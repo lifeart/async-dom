@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MutationLogEntry } from "../../src/core/debug.ts";
 import { createNodeId } from "../../src/core/protocol.ts";
-import {
-	exportSession,
-	importSession,
-} from "../../src/debug/session-export.ts";
+import { exportSession, importSession } from "../../src/debug/session-export.ts";
 
 function makeMinimalSessionData() {
 	return {

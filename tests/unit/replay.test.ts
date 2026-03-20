@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MutationLogEntry } from "../../src/core/debug.ts";
 import { createNodeId } from "../../src/core/protocol.ts";
-import {
-	createReplayState,
-	replayStep,
-	replaySeek,
-	replayReset,
-} from "../../src/debug/replay.ts";
+import { createReplayState, replayReset, replaySeek, replayStep } from "../../src/debug/replay.ts";
 
 function makeMutationEntry(action: string, index: number): MutationLogEntry {
 	return {
@@ -54,17 +49,17 @@ describe("replayStep", () => {
 
 		const first = replayStep(state);
 		expect(first).not.toBeNull();
-		expect(first!.action).toBe("createNode");
+		expect(first?.action).toBe("createNode");
 		expect(state.currentIndex).toBe(1);
 
 		const second = replayStep(state);
 		expect(second).not.toBeNull();
-		expect(second!.action).toBe("setAttribute");
+		expect(second?.action).toBe("setAttribute");
 		expect(state.currentIndex).toBe(2);
 
 		const third = replayStep(state);
 		expect(third).not.toBeNull();
-		expect(third!.action).toBe("appendChild");
+		expect(third?.action).toBe("appendChild");
 		expect(state.currentIndex).toBe(3);
 	});
 
@@ -116,10 +111,7 @@ describe("replaySeek", () => {
 
 describe("replayReset", () => {
 	it("returns to start", () => {
-		const entries = [
-			makeMutationEntry("createNode", 0),
-			makeMutationEntry("setAttribute", 1),
-		];
+		const entries = [makeMutationEntry("createNode", 0), makeMutationEntry("setAttribute", 1)];
 		const state = createReplayState(entries);
 		state.isPlaying = true;
 		replaySeek(state, 2);

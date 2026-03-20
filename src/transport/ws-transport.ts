@@ -16,7 +16,12 @@ export class WebSocketTransport implements Transport {
 	private ws: WebSocket | null = null;
 	private handlers: Array<(message: Message) => void> = [];
 	private _readyState: TransportReadyState = "connecting";
-	private _stats: TransportStats = { messageCount: 0, totalBytes: 0, largestMessageBytes: 0, lastMessageBytes: 0 };
+	private _stats: TransportStats = {
+		messageCount: 0,
+		totalBytes: 0,
+		largestMessageBytes: 0,
+		lastMessageBytes: 0,
+	};
 	onError?: (error: Error) => void;
 	onClose?: () => void;
 	private attempt = 0;

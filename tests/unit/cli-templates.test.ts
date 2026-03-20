@@ -67,7 +67,7 @@ describe("CLI templates", () => {
 
 		it("has react dependencies", () => {
 			const files = getTemplate("react-ts", "my-app");
-			const pkg = JSON.parse(files.find((f) => f.path === "package.json")!.content);
+			const pkg = JSON.parse(files.find((f) => f.path === "package.json")?.content);
 			expect(pkg.dependencies.react).toBeDefined();
 			expect(pkg.dependencies["react-dom"]).toBeDefined();
 		});
@@ -90,7 +90,7 @@ describe("CLI templates", () => {
 
 		it("has vue dependency", () => {
 			const files = getTemplate("vue-ts", "my-app");
-			const pkg = JSON.parse(files.find((f) => f.path === "package.json")!.content);
+			const pkg = JSON.parse(files.find((f) => f.path === "package.json")?.content);
 			expect(pkg.dependencies.vue).toBeDefined();
 		});
 	});

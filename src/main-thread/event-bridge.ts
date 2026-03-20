@@ -143,11 +143,7 @@ export class EventBridge {
 	 * Transport time is computed on the main thread to avoid cross-origin
 	 * timing issues between main thread and worker `performance.now()`.
 	 */
-	updateTraceWithWorkerTiming(
-		listenerId: string,
-		dispatchMs: number,
-		mutationCount: number,
-	): void {
+	updateTraceWithWorkerTiming(listenerId: string, dispatchMs: number, mutationCount: number): void {
 		const receivedAt = Date.now();
 		// Find the most recent trace that matches by listenerId, walking backwards
 		for (let i = this.eventTraces.length - 1; i >= 0; i--) {

@@ -1,6 +1,5 @@
 import type { DebugOptions } from "../core/debug.ts";
 import { DebugStats, MutationEventCorrelation, resolveDebugHooks } from "../core/debug.ts";
-import { CausalityTracker } from "../debug/causality-graph.ts";
 import { NodeCache } from "../core/node-cache.ts";
 import type { AppId, DomMutation, Message, NodeId, PerfEntryData } from "../core/protocol.ts";
 import {
@@ -13,6 +12,7 @@ import {
 } from "../core/protocol.ts";
 import { FrameScheduler, type SchedulerConfig } from "../core/scheduler.ts";
 import { QueryType, SyncChannelHost } from "../core/sync-channel.ts";
+import { CausalityTracker } from "../debug/causality-graph.ts";
 import {
 	captureEvent,
 	captureMutation,
@@ -674,7 +674,15 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			getAppData: (appId: string) => debugData.get(appId as AppId),
 			// Get transport stats for all apps
 			getTransportStats: () => {
-				const result: Record<string, { messageCount: number; totalBytes: number; largestMessageBytes: number; lastMessageBytes: number } | null> = {};
+				const result: Record<
+					string,
+					{
+						messageCount: number;
+						totalBytes: number;
+						largestMessageBytes: number;
+						lastMessageBytes: number;
+					} | null
+				> = {};
 				for (const appId of renderers.keys()) {
 					const transport = threadManager.getTransport(appId);
 					result[String(appId)] = transport?.getStats?.() ?? null;
