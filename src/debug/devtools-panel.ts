@@ -4,6 +4,19 @@ import type {
 	SyncReadLogEntry,
 	WarningLogEntry,
 } from "../core/debug.ts";
+import {
+	type ReplayState,
+	createReplayState,
+	replayStep,
+	replaySeek,
+	replayReset,
+} from "./replay.ts";
+import {
+	type DebugSession,
+	exportSession,
+	importSession,
+	downloadJson,
+} from "./session-export.ts";
 
 /**
  * The shape of __ASYNC_DOM_DEVTOOLS__ exposed on globalThis (main thread).
@@ -45,6 +58,11 @@ interface DevtoolsAPI {
 	refreshDebugData: () => void;
 	getAppData: (appId: string) => AppDebugData | undefined;
 	getAllAppsData: () => Record<string, AppDebugData>;
+	replayMutation: (mutation: import("../core/protocol.ts").DomMutation, appId: string) => void;
+	clearAndReapply: (
+		mutations: Array<{ mutation: import("../core/protocol.ts").DomMutation; batchUid?: number }>,
+		upToIndex: number,
+	) => void;
 }
 
 interface AppDebugData {
@@ -777,6 +795,22 @@ const PANEL_CSS = `
 .log-entry.event-entry .log-action { color: #d7ba7d; }
 .log-entry.syncread-entry .log-action { color: #c586c0; }
 
+/* ---- Replay bar ---- */
+
+.replay-bar { display: flex; align-items: center; gap: 4px; padding: 4px 0; border-bottom: 1px solid #2d2d2d; margin-bottom: 4px; background: #1a1a1a; }
+.replay-btn { background: #3c3c3c; border: 1px solid #555; color: #d4d4d4; padding: 2px 6px; cursor: pointer; font-family: inherit; font-size: 11px; border-radius: 3px; }
+.replay-btn:hover { background: #505050; }
+.replay-btn.active { background: #007acc; border-color: #007acc; }
+.replay-slider { flex: 1; height: 4px; accent-color: #007acc; }
+.replay-position { color: #808080; font-size: 10px; flex-shrink: 0; min-width: 60px; text-align: center; }
+.replay-exit { color: #f44747; border-color: #f44747; }
+.replay-exit:hover { background: #f44747; color: #fff; }
+.replay-highlight { background: #094771 !important; }
+
+/* ---- Import indicator ---- */
+
+.import-indicator { color: #d7ba7d; font-size: 10px; margin-left: 6px; }
+
 /* Responsive / mobile-friendly */
 @media (max-width: 600px) {
   .panel { width: calc(100vw - 16px) !important; height: 50vh !important; left: 8px; right: 8px; bottom: 8px; }
@@ -868,6 +902,12 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	const headerTitle = document.createElement("span");
 	headerTitle.className = "header-title";
 	headerTitle.textContent = "async-dom devtools";
+
+	const importIndicator = document.createElement("span");
+	importIndicator.className = "import-indicator";
+	importIndicator.style.display = "none";
+	headerTitle.appendChild(importIndicator);
+
 	headerBar.appendChild(headerTitle);
 
 	const headerActions = document.createElement("div");
@@ -886,6 +926,18 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		if (dt) dt.enableHighlightUpdates(highlightUpdatesEnabled);
 	});
 	headerActions.appendChild(highlightBtn);
+
+	const exportBtn = document.createElement("button");
+	exportBtn.className = "header-btn";
+	exportBtn.textContent = "\u2193";
+	exportBtn.title = "Export debug session";
+	headerActions.appendChild(exportBtn);
+
+	const importBtn = document.createElement("button");
+	importBtn.className = "header-btn";
+	importBtn.textContent = "\u2191";
+	importBtn.title = "Import debug session";
+	headerActions.appendChild(importBtn);
 
 	const refreshBtn = document.createElement("button");
 	refreshBtn.className = "header-btn";
@@ -1001,12 +1053,75 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	logClearBtn.textContent = "Clear";
 	logToolbar.appendChild(logClearBtn);
 
+	const logReplayBtn = document.createElement("button");
+	logReplayBtn.className = "log-btn";
+	logReplayBtn.textContent = "Replay";
+	logToolbar.appendChild(logReplayBtn);
+
 	logContent.appendChild(logToolbar);
+
+	// Replay bar (hidden by default)
+	const replayBar = document.createElement("div");
+	replayBar.className = "replay-bar";
+	replayBar.style.display = "none";
+
+	const replayFirstBtn = document.createElement("button");
+	replayFirstBtn.className = "replay-btn";
+	replayFirstBtn.textContent = "\u23EE";
+	replayBar.appendChild(replayFirstBtn);
+
+	const replayPrevBtn = document.createElement("button");
+	replayPrevBtn.className = "replay-btn";
+	replayPrevBtn.textContent = "\u25C0";
+	replayBar.appendChild(replayPrevBtn);
+
+	const replayPlayBtn = document.createElement("button");
+	replayPlayBtn.className = "replay-btn";
+	replayPlayBtn.textContent = "\u25B6";
+	replayBar.appendChild(replayPlayBtn);
+
+	const replayStepFwdBtn = document.createElement("button");
+	replayStepFwdBtn.className = "replay-btn";
+	replayStepFwdBtn.textContent = "\u25B6\u2758";
+	replayStepFwdBtn.title = "Step forward one entry";
+	replayBar.appendChild(replayStepFwdBtn);
+
+	const replayNextBtn = document.createElement("button");
+	replayNextBtn.className = "replay-btn";
+	replayNextBtn.textContent = "\u23ED";
+	replayNextBtn.title = "Skip to end";
+	replayBar.appendChild(replayNextBtn);
+
+	const replaySlider = document.createElement("input");
+	replaySlider.type = "range";
+	replaySlider.className = "replay-slider";
+	replaySlider.min = "0";
+	replaySlider.max = "0";
+	replaySlider.value = "0";
+	replayBar.appendChild(replaySlider);
+
+	const replayPosition = document.createElement("span");
+	replayPosition.className = "replay-position";
+	replayPosition.textContent = "0 / 0";
+	replayBar.appendChild(replayPosition);
+
+	const replaySpeedBtn = document.createElement("button");
+	replaySpeedBtn.className = "replay-btn";
+	replaySpeedBtn.textContent = "1x";
+	replayBar.appendChild(replaySpeedBtn);
+
+	const replayExitBtn = document.createElement("button");
+	replayExitBtn.className = "replay-btn replay-exit";
+	replayExitBtn.textContent = "\u2715 Exit";
+	replayBar.appendChild(replayExitBtn);
 
 	const logList = document.createElement("div");
 	logList.className = "log-list";
 	logList.innerHTML = '<div class="log-empty">No mutations captured yet.</div>';
 	logContent.appendChild(logList);
+
+	// Insert replay bar before logList (must be after both are created)
+	logContent.insertBefore(replayBar, logList);
 
 	tabPanels.Log = logContent as HTMLDivElement;
 	panel.appendChild(logContent);
@@ -1048,6 +1163,270 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	let highlightUpdatesEnabled = false;
 	let selectedNodeForSidebar: TreeNode | null = null;
 	let expandedFrameId: number | null = null;
+
+	// Replay state (Feature 8)
+	let replayState: ReplayState | null = null;
+	let replayTimer: ReturnType<typeof setInterval> | null = null;
+	let replaySpeedMultiplier = 1;
+	const REPLAY_SPEEDS = [1, 2, 5];
+
+	// Import state (Feature 14)
+	let importedSession: DebugSession | null = null;
+
+	// ---- Feature 8: Replay controls ----
+
+	function updateReplayUI(): void {
+		if (!replayState) return;
+		replaySlider.max = String(replayState.entries.length);
+		replaySlider.value = String(replayState.currentIndex);
+		replayPosition.textContent = `${replayState.currentIndex} / ${replayState.entries.length}`;
+		replayPlayBtn.textContent = replayState.isPlaying ? "\u23F8" : "\u25B6";
+		replayPlayBtn.classList.toggle("active", replayState.isPlaying);
+	}
+
+	function enterReplayMode(): void {
+		if (importedSession) return; // no replay in imported mode
+		replayState = createReplayState(mutationLog);
+		replayBar.style.display = "flex";
+		logReplayBtn.classList.add("active");
+		updateReplayUI();
+		renderLogTab();
+	}
+
+	function exitReplayMode(): void {
+		if (replayTimer) {
+			clearInterval(replayTimer);
+			replayTimer = null;
+		}
+		if (replayState) {
+			replayState.isPlaying = false;
+			replayState = null;
+		}
+		replayBar.style.display = "none";
+		logReplayBtn.classList.remove("active");
+		renderLogTab();
+	}
+
+	function applyReplayMutation(entry: MutationLogEntry): void {
+		const dt = getDevtools();
+		if (!dt?.replayMutation) return;
+		const appId = dt.apps()[0];
+		if (appId) dt.replayMutation(entry.mutation, appId);
+	}
+
+	function clearAndReapplyUpTo(index: number): void {
+		if (!replayState) return;
+		const dt = getDevtools();
+		if (!dt?.clearAndReapply) return;
+		dt.clearAndReapply(replayState.entries, index);
+	}
+
+	function replayStepForwardOne(): void {
+		if (!replayState) return;
+		const entry = replayStep(replayState);
+		if (entry) applyReplayMutation(entry);
+		updateReplayUI();
+		renderLogTab();
+	}
+
+	function replayStepBackward(): void {
+		if (!replayState) return;
+		if (replayState.currentIndex > 0) {
+			replaySeek(replayState, replayState.currentIndex - 1);
+			// Backward requires clearing and re-applying from scratch
+			clearAndReapplyUpTo(replayState.currentIndex);
+		}
+		updateReplayUI();
+		renderLogTab();
+	}
+
+	function replayGoToStart(): void {
+		if (!replayState) return;
+		replayReset(replayState);
+		// Clear DOM — nothing to re-apply at index 0
+		clearAndReapplyUpTo(0);
+		updateReplayUI();
+		renderLogTab();
+	}
+
+	function replayGoToEnd(): void {
+		if (!replayState) return;
+		replaySeek(replayState, replayState.entries.length);
+		// Re-apply all mutations
+		clearAndReapplyUpTo(replayState.entries.length);
+		updateReplayUI();
+		renderLogTab();
+	}
+
+	function toggleReplayPlay(): void {
+		if (!replayState) return;
+		replayState.isPlaying = !replayState.isPlaying;
+		if (replayState.isPlaying) {
+			const intervalMs = Math.max(50, 500 / replaySpeedMultiplier);
+			replayTimer = setInterval(() => {
+				if (!replayState || replayState.currentIndex >= replayState.entries.length) {
+					if (replayState) replayState.isPlaying = false;
+					if (replayTimer) { clearInterval(replayTimer); replayTimer = null; }
+					updateReplayUI();
+					return;
+				}
+				const entry = replayStep(replayState);
+				if (entry) applyReplayMutation(entry);
+				updateReplayUI();
+				renderLogTab();
+			}, intervalMs);
+		} else {
+			if (replayTimer) { clearInterval(replayTimer); replayTimer = null; }
+		}
+		updateReplayUI();
+	}
+
+	function cycleReplaySpeed(): void {
+		const idx = REPLAY_SPEEDS.indexOf(replaySpeedMultiplier);
+		replaySpeedMultiplier = REPLAY_SPEEDS[(idx + 1) % REPLAY_SPEEDS.length];
+		replaySpeedBtn.textContent = `${replaySpeedMultiplier}x`;
+		// Restart play interval if playing
+		if (replayState?.isPlaying) {
+			if (replayTimer) { clearInterval(replayTimer); replayTimer = null; }
+			replayState.isPlaying = false;
+			toggleReplayPlay();
+		}
+	}
+
+	logReplayBtn.addEventListener("click", () => {
+		if (replayState) exitReplayMode();
+		else enterReplayMode();
+	});
+	replayFirstBtn.addEventListener("click", replayGoToStart);
+	replayPrevBtn.addEventListener("click", replayStepBackward);
+	replayPlayBtn.addEventListener("click", toggleReplayPlay);
+	replayStepFwdBtn.addEventListener("click", replayStepForwardOne);
+	replayNextBtn.addEventListener("click", replayGoToEnd);
+	replaySlider.addEventListener("input", () => {
+		if (!replayState) return;
+		const target = Number(replaySlider.value);
+		replaySeek(replayState, target);
+		// Re-apply mutations up to the new position
+		clearAndReapplyUpTo(replayState.currentIndex);
+		updateReplayUI();
+		renderLogTab();
+	});
+	replaySpeedBtn.addEventListener("click", cycleReplaySpeed);
+	replayExitBtn.addEventListener("click", exitReplayMode);
+
+	// ---- Feature 14: Export / Import ----
+
+	exportBtn.addEventListener("click", () => {
+		const dt = getDevtools();
+		const schedulerStats = dt?.scheduler?.stats() ?? {};
+		const allData = dt?.getAllAppsData() ?? {};
+		const firstAppData = Object.values(allData)[0];
+
+		const json = exportSession({
+			mutationLog: importedSession ? importedSession.mutationLog : [...mutationLog],
+			warningLog: importedSession ? importedSession.warningLog : [...warningLog],
+			eventLog: importedSession ? importedSession.eventLog : [...eventLog],
+			syncReadLog: importedSession ? importedSession.syncReadLog : [...syncReadLog],
+			schedulerStats: schedulerStats as Record<string, unknown>,
+			tree: firstAppData?.tree,
+			appData: allData as Record<string, unknown>,
+		});
+
+		const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+		downloadJson(json, `async-dom-session-${timestamp}.json`);
+	});
+
+	importBtn.addEventListener("click", () => {
+		const input = document.createElement("input");
+		input.type = "file";
+		input.accept = ".json";
+		input.addEventListener("change", () => {
+			const file = input.files?.[0];
+			if (!file) return;
+			const reader = new FileReader();
+			reader.onload = () => {
+				try {
+					const session = importSession(reader.result as string);
+					enterImportMode(session);
+				} catch (err) {
+					console.error("[async-dom devtools] Import failed:", err);
+				}
+			};
+			reader.readAsText(file);
+		});
+		input.click();
+	});
+
+	function setImportControlsDisabled(disabled: boolean): void {
+		// Log tab controls
+		logClearBtn.disabled = disabled;
+		logPauseBtn.disabled = disabled;
+		logAutoScrollBtn.disabled = disabled;
+		logReplayBtn.disabled = disabled;
+		// Warnings tab controls
+		warnClearBtn.disabled = disabled;
+
+		const grayedStyle = disabled ? "0.4" : "1";
+		logClearBtn.style.opacity = grayedStyle;
+		logPauseBtn.style.opacity = grayedStyle;
+		logAutoScrollBtn.style.opacity = grayedStyle;
+		logReplayBtn.style.opacity = grayedStyle;
+		warnClearBtn.style.opacity = grayedStyle;
+
+		if (disabled) {
+			logClearBtn.style.pointerEvents = "none";
+			logPauseBtn.style.pointerEvents = "none";
+			logAutoScrollBtn.style.pointerEvents = "none";
+			logReplayBtn.style.pointerEvents = "none";
+			warnClearBtn.style.pointerEvents = "none";
+		} else {
+			logClearBtn.style.pointerEvents = "";
+			logPauseBtn.style.pointerEvents = "";
+			logAutoScrollBtn.style.pointerEvents = "";
+			logReplayBtn.style.pointerEvents = "";
+			warnClearBtn.style.pointerEvents = "";
+		}
+	}
+
+	function enterImportMode(session: DebugSession): void {
+		importedSession = session;
+		// Exit replay if active
+		if (replayState) exitReplayMode();
+
+		importIndicator.textContent = "[IMPORTED]";
+		importIndicator.style.display = "inline";
+
+		// Disable irrelevant controls
+		setImportControlsDisabled(true);
+
+		// Add a close-import button if not already present
+		let closeImportBtn = headerActions.querySelector(".close-import-btn") as HTMLButtonElement | null;
+		if (!closeImportBtn) {
+			closeImportBtn = document.createElement("button");
+			closeImportBtn.className = "header-btn close-import-btn";
+			closeImportBtn.textContent = "\u2715";
+			closeImportBtn.title = "Close imported session";
+			closeImportBtn.style.color = "#d7ba7d";
+			closeImportBtn.addEventListener("click", exitImportMode);
+			headerActions.insertBefore(closeImportBtn, headerActions.firstChild);
+		}
+
+		renderActiveTab();
+	}
+
+	function exitImportMode(): void {
+		importedSession = null;
+		importIndicator.style.display = "none";
+		importIndicator.textContent = "";
+
+		// Re-enable controls
+		setImportControlsDisabled(false);
+
+		const closeImportBtn = headerActions.querySelector(".close-import-btn");
+		if (closeImportBtn) closeImportBtn.remove();
+
+		renderActiveTab();
+	}
 
 	// ---- Feature 1: Queue pressure health dot (polls even when collapsed) ----
 	function updateHealthDot(): void {
@@ -1271,6 +1650,37 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	}
 
 	function renderTreeTab(): void {
+		// Imported session: show tree if available
+		if (importedSession) {
+			if (importedSession.tree) {
+				const tree = importedSession.tree as TreeNode;
+				const layout = document.createElement("div");
+				layout.className = "tree-with-sidebar";
+				const treeMain = document.createElement("div");
+				treeMain.className = "tree-main";
+				const statusLine = document.createElement("div");
+				statusLine.className = "tree-refresh-bar";
+				const statusText = document.createElement("span");
+				statusText.className = "tree-status";
+				statusText.textContent = "Imported session tree (read-only)";
+				statusLine.appendChild(statusText);
+				treeMain.appendChild(statusLine);
+				const sidebar = document.createElement("div") as HTMLDivElement;
+				sidebar.className = "node-sidebar";
+				const fakeDt = getDevtools();
+				if (fakeDt) {
+					buildTreeDOM(treeMain, tree, 0, true, fakeDt, sidebar);
+				}
+				layout.appendChild(treeMain);
+				layout.appendChild(sidebar);
+				treeContent.innerHTML = "";
+				treeContent.appendChild(layout);
+			} else {
+				treeContent.innerHTML = '<div class="tree-empty">Imported session has no tree data.</div>';
+			}
+			return;
+		}
+
 		const dt = getDevtools();
 		if (!dt) {
 			treeContent.innerHTML = '<div class="tree-empty">Devtools API not available.</div>';
@@ -1482,6 +1892,22 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	// ---- Performance rendering ----
 
 	function renderPerfTab(): void {
+		// Imported session: show read-only scheduler stats
+		if (importedSession) {
+			const ss = importedSession.schedulerStats;
+			let html = '<div class="perf-section-title">Imported Session (read-only)</div>';
+			for (const [key, val] of Object.entries(ss)) {
+				html += `<div class="perf-row"><span class="perf-label">${escapeHtml(String(key))}</span><span class="perf-value">${escapeHtml(String(val))}</span></div>`;
+			}
+			html += `<div class="perf-row"><span class="perf-label">Exported At</span><span class="perf-value">${escapeHtml(importedSession.exportedAt)}</span></div>`;
+			html += `<div class="perf-row"><span class="perf-label">Mutations</span><span class="perf-value">${importedSession.mutationLog.length}</span></div>`;
+			html += `<div class="perf-row"><span class="perf-label">Warnings</span><span class="perf-value">${importedSession.warningLog.length}</span></div>`;
+			html += `<div class="perf-row"><span class="perf-label">Events</span><span class="perf-value">${importedSession.eventLog.length}</span></div>`;
+			html += `<div class="perf-row"><span class="perf-label">Sync Reads</span><span class="perf-value">${importedSession.syncReadLog.length}</span></div>`;
+			perfContent.innerHTML = html;
+			return;
+		}
+
 		const dt = getDevtools();
 		if (!dt) {
 			perfContent.innerHTML =
@@ -1744,11 +2170,24 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	}
 
 	function renderLogTab(): void {
-		logCountSpan.textContent = String(mutationLog.length);
+		// Determine the source of mutations based on mode
+		const activeMutationLog = importedSession ? importedSession.mutationLog : mutationLog;
+		const activeEventLog = importedSession ? importedSession.eventLog : eventLog;
+		const activeSyncReadLog = importedSession ? importedSession.syncReadLog : syncReadLog;
 
-		if (mutationLog.length === 0) {
-			if (lastRenderedLogLength !== 0) {
-				logList.innerHTML = '<div class="log-empty">No mutations captured yet.</div>';
+		// In replay mode, show only entries up to currentIndex
+		const displayMutations = replayState
+			? replayState.entries.slice(0, replayState.currentIndex)
+			: activeMutationLog;
+
+		logCountSpan.textContent = String(displayMutations.length);
+
+		if (displayMutations.length === 0) {
+			if (lastRenderedLogLength !== 0 || replayState) {
+				const msg = replayState
+					? "Replay position: 0. Step forward to see mutations."
+					: "No mutations captured yet.";
+				logList.innerHTML = `<div class="log-empty">${msg}</div>`;
 				lastRenderedLogLength = 0;
 			}
 			return;
@@ -1765,7 +2204,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		const groups: BatchGroup[] = [];
 		let currentGroup: BatchGroup | null = null;
 
-		for (const entry of mutationLog) {
+		for (const entry of displayMutations) {
 			if (filterText && !entry.action.toLowerCase().includes(filterText)) continue;
 
 			const uid = entry.batchUid;
@@ -1828,6 +2267,16 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		logList.innerHTML = "";
 		logList.appendChild(fragment);
 
+		// Highlight current replay entry
+		if (replayState && replayState.currentIndex > 0) {
+			const allLogEntries = logList.querySelectorAll(".log-entry");
+			const targetIdx = replayState.currentIndex - 1;
+			if (targetIdx < allLogEntries.length) {
+				allLogEntries[targetIdx].classList.add("replay-highlight");
+				allLogEntries[targetIdx].scrollIntoView({ block: "nearest" });
+			}
+		}
+
 		// Event round-trip tracer section
 		const dt = getDevtools();
 		if (dt) {
@@ -1862,13 +2311,13 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		}
 
 		// Events section (Gap 4)
-		if (eventLog.length > 0) {
+		if (activeEventLog.length > 0) {
 			const evtSection = document.createElement("div");
 			evtSection.className = "log-section-title";
-			evtSection.textContent = `Events (${eventLog.length})`;
+			evtSection.textContent = `Events (${activeEventLog.length})`;
 			logList.appendChild(evtSection);
 
-			const recentEvents = eventLog.slice(-50);
+			const recentEvents = activeEventLog.slice(-50);
 			for (const entry of recentEvents) {
 				const div = document.createElement("div");
 				div.className = "log-entry event-entry";
@@ -1893,13 +2342,13 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		}
 
 		// Sync Reads section (Gap 4)
-		if (syncReadLog.length > 0) {
+		if (activeSyncReadLog.length > 0) {
 			const syncSection = document.createElement("div");
 			syncSection.className = "log-section-title";
-			syncSection.textContent = `Sync Reads (${syncReadLog.length})`;
+			syncSection.textContent = `Sync Reads (${activeSyncReadLog.length})`;
 			logList.appendChild(syncSection);
 
-			const recentReads = syncReadLog.slice(-50);
+			const recentReads = activeSyncReadLog.slice(-50);
 			for (const entry of recentReads) {
 				const div = document.createElement("div");
 				div.className = "log-entry syncread-entry";
@@ -1988,10 +2437,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			}
 		}
 
-		if (autoScroll) {
+		if (autoScroll && !replayState) {
 			logList.scrollTop = logList.scrollHeight;
 		}
-		lastRenderedLogLength = mutationLog.length;
+		lastRenderedLogLength = displayMutations.length;
 	}
 
 	logFilter.addEventListener("input", renderLogTab);
@@ -2008,7 +2457,9 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	let lastRenderedWarningLength = 0;
 
 	function renderWarningsTab(): void {
-		if (warningLog.length === 0) {
+		const activeWarningLog = importedSession ? importedSession.warningLog : warningLog;
+
+		if (activeWarningLog.length === 0) {
 			if (lastRenderedWarningLength !== 0) {
 				warnList.innerHTML = '<div class="warn-empty">No warnings captured yet.</div>';
 				lastRenderedWarningLength = 0;
@@ -2016,11 +2467,11 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			return;
 		}
 
-		if (warningLog.length === lastRenderedWarningLength) return;
+		if (activeWarningLog.length === lastRenderedWarningLength) return;
 
 		const fragment = document.createDocumentFragment();
 
-		for (const entry of warningLog) {
+		for (const entry of activeWarningLog) {
 			const div = document.createElement("div");
 			div.className = "warn-entry";
 
@@ -2060,7 +2511,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		warnList.innerHTML = "";
 		warnList.appendChild(fragment);
 		warnList.scrollTop = warnList.scrollHeight;
-		lastRenderedWarningLength = warningLog.length;
+		lastRenderedWarningLength = activeWarningLog.length;
 	}
 
 	warnClearBtn.addEventListener("click", () => {
@@ -2140,6 +2591,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	return {
 		destroy(): void {
 			stopPolling();
+			if (replayTimer) { clearInterval(replayTimer); replayTimer = null; }
 			clearInterval(healthDotTimer);
 			onWarningBadgeUpdate = null;
 			// Reset module-level state for clean re-creation (e.g., HMR)

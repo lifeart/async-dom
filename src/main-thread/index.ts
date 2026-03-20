@@ -604,6 +604,32 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				}
 				return result;
 			},
+			// Replay: apply a single mutation through the renderer
+			replayMutation: (mutation: DomMutation, appId: string) => {
+				const renderer = renderers.get(appId as AppId);
+				if (renderer) {
+					renderer.apply(mutation);
+				}
+			},
+			// Replay: clear the renderer's DOM subtree and re-apply mutations up to a given index
+			clearAndReapply: (
+				mutations: Array<{ mutation: DomMutation; batchUid?: number }>,
+				upToIndex: number,
+			) => {
+				// Apply to first renderer
+				for (const renderer of renderers.values()) {
+					const root = renderer.getRoot();
+					if (root) {
+						root.body.textContent = "";
+						root.head.textContent = "";
+					}
+					const end = Math.min(upToIndex, mutations.length);
+					for (let i = 0; i < end; i++) {
+						renderer.apply(mutations[i].mutation, mutations[i].batchUid);
+					}
+					break;
+				}
+			},
 		};
 
 		// Inject the in-page devtools panel
