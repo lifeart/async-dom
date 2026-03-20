@@ -7,16 +7,17 @@
 
 Offload UI to Web Workers with frame-budgeted scheduling. Your application logic runs in a worker; mutations are serialized, transported, and applied by a scheduler that keeps the main thread at 60 fps.
 
+**[Live Demo](https://lifeart.github.io/async-dom/)** · **[Demo with DevTools](https://lifeart.github.io/async-dom/?debug)**
+
 ## Key Features
 
-- **Comprehensive DOM API** -- virtual `document` and `window` with querySelector, dataset, classList, input properties, and observer stubs so frameworks work out of the box.
-- **Synchronous DOM reads** -- `getBoundingClientRect()`, `offsetWidth`, `getComputedStyle()` return real values via SharedArrayBuffer, with automatic async fallback.
-- **Frame budgeting** -- adaptive batch sizing per frame with priority levels and optional viewport culling.
-- **CSS selector engine** -- `querySelector` / `querySelectorAll` run against the virtual tree in the worker.
-- **Binary wire format** -- 22-opcode binary codec with string deduplication and numeric Node IDs.
-- **Per-app isolation** -- multiple workers render into the same page, each with its own renderer and optional shadow DOM.
-- **Security** -- HTML sanitizer, property allowlist, and attribute filtering block dangerous content.
-- **Multi-transport** -- Worker `postMessage`, binary `DataView`, WebSocket with auto-reconnect, optional Comlink adapter.
+- **Comprehensive DOM API** — virtual `document` and `window` with querySelector, dataset, classList, input properties, and observer stubs so frameworks work out of the box.
+- **Synchronous DOM reads** — `getBoundingClientRect()`, `offsetWidth`, `getComputedStyle()` return real values via SharedArrayBuffer.
+- **Frame budgeting** — adaptive batch sizing per frame with priority levels and optional viewport culling.
+- **Binary wire format** — 22-opcode binary codec with string deduplication and numeric Node IDs.
+- **Per-app isolation** — multiple workers render into the same page, each with its own renderer and optional shadow DOM.
+- **Built-in DevTools** — in-page debug panel with virtual DOM tree, scheduler stats, mutation log, and worker error reporting.
+- **Security** — HTML sanitizer, property allowlist, and attribute filtering block dangerous content.
 
 ## Getting Started
 
@@ -24,13 +25,11 @@ Offload UI to Web Workers with frame-budgeted scheduling. Your application logic
 npm install async-dom
 ```
 
-The package ships ESM and CJS builds with full TypeScript declarations.
-
-| Import path        | Purpose                         |
-| ------------------ | ------------------------------- |
-| `async-dom`        | Main thread API                 |
-| `async-dom/worker` | Worker thread API (virtual DOM) |
-| `async-dom/transport` | Transport backends           |
+| Import path           | Purpose                         |
+| --------------------- | ------------------------------- |
+| `async-dom`           | Main thread API                 |
+| `async-dom/worker`    | Worker thread API (virtual DOM) |
+| `async-dom/transport` | Transport backends              |
 
 ### main.ts
 
@@ -57,36 +56,126 @@ import { createWorkerDom } from "async-dom/worker";
 const { document } = createWorkerDom();
 
 const div = document.createElement("div");
-div.setAttribute("class", "greeting");
 div.textContent = "Hello from a Web Worker!";
+div.id = "greet";
 document.body.appendChild(div);
 
-// element.id maps to the HTML "id" attribute
-div.id = "greet";
-console.log(div.id); // "greet"
-
-// Modern DOM methods
-const list = document.createElement("ul");
-list.append(
-  document.createElement("li"),
-  document.createElement("li"),
-);
-document.body.append(list);
+// Input elements sync state with main thread
+const input = document.createElement("input");
+input.addEventListener("input", (e) => {
+  console.log("Value:", input.value); // real value from main thread
+});
+document.body.appendChild(input);
 ```
-
-All DOM mutations are automatically batched via microtask and sent to the main thread.
 
 ## Examples
 
-Working examples are in the [`examples/`](./examples) directory:
+Working examples in [`examples/`](./examples):
 
-- **[vanilla](./examples/vanilla)** -- 7 000-node interactive grid with click scoring, hover effects, and periodic color updates. A good starting point for understanding the API.
-
-Run the dev server to try them:
+| Example | Description |
+| ------- | ----------- |
+| **[vanilla](./examples/vanilla)** | 7,000-node interactive grid — click scoring, hover effects, periodic updates |
+| **[counter](./examples/counter)** | Minimal counter — click handlers, textContent updates |
+| **[todo](./examples/todo)** | Todo list — input sync, dynamic DOM, classList, event handling |
+| **[multi-app](./examples/multi-app)** | Two isolated apps in shadow DOM — CSS isolation demo |
+| **[debug](./examples/debug)** | Debug panel with devtools, mutation logging, stats |
 
 ```bash
-npm run dev
+npm run dev          # run vanilla example
 ```
+
+## Debugging
+
+### In-Page DevTools Panel
+
+Add `?debug` to the URL or pass `debug: { exposeDevtools: true }`:
+
+```ts
+const dom = createAsyncDom({
+  target: document.getElementById("app")!,
+  worker,
+  debug: { exposeDevtools: true, logWarnings: true },
+});
+```
+
+This injects a collapsible panel in the bottom-right corner with 4 tabs:
+
+| Tab | What it shows |
+| --- | ------------- |
+| **Tree** | Virtual DOM tree from the worker thread (not a copy of the real DOM) |
+| **Performance** | Scheduler stats: pending queue, frame time, mutations/frame, coalescing ratio |
+| **Log** | Live mutation stream with filtering, pause/resume, auto-scroll |
+| **Warnings** | Missing nodes, queue overflow, worker errors with expandable stack traces |
+
+Multi-app: when multiple workers are running, the panel shows a per-app selector with separate trees and stats.
+
+### Always-On Warnings
+
+These fire via `console.warn` regardless of debug config — they indicate real bugs:
+
+| Warning | Meaning |
+| ------- | ------- |
+| `appendChild: parent not found` | Mutation targets a node not in the cache |
+| `Scheduler queue overflow: N pending` | Queue > 10K — tab hidden or applier broken |
+| `Scheduler not ticking after 1 second` | `requestAnimationFrame` not firing (hidden tab) |
+| `App X worker error: ...` | Runtime error in worker with stack trace |
+| `App X worker disconnected` | Worker crashed or was terminated |
+
+### Worker Error Reporting
+
+Worker runtime errors (syntax, logical, uncaught exceptions, unhandled promise rejections) are automatically:
+1. Captured via `self.onerror` and `self.onunhandledrejection`
+2. Serialized with name, message, stack, filename, line, column
+3. Forwarded to the main thread via the error protocol
+4. Displayed in the DevTools Warnings tab with expandable stack traces
+5. Passed to your `onError` callback if provided
+
+```ts
+dom.addApp({
+  worker: new Worker("./app.ts", { type: "module" }),
+  onError: (error, appId) => {
+    console.error(`[${appId}] ${error.name}: ${error.message}`);
+    console.error(error.stack);
+    // error.filename, error.lineno, error.colno available
+    // error.isUnhandledRejection for promise rejections
+  },
+});
+```
+
+### Debug Options
+
+```ts
+interface DebugOptions {
+  logMutations?: boolean;    // Log every mutation applied on main thread
+  logEvents?: boolean;       // Log event serialization and dispatch
+  logSyncReads?: boolean;    // Log SharedArrayBuffer read requests
+  logScheduler?: boolean;    // Log per-frame scheduler stats
+  logWarnings?: boolean;     // Log structured warnings
+  exposeDevtools?: boolean;  // Inject in-page debug panel + __ASYNC_DOM_DEVTOOLS__ global
+}
+```
+
+### Console DevTools API
+
+When `exposeDevtools: true`, inspect from the browser console:
+
+```js
+// Main thread console:
+__ASYNC_DOM_DEVTOOLS__.scheduler.stats()    // {pending, frameId, frameTime, isRunning}
+__ASYNC_DOM_DEVTOOLS__.scheduler.flush()    // Manual drain for debugging
+__ASYNC_DOM_DEVTOOLS__.apps()               // List all app IDs
+__ASYNC_DOM_DEVTOOLS__.findRealNode(42)     // Find real DOM element by nodeId
+__ASYNC_DOM_DEVTOOLS__.getAllAppsData()      // Virtual DOM trees + worker stats
+
+// Worker console:
+__ASYNC_DOM_DEVTOOLS__.tree()               // Virtual DOM tree snapshot
+__ASYNC_DOM_DEVTOOLS__.stats()              // Mutation coalescing stats
+__ASYNC_DOM_DEVTOOLS__.flush()              // Force-send pending mutations
+```
+
+### Chrome Extension
+
+A standalone Chrome DevTools extension is available in [`chrome-extension/`](./chrome-extension). Load it as an unpacked extension for a dedicated DevTools panel with tree view, performance charts, and mutation log.
 
 ## Architecture
 
@@ -97,12 +186,12 @@ Worker Thread                  Main Thread
 | (virtual DOM tree) |         |   (per-app comms)   |
 |        |           |         |        |            |
 | MutationCollector  |         |   FrameScheduler    |
-|  (microtask batch) |         |   (budget, sort,    |
-+--------|----------+         |    cull, skip)       |
+|  (batch + coalesce)|         |   (budget, sort,    |
++--------|----------+         |    cull, fairness)   |
          |                     |        |            |
     Transport ───────────────> |   DomRenderer(s)    |
   (postMessage /               |   (per-app, apply   |
-   WebSocket)                  |    to real DOM)     |
+   binary / WS)                |    to real DOM)     |
          |                     |        |            |
          | <─── Events ─────── |   EventBridge       |
          |                     |   (DOM → Worker)    |
@@ -116,178 +205,100 @@ Worker Thread                  Main Thread
 +--------------------+
 ```
 
-1. Application code manipulates `VirtualDocument` in the worker.
-2. `MutationCollector` batches mutations per microtask and sends them over the transport.
-3. `ThreadManager` receives messages and routes them to the `FrameScheduler`.
-4. `FrameScheduler` sorts by priority, measures timing, and applies mutations within the frame budget via per-app `DomRenderer` instances.
-5. `EventBridge` listens for real DOM events and forwards serialized copies back to the worker, including input state (`value`, `checked`, `selectedIndex`).
-6. `SyncChannelHost` handles blocking DOM read requests from the worker via `SharedArrayBuffer`.
-
 ## Synchronous DOM Reads
 
-Inspired by [Partytown](https://partytown.builder.io/), async-dom uses `SharedArrayBuffer` + `Atomics.wait/notify` so the worker can make blocking reads against the real DOM:
+Inspired by [Partytown](https://partytown.builder.io/), async-dom uses `SharedArrayBuffer` + `Atomics.wait/notify` for blocking reads:
 
-| API                                       | Returns                        |
-| ----------------------------------------- | ------------------------------ |
-| `el.getBoundingClientRect()`              | Real DOMRect values            |
-| `el.offsetWidth`, `clientHeight`, etc.    | Real layout metrics            |
-| `window.getComputedStyle(el)`             | Real computed style properties |
-| `window.innerWidth` / `innerHeight`       | Real viewport dimensions       |
+| API | Returns |
+| --- | ------- |
+| `el.getBoundingClientRect()` | Real DOMRect values |
+| `el.offsetWidth`, `clientHeight`, etc. | Real layout metrics |
+| `window.getComputedStyle(el)` | Real computed styles |
+| `window.innerWidth` / `innerHeight` | Real viewport dimensions |
+| `window.screen.width` / `height` | Real screen dimensions |
 
-**Fallback:** When `SharedArrayBuffer` is unavailable (missing COOP/COEP headers), sync reads return default values (`0` / `{}`).
+**Fallback:** Without COOP/COEP headers, sync reads return default values (`0` / `{}`).
 
 ## Security
 
-- **HTML sanitizer** -- `innerHTML` and `insertAdjacentHTML` strip dangerous tags (`<script>`, `<iframe>`, `<object>`, etc.) and `on*` attributes. Opt out per-app with `allowUnsafeHTML: true`.
-- **Property allowlist** -- `setProperty` mutations only apply to a curated set of safe DOM properties. Extend with `additionalAllowedProperties`.
-- **Attribute filtering** -- `setAttribute` drops `on*` handlers and `javascript:` URIs.
+- **HTML sanitizer** — `innerHTML` and `insertAdjacentHTML` strip `<script>`, `<iframe>`, `<style>`, `<object>`, `on*` attributes, and `javascript:`/`data:text/html` URIs. Opt out with `allowUnsafeHTML: true`.
+- **Property allowlist** — `setProperty` only applies safe properties (`value`, `checked`, `textContent`, etc.). Extend with `additionalAllowedProperties`.
+- **Attribute filtering** — `setAttribute` blocks `on*` handlers and dangerous URIs.
 
 ## Per-App Isolation
 
-Each app gets its own `DomRenderer`, `NodeCache`, `EventBridge`, and `SyncChannelHost`. Pass `shadow: true` to render into a shadow root for full CSS/DOM encapsulation.
+Each app gets its own `DomRenderer`, `NodeCache`, `EventBridge`, and `SyncChannelHost`. Shadow DOM provides CSS encapsulation:
 
 ```ts
-const dom = createAsyncDom({ target: document.getElementById("root")! });
+const dom = createAsyncDom({ target: document.body });
 
-const appA = dom.addApp({
+dom.addApp({
   worker: new Worker("./app-a.ts", { type: "module" }),
-  shadow: true,
+  mountPoint: "#container-a",
+  shadow: true,  // CSS fully isolated
 });
-const appB = dom.addApp({
+
+dom.addApp({
   worker: new Worker("./app-b.ts", { type: "module" }),
+  mountPoint: "#container-b",
+  shadow: { mode: "closed" },
 });
 
 dom.start();
-dom.removeApp(appA); // clean teardown without affecting appB
 ```
-
-### Renderer Permissions
-
-| Permission                    | Default | Description                     |
-| ----------------------------- | ------- | ------------------------------- |
-| `allowHeadAppend`             | `false` | Append nodes to `<head>`        |
-| `allowBodyAppend`             | `false` | Append nodes to `<body>`        |
-| `allowNavigation`             | `true`  | Call `pushState`/`replaceState` |
-| `allowScroll`                 | `true`  | Call `window.scrollTo`          |
-| `allowUnsafeHTML`             | `false` | Skip HTML sanitization          |
-| `additionalAllowedProperties` | `[]`    | Extend the property allowlist   |
 
 ## Transports
 
-| Class                   | Import                | Use case                                |
-| ----------------------- | --------------------- | --------------------------------------- |
-| `WorkerTransport`       | `async-dom/transport` | Main thread side of a Worker connection |
-| `BinaryWorkerTransport` | `async-dom/transport` | Binary-encoded transport (zero-copy)    |
-| `WorkerSelfTransport`   | `async-dom/transport` | Worker side (`self.postMessage`)        |
-| `WebSocketTransport`    | `async-dom/transport` | WebSocket client with auto-reconnect    |
-| `createComlinkEndpoint` | `async-dom/transport` | Comlink RPC adapter (optional peer dep) |
+| Class | Use case |
+| ----- | -------- |
+| `WorkerTransport` | Default — structured clone via `postMessage` |
+| `BinaryWorkerTransport` | Zero-copy binary codec (22 opcodes + string dedup) |
+| `WebSocketTransport` | WebSocket with auto-reconnect and exponential backoff |
+| `createComlinkEndpoint` | Comlink RPC adapter (optional peer dependency) |
 
-## Debug & DevTools
+## Comparison
 
-```ts
-const dom = createAsyncDom({
-  target: document.getElementById("app")!,
-  worker,
-  debug: {
-    logMutations: true,
-    logEvents: true,
-    logSyncReads: true,
-    logScheduler: true,
-    logWarnings: true,
-    exposeDevtools: true,
-  },
-});
-```
-
-When `exposeDevtools: true`, a `__ASYNC_DOM_DEVTOOLS__` global is exposed on both threads for live inspection.
-
-## API Reference
-
-### `createAsyncDom(config): AsyncDomInstance`
-
-| Config Property | Type                   | Description                                                                     |
-| --------------- | ---------------------- | ------------------------------------------------------------------------------- |
-| `target`        | `Element`              | Root DOM element to render into                                                 |
-| `worker`        | `Worker` (opt.)        | Initial worker                                                                  |
-| `scheduler`     | `SchedulerConfig` (opt.) | `frameBudgetMs`, `enableViewportCulling`, `enablePrioritySkipping`            |
-| `debug`         | `DebugOptions` (opt.)  | Logging and devtools configuration                                              |
-
-| Instance Method    | Description                              |
-| ------------------ | ---------------------------------------- |
-| `start()`          | Begin the render loop                    |
-| `stop()`           | Pause the render loop                    |
-| `destroy()`        | Stop, flush, and tear down all resources |
-| `addApp(config)`   | Register another worker; returns `AppId` |
-| `removeApp(appId)` | Remove an app and its event listeners    |
-
-### `createWorkerDom(config?): WorkerDomResult`
-
-| Config Property | Type                   | Description                                    |
-| --------------- | ---------------------- | ---------------------------------------------- |
-| `appId`         | `AppId` (opt.)         | Explicit app identifier                        |
-| `transport`     | `Transport` (opt.)     | Custom transport (defaults to `WorkerSelfTransport`) |
-| `debug`         | `DebugOptions` (opt.)  | Logging and devtools configuration             |
-
-Returns `{ document: VirtualDocument, window: WorkerWindow }`.
-
-## Comparison with Alternatives
-
-| Feature                  | async-dom             | [Partytown](https://partytown.builder.io/) | [worker-dom](https://github.com/nicejob/nicejob) |
-| ------------------------ | --------------------- | ------------------------------------------- | ------------------------------------------------- |
-| Primary use case         | Full app rendering    | Third-party scripts                         | AMP components                                    |
-| DOM API coverage         | Comprehensive         | Proxy-based forwarding                      | Subset                                            |
-| Sync DOM reads           | SharedArrayBuffer     | Service Worker + Atomics                    | No                                                |
-| Frame-budget scheduling  | Yes (adaptive)        | No                                          | No                                                |
-| Binary wire format       | Yes (22 opcodes)      | No                                          | Transfer list                                     |
-| Multi-app isolation      | Yes (shadow DOM opt.)  | No                                          | No                                                |
-| CSS selector engine      | In-worker             | Forwarded to main                           | No                                                |
-| Bundle size (gzip)       | ~11 KB worker, ~10 KB main | ~12 KB                                 | ~12 KB                                            |
+| Feature | async-dom | [Partytown](https://partytown.builder.io/) | [@ampproject/worker-dom](https://github.com/nicejob/nicejob) |
+| ------- | --------- | ------------------------------------------- | ------------------------------------------------------------ |
+| Use case | Full app rendering | Third-party scripts | AMP components |
+| DOM API | Comprehensive | Proxy forwarding | Subset |
+| Sync reads | SharedArrayBuffer | Service Worker + Atomics | No |
+| Frame budgeting | Adaptive | No | No |
+| Binary wire format | 22 opcodes + string dedup | No | Transfer list |
+| Multi-app isolation | Shadow DOM | No | No |
+| In-page devtools | Built-in panel | No | No |
+| Bundle (gzip) | ~11 KB + ~10 KB | ~12 KB | ~12 KB |
 
 ## Browser Support
 
-| Browser         | Minimum Version | Notes                                       |
-| --------------- | --------------- | ------------------------------------------- |
-| Chrome          | 80+             | Full support including SharedArrayBuffer     |
-| Firefox         | 79+             | Full support including SharedArrayBuffer     |
-| Safari          | 15.2+           | SharedArrayBuffer requires COOP/COEP headers |
-| Edge            | 80+             | Full support (Chromium-based)               |
+| Browser | Minimum | Notes |
+| ------- | ------- | ----- |
+| Chrome | 80+ | Full support |
+| Firefox | 79+ | Full support |
+| Safari | 15.2+ | Requires COOP/COEP headers for sync reads |
+| Edge | 80+ | Full support (Chromium) |
 
-**Required for sync DOM reads:** Cross-origin isolation headers:
+**Required for sync reads:**
 ```
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
-Without these headers, sync reads fall back to returning default values.
-
-**Required:** Web Workers with `type: "module"` support.
-
-## Performance
-
-- ~11 KB gzipped (worker bundle), ~10 KB gzipped (main thread bundle)
-- Frame-budgeted rendering (16 ms target, adaptive batch sizing)
-- Priority system: high / normal / low with optional mutation skipping under pressure
-- Viewport culling: off-screen style mutations are deferred during scroll
 
 ## Development
 
 ```bash
 npm install          # install dependencies
 npm run dev          # dev server with examples
-npm run build        # build (ESM + CJS via tsdown)
-npm run test         # run tests (503 tests across 34 files)
+npm run build        # build ESM + CJS + declarations
+npm test             # 472 tests across 34 files
 npm run typecheck    # type-check
 npm run lint         # lint (Biome)
-npm run ci           # full CI pipeline (lint + typecheck + test + build)
 ```
 
 ## Contributing
 
-Contributions are welcome. Please open an issue first to discuss what you would like to change. See the [issue tracker](https://github.com/lifeart/async-dom/issues).
+Contributions welcome. Please open an issue first. See the [issue tracker](https://github.com/lifeart/async-dom/issues).
 
 ## License
 
-MIT -- see [LICENSE](./LICENSE).
-
----
-
-Originally created by [Aleksandr Kanunnikov](https://github.com/lifeart) in 2017. Rewritten as a modern TypeScript library in 2025.
+MIT — see [LICENSE](./LICENSE).
