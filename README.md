@@ -5,31 +5,81 @@
 [![license](https://img.shields.io/npm/l/async-dom)](./LICENSE)
 [![bundle size](https://img.shields.io/bundlephobia/minzip/async-dom)](https://bundlephobia.com/package/async-dom)
 
-Offload UI to Web Workers with frame-budgeted scheduling. Your application logic runs in a worker; mutations are serialized, transported, and applied by a scheduler that keeps the main thread at 60 fps.
+**Your application runs in a Web Worker. The DOM is just a projection.**
 
-**[Live Demo](https://lifeart.github.io/async-dom/)** · **[Demo with DevTools](https://lifeart.github.io/async-dom/?debug)**
+async-dom moves your entire UI framework — React, Vue, Svelte, or vanilla JS — into a Web Worker. The main thread receives only serialized mutation instructions through a message-passing channel and applies them with a frame-budgeted scheduler at 60 fps.
 
-## Key Features
+This architecture doesn't just improve performance. It fundamentally changes what is accessible to scrapers, bots, browser extensions, and anyone inspecting your page.
 
-- **Comprehensive DOM API** — virtual `document` and `window` with querySelector, dataset, classList, input properties, and observer stubs so frameworks work out of the box.
-- **Synchronous DOM reads** — `getBoundingClientRect()`, `offsetWidth`, `getComputedStyle()` return real values via SharedArrayBuffer.
-- **Frame budgeting** — adaptive batch sizing per frame with priority levels and optional viewport culling.
-- **Binary wire format** — 22-opcode binary codec with string deduplication and numeric Node IDs.
-- **Per-app isolation** — multiple workers render into the same page, each with its own renderer and optional shadow DOM.
-- **Built-in DevTools** — in-page debug panel with virtual DOM tree, scheduler profiler, mutation log, event tracer, causality graph, time-travel replay, and session export/import.
-- **Security** — HTML sanitizer, property allowlist, and attribute filtering block dangerous content.
+**[Live Demo](https://lifeart.github.io/async-dom/)** · **[Demo with DevTools](https://lifeart.github.io/async-dom/?debug)** · **[npm](https://www.npmjs.com/package/async-dom)**
 
-## Getting Started
+---
+
+## Why async-dom?
+
+### The web has a content protection problem
+
+Cloudflare blocked **416 billion AI bot requests** in the past year. OpenAI's crawl-to-referral ratio is 1,700:1 — they consume vastly more content than they return in traffic. `robots.txt` is voluntarily ignored. Legal battles (NYT vs OpenAI, Danish publishers vs OpenAI) are slow. The industry needs structural defenses, not polite requests.
+
+### The web has a performance problem
+
+JavaScript is single-threaded. The main thread handles rendering, user input, framework execution, and third-party scripts — all competing for the same 16ms frame budget. The result: jank, poor Core Web Vitals, and frustrated users.
+
+### The web has a security problem
+
+Traditional web apps expose everything: business logic in bundled JS, data structures in the DOM tree, auth tokens accessible to any XSS payload, and source code available to anyone with DevTools.
+
+**async-dom addresses all three.**
+
+---
+
+## Real-World Use Cases
+
+### Content Protection & Anti-Scraping
+
+| Use Case | How async-dom helps |
+| -------- | ------------------- |
+| **AI scraping prevention** | Content never exists in initial HTML. `curl` and simple scrapers get an empty shell. Headless browsers see only rendered pixels, not structured data. |
+| **Copyright & DRM** | Business logic and data stay in the worker. The DOM is a procedural artifact — not a template that maps 1:1 to source content. Per-session watermarking at the render layer makes leaked content traceable. |
+| **NDA UI demos** | Share interactive prototypes where the client cannot copy JS logic — it runs server-side via WebSocket transport or inside an opaque worker. |
+| **Exam & education anti-cheat** | Students interact with the UI but cannot access APIs, source code, or application state — the logic runs outside their reach. |
+| **Dynamic obfuscation** | Class names, element IDs, and DOM structure can change on every page load, breaking CSS-selector-based scrapers without affecting the user experience. |
+
+### Performance & Architecture
+
+| Use Case | How async-dom helps |
+| -------- | ------------------- |
+| **Main thread liberation** | Your entire framework (React, Vue, Svelte) runs off the main thread. No framework runtime competes with user input or browser rendering. |
+| **Heavy computation** | Sorting, filtering, data processing, fractal rendering — all happen in the worker without dropping frames. |
+| **Multi-core utilization** | Modern devices have 4-8+ cores. Traditional web apps use one. async-dom lets you use the rest. |
+| **SmartTV & low-power devices** | Run computation on a backend, stream DOM updates via WebSocket to constrained hardware for smooth 60fps UI. |
+| **IoT streaming** | Execute the app on a server, stream rendered output to any connected device — TVs, kiosks, embedded displays. |
+
+### Multi-Framework & Isolation
+
+| Use Case | How async-dom helps |
+| -------- | ------------------- |
+| **Framework zoo** | Run React, Vue, and Svelte simultaneously on one page — each in its own worker with shadow DOM isolation. Zero conflicts, zero iframes. |
+| **Micro-frontend isolation** | Each team ships a worker. CSS is encapsulated via shadow DOM. No shared global state. Independent deployment. |
+| **Version coexistence** | Run different versions of the same framework side by side — React 18 and React 19 on one page, no conflicts. |
+| **Cross-platform bridge** | Use async-dom as a rendering bridge for React Native, embedded views, or custom renderers. DOM mutations become platform events. |
+
+### Collaboration & Debugging
+
+| Use Case | How async-dom helps |
+| -------- | ------------------- |
+| **Parallel editing** | Capture events from multiple users via WebSocket and apply them to a single app instance — real-time collaborative UI. |
+| **Marketing & UX analytics** | WebSocket transport broadcasts UI state to multiple observers. Watch exactly what users experience, live. |
+| **Time-travel debugging** | Record and replay DOM mutation sequences. Scrub through rendering history. Compare tree snapshots. |
+| **Rendering regression tests** | If mutation batches are identical, the UI is identical. Deterministic rendering without pixel comparison. |
+
+---
+
+## Quick Start
 
 ```bash
 npm install async-dom
 ```
-
-| Import path           | Purpose                         |
-| --------------------- | ------------------------------- |
-| `async-dom`           | Main thread API                 |
-| `async-dom/worker`    | Worker thread API (virtual DOM) |
-| `async-dom/transport` | Transport backends              |
 
 ### main.ts
 
@@ -57,166 +107,81 @@ const { document } = createWorkerDom();
 
 const div = document.createElement("div");
 div.textContent = "Hello from a Web Worker!";
-div.id = "greet";
 document.body.appendChild(div);
 
-// Input elements sync state with main thread
 const input = document.createElement("input");
-input.addEventListener("input", (e) => {
+input.addEventListener("input", () => {
   console.log("Value:", input.value); // real value from main thread
 });
 document.body.appendChild(input);
 ```
 
-## Examples
+That's it. Your app now runs entirely in a worker.
 
-Working examples in [`examples/`](./examples):
+---
 
-| Example | Description |
-| ------- | ----------- |
-| **[vanilla](./examples/vanilla)** | 7,000-node interactive grid — click scoring, hover effects, periodic updates |
-| **[counter](./examples/counter)** | Minimal counter — click handlers, textContent updates |
-| **[todo](./examples/todo)** | Todo list — input sync, dynamic DOM, classList, event handling |
-| **[multi-app](./examples/multi-app)** | Two isolated apps in shadow DOM — CSS isolation demo |
-| **[debug](./examples/debug)** | Debug panel with devtools, mutation logging, stats |
-| **[audio-player](./examples/audio-player)** | Audio playback from worker — play/pause, progress, media events |
+## Framework Adapters
 
-```bash
-npm run dev          # run vanilla example
-```
+async-dom ships first-class adapters for React, Vue, and Svelte.
 
-## Debugging
+### React
 
-### In-Page DevTools Panel
+```tsx
+import { AsyncDom } from "async-dom/react";
 
-Add `?debug` to the URL or pass `debug: { exposeDevtools: true }`:
-
-```ts
-const dom = createAsyncDom({
-  target: document.getElementById("app")!,
-  worker,
-  debug: { exposeDevtools: true, logWarnings: true },
-});
-```
-
-This injects a collapsible panel in the bottom-right corner with 5 tabs:
-
-| Tab | What it shows |
-| --- | ------------- |
-| **Tree** | Virtual DOM tree from the worker with node inspector sidebar (attributes, computed styles, event listeners, mutation history, "why updated?" trail). Snapshot & diff two tree states. |
-| **Performance** | Scheduler stats, frame budget flamechart, worker-to-main latency (P50/P95/P99), dropped frames, mutation type chart, coalescing breakdown, sync read heatmap, transport message sizes, worker CPU profiler, multi-app interleaving timeline |
-| **Log** | Live mutation stream grouped by batch with color-coded diffs, event round-trip tracer with visual timeline bars, coalesced mutation display, time-travel replay with scrubber |
-| **Warnings** | Warnings grouped by code with inline docs and suggested fixes, suppress per code, filter |
-| **Graph** | Causality DAG: events → mutation batches → affected DOM nodes |
-
-Additional header controls: highlight DOM updates toggle, export/import debug sessions, health status dot.
-
-Multi-app: when multiple workers are running, the panel shows a per-app selector with separate trees and stats.
-
-### Always-On Warnings
-
-These fire via `console.warn` regardless of debug config — they indicate real bugs:
-
-| Warning | Meaning |
-| ------- | ------- |
-| `appendChild: parent not found` | Mutation targets a node not in the cache |
-| `Scheduler queue overflow: N pending` | Queue > 10K — tab hidden or applier broken |
-| `Scheduler not ticking after 1 second` | `requestAnimationFrame` not firing (hidden tab) |
-| `App X worker error: ...` | Runtime error in worker with stack trace |
-| `App X worker disconnected` | Worker crashed or was terminated |
-
-### Worker Error Reporting
-
-Worker runtime errors (syntax, logical, uncaught exceptions, unhandled promise rejections) are automatically:
-1. Captured via `self.onerror` and `self.onunhandledrejection`
-2. Serialized with name, message, stack, filename, line, column
-3. Forwarded to the main thread via the error protocol
-4. Displayed in the DevTools Warnings tab with expandable stack traces
-5. Passed to your `onError` callback if provided
-
-```ts
-dom.addApp({
-  worker: new Worker("./app.ts", { type: "module" }),
-  onError: (error, appId) => {
-    console.error(`[${appId}] ${error.name}: ${error.message}`);
-    console.error(error.stack);
-    // error.filename, error.lineno, error.colno available
-    // error.isUnhandledRejection for promise rejections
-  },
-});
-```
-
-### Debug Options
-
-```ts
-interface DebugOptions {
-  logMutations?: boolean;    // Log every mutation applied on main thread
-  logEvents?: boolean;       // Log event serialization and dispatch
-  logSyncReads?: boolean;    // Log SharedArrayBuffer read requests
-  logScheduler?: boolean;    // Log per-frame scheduler stats
-  logWarnings?: boolean;     // Log structured warnings
-  exposeDevtools?: boolean;  // Inject in-page debug panel + __ASYNC_DOM_DEVTOOLS__ global
+function App() {
+  return (
+    <AsyncDom
+      worker="./app.worker.ts"
+      debug
+      fallback={<div>Loading...</div>}
+      onReady={(instance) => console.log("ready")}
+    />
+  );
 }
 ```
 
-### Console DevTools API
+### Vue
 
-When `exposeDevtools: true`, inspect from the browser console:
+```vue
+<template>
+  <AsyncDom worker="./app.worker.ts" :debug="true" @ready="onReady">
+    <template #fallback><div>Loading...</div></template>
+  </AsyncDom>
+</template>
 
-```js
-// Main thread console:
-__ASYNC_DOM_DEVTOOLS__.scheduler.stats()       // {pending, frameId, frameTime, isRunning, droppedFrameCount, workerToMainLatencyMs}
-__ASYNC_DOM_DEVTOOLS__.scheduler.frameLog()    // Per-frame timing breakdown
-__ASYNC_DOM_DEVTOOLS__.scheduler.flush()       // Manual drain for debugging
-__ASYNC_DOM_DEVTOOLS__.apps()                  // List all app IDs
-__ASYNC_DOM_DEVTOOLS__.findRealNode(42)        // Find real DOM element by nodeId
-__ASYNC_DOM_DEVTOOLS__.getAllAppsData()         // Virtual DOM trees + worker stats
-__ASYNC_DOM_DEVTOOLS__.getEventTraces()        // Event round-trip timing data
-__ASYNC_DOM_DEVTOOLS__.getTransportStats()     // Per-app transport message sizes
-__ASYNC_DOM_DEVTOOLS__.getWorkerPerfEntries()  // Worker CPU performance entries
-__ASYNC_DOM_DEVTOOLS__.getCausalityTracker()   // Event → mutation causality graph
-__ASYNC_DOM_DEVTOOLS__.getMutationCorrelation() // "Why was this node updated?" data
-__ASYNC_DOM_DEVTOOLS__.enableHighlightUpdates(true)  // Flash DOM nodes on mutation
-
-// Worker console:
-__ASYNC_DOM_DEVTOOLS__.tree()               // Virtual DOM tree snapshot
-__ASYNC_DOM_DEVTOOLS__.stats()              // Mutation coalescing stats
-__ASYNC_DOM_DEVTOOLS__.flush()              // Force-send pending mutations
+<script setup>
+import { AsyncDom } from "async-dom/vue";
+</script>
 ```
 
-### Chrome Extension
+### Svelte
 
-A standalone Chrome DevTools extension is available in [`chrome-extension/`](./chrome-extension). Load it as an unpacked extension for a dedicated DevTools panel with tree view, performance charts, and mutation log.
+```svelte
+<script>
+  import { asyncDom } from "async-dom/svelte";
+</script>
 
-## Sandbox Mode
-
-Run third-party scripts that access bare `document`/`window` globals without modification:
-
-```ts
-// Mode 1: Patch worker globals — bare `document` resolves to virtual DOM
-const { document, window } = createWorkerDom({ sandbox: "global" });
-// Now self.document === document, self.window === window
-// Third-party scripts "just work"
-
-// Mode 2: Sandboxed eval — Proxy + with for full variable interception
-const { window } = createWorkerDom({ sandbox: "eval" });
-window.eval(`
-  var div = document.createElement("div");
-  div.textContent = "Created by third-party script";
-  document.body.appendChild(div);
-`);
-
-// Mode 3: Both modes enabled
-const { document, window } = createWorkerDom({ sandbox: true });
+<div use:asyncDom={{ worker: "./app.worker.ts" }} />
 ```
 
-| Mode | Bare `document` works | `window.eval()` sandbox | Use case |
-| ---- | --------------------- | ----------------------- | -------- |
-| `"global"` | Yes (patches `self`) | No | Framework code that uses bare globals |
-| `"eval"` | No | Yes (Proxy + with) | Third-party analytics/ads scripts |
-| `true` | Yes | Yes | Maximum compatibility |
+---
 
-## Architecture
+## Package Exports
+
+| Import path           | Purpose                                      |
+| --------------------- | -------------------------------------------- |
+| `async-dom`           | Main thread API (`createAsyncDom`)           |
+| `async-dom/worker`    | Worker thread API (virtual `document`)       |
+| `async-dom/transport` | Transport backends (Worker, Binary, WS, Comlink) |
+| `async-dom/react`     | React `<AsyncDom>` component + `useAsyncDom` hook |
+| `async-dom/vue`       | Vue `<AsyncDom>` component + `useAsyncDom` composable |
+| `async-dom/svelte`    | Svelte `asyncDom` action                     |
+| `async-dom/vite-plugin` | Vite plugin (COOP/COEP headers, binary transport, error overlay) |
+
+---
+
+## How It Works
 
 ```
 Worker Thread                  Main Thread
@@ -244,69 +209,187 @@ Worker Thread                  Main Thread
 +--------------------+
 ```
 
-## Synchronous DOM Reads
+1. **Worker** — Your framework runs here. Virtual `document` and `window` provide the full DOM API. Mutations are batched and coalesced automatically.
+2. **Transport** — Mutations are serialized (structured clone, binary codec, or WebSocket) and sent to the main thread.
+3. **Scheduler** — The main thread applies mutations within a per-frame budget. Priority sorting, viewport culling, and adaptive batch sizing keep paint at 60 fps.
+4. **Events** — User interactions on the main thread are serialized and dispatched to worker event handlers.
+5. **Sync Reads** — `getBoundingClientRect()`, `offsetWidth`, `getComputedStyle()` block in the worker via `SharedArrayBuffer` + `Atomics` and return real values from the main thread.
 
-Inspired by [Partytown](https://partytown.builder.io/), async-dom uses `SharedArrayBuffer` + `Atomics.wait/notify` for blocking reads:
+---
 
-| API | Returns |
-| --- | ------- |
-| `el.getBoundingClientRect()` | Real DOMRect values |
-| `el.offsetWidth`, `clientHeight`, etc. | Real layout metrics |
-| `window.getComputedStyle(el)` | Real computed styles |
-| `window.innerWidth` / `innerHeight` | Real viewport dimensions |
-| `window.screen.width` / `height` | Real screen dimensions |
+## Security Model
 
-**Fallback:** Without COOP/COEP headers, sync reads return default values (`0` / `{}`).
+async-dom provides multiple layers of protection:
 
-## Security
+### Worker Isolation (Architectural)
 
-- **HTML sanitizer** — `innerHTML` and `insertAdjacentHTML` strip `<script>`, `<iframe>`, `<style>`, `<object>`, `on*` attributes, and `javascript:`/`data:text/html` URIs. Opt out with `allowUnsafeHTML: true`.
-- **Property allowlist** — `setProperty` only applies safe properties (`value`, `checked`, `textContent`, etc.). Extend with `additionalAllowedProperties`.
+- **No direct DOM access** — XSS payloads in the page cannot reach worker internal state.
+- **Serialized communication only** — all data passes through `postMessage`, a natural sanitization boundary.
+- **Separate execution context** — workers are isolated at the browser engine level. No `shadowRoot` workaround, no extension bypass.
+- **Token protection** — auth tokens and session state in the worker are inaccessible to malicious main-thread scripts.
+
+### Content Sanitization (Active)
+
+- **HTML sanitizer** — `innerHTML` strips `<script>`, `<iframe>`, `<style>`, `<object>`, `on*` attributes, and `javascript:`/`data:text/html` URIs.
+- **Property allowlist** — `setProperty` only applies safe properties (`value`, `checked`, `textContent`, etc.).
 - **Attribute filtering** — `setAttribute` blocks `on*` handlers and dangerous URIs.
+
+### Anti-Scraping (Structural)
+
+Unlike `robots.txt` (voluntary), CDN-level blocks (circumventable), or CAPTCHAs (UX-degrading), worker-based rendering is a **structural defense**:
+
+- Empty HTML payload — no content for `curl`, `wget`, or simple GET requests.
+- Procedural DOM — the rendered tree is an artifact of the mutation protocol, not a semantic template.
+- Dynamic structure — class names, nesting, and attributes can randomize per session.
+- Honeypot injection — the worker can insert invisible trap elements that bots follow but humans never see.
+- Behavioral gating — the worker controls what renders and when, enabling real-time bot detection at the application layer.
+
+---
+
+## Transports
+
+| Transport | Use case |
+| --------- | -------- |
+| `WorkerTransport` | Default — structured clone via `postMessage` |
+| `BinaryWorkerTransport` | Production — 22-opcode binary codec with string deduplication |
+| `WebSocketTransport` | Remote rendering — WebSocket with auto-reconnect and exponential backoff |
+| `createComlinkEndpoint` | RPC — Comlink adapter (optional peer dependency) |
+
+WebSocket transport enables powerful patterns: server-side rendering to any device, collaborative multi-user editing, and IoT streaming.
+
+---
 
 ## Per-App Isolation
 
-Each app gets its own `DomRenderer`, `NodeCache`, `EventBridge`, and `SyncChannelHost`. Shadow DOM provides CSS encapsulation:
+Run multiple independent applications on one page. Each gets its own renderer, node cache, event bridge, and optional shadow DOM:
 
 ```ts
 const dom = createAsyncDom({ target: document.body });
 
 dom.addApp({
-  worker: new Worker("./app-a.ts", { type: "module" }),
-  mountPoint: "#container-a",
-  shadow: true,  // CSS fully isolated
+  worker: new Worker("./react-app.ts", { type: "module" }),
+  mountPoint: "#panel-a",
+  shadow: true,
 });
 
 dom.addApp({
-  worker: new Worker("./app-b.ts", { type: "module" }),
-  mountPoint: "#container-b",
+  worker: new Worker("./vue-app.ts", { type: "module" }),
+  mountPoint: "#panel-b",
   shadow: { mode: "closed" },
 });
 
 dom.start();
 ```
 
-## Transports
+---
 
-| Class | Use case |
-| ----- | -------- |
-| `WorkerTransport` | Default — structured clone via `postMessage` |
-| `BinaryWorkerTransport` | Zero-copy binary codec (22 opcodes + string dedup) |
-| `WebSocketTransport` | WebSocket with auto-reconnect and exponential backoff |
-| `createComlinkEndpoint` | Comlink RPC adapter (optional peer dependency) |
+## Sandbox Mode
+
+Run third-party scripts that expect bare `document`/`window` globals — no modifications needed:
+
+```ts
+// Patch worker globals — bare `document` resolves to virtual DOM
+const { document } = createWorkerDom({ sandbox: "global" });
+
+// Sandboxed eval — Proxy + with for full variable interception
+const { window } = createWorkerDom({ sandbox: "eval" });
+window.eval(`document.body.innerHTML = "<h1>Works!</h1>"`);
+```
+
+| Mode | Bare `document` | `eval()` sandbox | Use case |
+| ---- | ---------------- | ---------------- | -------- |
+| `"global"` | Yes | No | Framework code with bare globals |
+| `"eval"` | No | Yes | Third-party analytics/ads scripts |
+| `true` | Yes | Yes | Maximum compatibility |
+
+---
+
+## Synchronous DOM Reads
+
+Via `SharedArrayBuffer` + `Atomics.wait/notify` — real values, not guesses:
+
+| API | Returns |
+| --- | ------- |
+| `el.getBoundingClientRect()` | Real DOMRect |
+| `el.offsetWidth`, `clientHeight`, etc. | Real layout metrics |
+| `window.getComputedStyle(el)` | Real computed styles |
+| `window.innerWidth` / `innerHeight` | Real viewport size |
+
+**Requires** COOP/COEP headers (automatic with the Vite plugin):
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+---
+
+## Built-in DevTools
+
+Add `?debug` to the URL or set `debug: { exposeDevtools: true }`:
+
+| Tab | What it shows |
+| --- | ------------- |
+| **Tree** | Virtual DOM tree with node inspector — attributes, styles, event listeners, mutation history, "why updated?" trail. Snapshot & diff. |
+| **Performance** | Frame budget flamechart, worker-to-main latency (P50/P95/P99), dropped frames, mutation type chart, coalescing breakdown, sync read heatmap, worker CPU profiler. |
+| **Log** | Live mutation stream, color-coded diffs, event round-trip tracer, time-travel replay with scrubber. |
+| **Warnings** | Grouped by code with docs and fixes. Suppressible. |
+| **Graph** | Causality DAG: events --> mutation batches --> affected DOM nodes. |
+
+Console API available via `__ASYNC_DOM_DEVTOOLS__` for programmatic inspection.
+
+---
+
+## Examples
+
+**[Live examples hub](https://lifeart.github.io/async-dom/)**
+
+| Example | Description | Tags |
+| ------- | ----------- | ---- |
+| [7000 Nodes Grid](./examples/vanilla) | Interactive color grid with 7,000 DOM nodes from a worker | performance, events |
+| [Counter](./examples/counter) | Minimal example — click handlers, textContent updates | beginner |
+| [Todo List](./examples/todo) | Input sync, dynamic DOM, classList, keyboard events | input sync, dynamic DOM |
+| [Multi-App](./examples/multi-app) | Two workers in shadow DOM — CSS isolation | isolation, shadow DOM |
+| [Audio Player](./examples/audio-player) | Audio playback controlled from a worker | media API, callMethod |
+| [React: Mandelbrot](./examples/react-mandelbrot) | Fractal renderer — 4,800 pixels computed in a worker | React, heavy compute |
+| [Vue: Game of Life](./examples/vue-gameoflife) | 60x40 grid simulation — 2,400 cell DOM updates | Vue, simulation |
+| [Svelte: Particle Life](./examples/svelte-particles) | 320 particles with attraction/repulsion rules | Svelte, simulation |
+| [Framework Showcase](./examples/framework-showcase) | React + Vue + Svelte on one page, zero framework runtime on main thread | multi-framework |
+| [DevTools Panel](./examples/vanilla/?debug) | 7000-node grid with built-in debug panel | devtools |
+
+```bash
+npm run dev    # run all examples locally
+```
+
+---
 
 ## Comparison
 
 | Feature | async-dom | [Partytown](https://partytown.builder.io/) | [@ampproject/worker-dom](https://github.com/nicejob/nicejob) |
 | ------- | --------- | ------------------------------------------- | ------------------------------------------------------------ |
-| Use case | Full app rendering | Third-party scripts | AMP components |
+| Scope | Full app rendering | Third-party scripts only | AMP components only |
+| Frameworks | React, Vue, Svelte, vanilla | N/A | AMP only |
 | DOM API | Comprehensive | Proxy forwarding | Subset |
 | Sync reads | SharedArrayBuffer | Service Worker + Atomics | No |
-| Frame budgeting | Adaptive | No | No |
-| Binary wire format | 22 opcodes + string dedup | No | Transfer list |
+| Frame budgeting | Adaptive with priority | No | No |
+| Binary protocol | 22 opcodes + string dedup | No | Transfer list |
 | Multi-app isolation | Shadow DOM | No | No |
-| In-page devtools | Built-in panel | No | No |
+| WebSocket transport | Yes (remote rendering) | No | No |
+| Content protection | Structural (worker isolation) | No | No |
+| DevTools | Built-in 5-tab panel | No | No |
 | Bundle (gzip) | ~11 KB + ~10 KB | ~12 KB | ~12 KB |
+| Status | Active | Maintenance | Inactive |
+
+---
+
+## CLI Scaffold
+
+```bash
+npx async-dom init my-app --template react-ts
+```
+
+Templates: `vanilla-ts`, `react-ts`, `vue-ts`
+
+---
 
 ## Browser Support
 
@@ -314,14 +397,10 @@ dom.start();
 | ------- | ------- | ----- |
 | Chrome | 80+ | Full support |
 | Firefox | 79+ | Full support |
-| Safari | 15.2+ | Requires COOP/COEP headers for sync reads |
+| Safari | 15.2+ | Requires COOP/COEP for sync reads |
 | Edge | 80+ | Full support (Chromium) |
 
-**Required for sync reads:**
-```
-Cross-Origin-Opener-Policy: same-origin
-Cross-Origin-Embedder-Policy: require-corp
-```
+---
 
 ## Development
 
