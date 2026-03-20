@@ -168,6 +168,74 @@ describe("asyncDomPlugin", () => {
 		});
 	});
 
+	it("configurePreviewServer sets COOP/COEP headers", () => {
+		const plugin = asyncDomPlugin() as Plugin & {
+			configurePreviewServer: (server: unknown) => void;
+		};
+
+		const middlewareStack: Array<(req: unknown, res: unknown, next: () => void) => void> = [];
+		const mockServer = {
+			middlewares: {
+				use: (fn: (req: unknown, res: unknown, next: () => void) => void) => {
+					middlewareStack.push(fn);
+				},
+			},
+		};
+
+		plugin.configurePreviewServer(mockServer);
+
+		expect(middlewareStack.length).toBeGreaterThan(0);
+
+		const headers = new Map<string, string>();
+		const mockRes = {
+			getHeader: (name: string) => headers.get(name),
+			setHeader: (name: string, value: string) => headers.set(name, value),
+		};
+
+		middlewareStack[0]({}, mockRes, vi.fn());
+		expect(headers.get("Cross-Origin-Opener-Policy")).toBe("same-origin");
+		expect(headers.get("Cross-Origin-Embedder-Policy")).toBe("require-corp");
+	});
+
+	it("configurePreviewServer skips headers when disabled", () => {
+		const plugin = asyncDomPlugin({ headers: false }) as Plugin & {
+			configurePreviewServer: (server: unknown) => void;
+		};
+
+		const middlewareStack: Array<(req: unknown, res: unknown, next: () => void) => void> = [];
+		const mockServer = {
+			middlewares: {
+				use: (fn: (req: unknown, res: unknown, next: () => void) => void) => {
+					middlewareStack.push(fn);
+				},
+			},
+		};
+
+		plugin.configurePreviewServer(mockServer);
+		expect(middlewareStack.length).toBe(0);
+	});
+
+	it("workerErrorOverlay: false skips HMR error handler", () => {
+		const plugin = asyncDomPlugin({ workerErrorOverlay: false }) as Plugin & {
+			configureServer: (server: unknown) => void;
+		};
+
+		const hotHandlers = new Map<string, (...args: unknown[]) => void>();
+		const mockServer = {
+			middlewares: { use: vi.fn() },
+			hot: {
+				on: (event: string, handler: (...args: unknown[]) => void) => {
+					hotHandlers.set(event, handler);
+				},
+				send: vi.fn(),
+			},
+		};
+
+		plugin.configureServer(mockServer);
+
+		expect(hotHandlers.has("async-dom:error")).toBe(false);
+	});
+
 	it("transformIndexHtml injects error snippet in dev mode", () => {
 		const plugin = asyncDomPlugin() as Plugin & {
 			transformIndexHtml: {

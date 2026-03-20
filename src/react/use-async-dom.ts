@@ -46,6 +46,7 @@ export interface UseAsyncDomResult {
 export function useAsyncDom(options: UseAsyncDomOptions): UseAsyncDomResult {
 	const containerRef = useRef<HTMLDivElement | null>(null);
 	const [instance, setInstance] = useState<AsyncDomInstance | null>(null);
+	const instanceRef = useRef<AsyncDomInstance | null>(null);
 
 	// Stabilize callback refs to prevent re-creation on re-renders
 	const workerRef = useRef(options.worker);
@@ -88,16 +89,16 @@ export function useAsyncDom(options: UseAsyncDomOptions): UseAsyncDomResult {
 				debug: resolveDebugOption(debugRef.current),
 			});
 			inst.start();
+			instanceRef.current = inst;
 			setInstance(inst);
 			onReadyRef.current?.(inst);
 		});
 
 		return () => {
 			cancelled = true;
-			setInstance((prev) => {
-				prev?.destroy();
-				return null;
-			});
+			instanceRef.current?.destroy();
+			instanceRef.current = null;
+			setInstance(null);
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
