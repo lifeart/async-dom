@@ -52,6 +52,10 @@ interface WorkerLocation {
 	pathname: string;
 	protocol: string;
 	search: string;
+	toString(): string;
+	assign(url: string): void;
+	replace(url: string): void;
+	reload(): void;
 }
 
 interface WorkerHistory {
@@ -110,6 +114,8 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 				location.protocol = initLoc.protocol;
 				location.hostname = initLoc.hostname;
 				location.port = initLoc.port;
+				location.host = initLoc.host;
+				location.origin = initLoc.origin;
 				location.pathname = initLoc.pathname;
 				location.search = initLoc.search;
 				location.hash = initLoc.hash;
@@ -189,6 +195,23 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 		},
 	};
 
+	function updateLocationFromURL(loc: WorkerLocation, url: string): void {
+		try {
+			const parsed = new URL(url, loc.href);
+			loc.href = parsed.href;
+			loc.protocol = parsed.protocol;
+			loc.hostname = parsed.hostname;
+			loc.port = parsed.port;
+			loc.host = parsed.host;
+			loc.origin = parsed.origin;
+			loc.pathname = parsed.pathname;
+			loc.search = parsed.search;
+			loc.hash = parsed.hash;
+		} catch {
+			// Invalid URL — ignore
+		}
+	}
+
 	const location: WorkerLocation = {
 		hash: "",
 		href: "http://localhost/",
@@ -199,11 +222,27 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 		pathname: "/",
 		protocol: "http:",
 		search: "",
+		toString() {
+			return this.href;
+		},
+		assign(url: string) {
+			updateLocationFromURL(location, url);
+			doc.collector.add({ action: "pushState", state: null, title: "", url });
+		},
+		replace(url: string) {
+			updateLocationFromURL(location, url);
+			doc.collector.add({ action: "replaceState", state: null, title: "", url });
+		},
+		reload() {
+			// No-op in worker — can't reload the main page from here
+		},
 	};
 
 	const history: WorkerHistory = {
 		state: null,
 		pushState(state: unknown, title: string, url: string) {
+			history.state = state;
+			updateLocationFromURL(location, url);
 			doc.collector.add({
 				action: "pushState",
 				state,
@@ -212,6 +251,8 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 			});
 		},
 		replaceState(state: unknown, title: string, url: string) {
+			history.state = state;
+			updateLocationFromURL(location, url);
 			doc.collector.add({
 				action: "replaceState",
 				state,
