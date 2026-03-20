@@ -1839,6 +1839,28 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 	// ---- App bar ----
 
+	/** Reset UI state that is specific to a particular app when switching apps. */
+	function resetPerAppState(): void {
+		// Tree tab: clear snapshots and diff state
+		snapshot1 = null;
+		snapshot2 = null;
+		showDiff = false;
+		currentDiff = null;
+		selectedNodeForSidebar = null;
+
+		// Log tab: reset coalesced view and log render position
+		showCoalesced = false;
+		lastRenderedLogLength = 0;
+
+		// Replay: exit replay mode if active
+		if (replayState) {
+			exitReplayMode();
+		}
+
+		// Performance: reset expanded frame
+		expandedFrameId = null;
+	}
+
 	function updateAppBar(): void {
 		const dt = getDevtools();
 		if (!dt) return;
@@ -1865,7 +1887,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			btn.className = `app-btn${id === selectedAppId ? " active" : ""}`;
 			btn.textContent = id;
 			btn.addEventListener("click", () => {
-				selectedAppId = id;
+				if (selectedAppId !== id) {
+					selectedAppId = id;
+					resetPerAppState();
+				}
 				updateAppBar();
 				renderActiveTab();
 			});
