@@ -27,7 +27,7 @@ export function createApiBridge(
 	const cache: Record<string, unknown> = {};
 
 	return new Proxy(cache, {
-		get(_target, prop: string) {
+		get(_target, prop: string | symbol) {
 			if (typeof prop !== "string") return undefined;
 
 			// Fire-and-forget methods
@@ -64,7 +64,8 @@ export function createApiBridge(
 
 			return undefined;
 		},
-		set(_target, prop: string, value: unknown) {
+		set(_target, prop: string | symbol, value: unknown) {
+			if (typeof prop !== "string") return true;
 			if (config.properties.includes(prop)) {
 				cache[prop] = value;
 				collector.add({

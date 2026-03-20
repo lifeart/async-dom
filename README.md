@@ -79,6 +79,7 @@ Working examples in [`examples/`](./examples):
 | **[todo](./examples/todo)** | Todo list — input sync, dynamic DOM, classList, event handling |
 | **[multi-app](./examples/multi-app)** | Two isolated apps in shadow DOM — CSS isolation demo |
 | **[debug](./examples/debug)** | Debug panel with devtools, mutation logging, stats |
+| **[audio-player](./examples/audio-player)** | Audio playback from worker — play/pause, progress, media events |
 
 ```bash
 npm run dev          # run vanilla example

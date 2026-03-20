@@ -15,6 +15,7 @@ export default defineConfig({
 				todo: resolve(__dirname, "examples/todo/index.html"),
 				"multi-app": resolve(__dirname, "examples/multi-app/index.html"),
 				debug: resolve(__dirname, "examples/debug/index.html"),
+				"audio-player": resolve(__dirname, "examples/audio-player/index.html"),
 			},
 		},
 	},
