@@ -4,6 +4,7 @@ import type {
 	SyncReadLogEntry,
 	WarningLogEntry,
 } from "../core/debug.ts";
+import { formatBytes } from "./format-helpers.ts";
 
 /**
  * The shape of __ASYNC_DOM_DEVTOOLS__ exposed on globalThis (main thread).
@@ -45,6 +46,7 @@ interface DevtoolsAPI {
 	refreshDebugData: () => void;
 	getAppData: (appId: string) => AppDebugData | undefined;
 	getAllAppsData: () => Record<string, AppDebugData>;
+	getTransportStats: () => Record<string, { messageCount: number; totalBytes: number; largestMessageBytes: number; lastMessageBytes: number } | null>;
 }
 
 interface AppDebugData {
@@ -777,6 +779,8 @@ const PANEL_CSS = `
 .log-entry.event-entry .log-action { color: #d7ba7d; }
 .log-entry.syncread-entry .log-action { color: #c586c0; }
 
+.transport-warn { color: #f44747; font-size: 10px; margin-left: 4px; }
+
 /* Responsive / mobile-friendly */
 @media (max-width: 600px) {
   .panel { width: calc(100vw - 16px) !important; height: 50vh !important; left: 8px; right: 8px; bottom: 8px; }
@@ -831,6 +835,7 @@ function sparkline(data: number[]): string {
 	const range = max - min || 1;
 	return data.map((v) => chars[Math.min(Math.floor(((v - min) / range) * 7), 7)]).join("");
 }
+
 
 // ---- Panel creation ----
 
@@ -1645,6 +1650,32 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 				html += `<span class="chart-bar-track"><span class="chart-bar-fill" style="width:${pct.toFixed(1)}%"></span></span>`;
 				html += `<span class="chart-bar-value">${count}</span>`;
 				html += "</div>";
+			}
+		}
+
+		// Transport section
+		if (dt.getTransportStats) {
+			const transportStats = dt.getTransportStats();
+			const appIds = Object.keys(transportStats);
+			if (appIds.length > 0) {
+				html += '<div class="perf-section-title">Transport</div>';
+				for (const appId of appIds) {
+					const ts = transportStats[appId];
+					if (!ts) continue;
+					if (appIds.length > 1) {
+						html += `<div class="perf-row"><span class="perf-label" style="font-weight:600">App: ${escapeHtml(appId)}</span><span class="perf-value"></span></div>`;
+					}
+					html += `<div class="perf-row"><span class="perf-label">Messages Sent</span><span class="perf-value">${ts.messageCount}</span></div>`;
+					html += `<div class="perf-row"><span class="perf-label">Total Bytes</span><span class="perf-value">${formatBytes(ts.totalBytes)}</span></div>`;
+					const avgBytes = ts.messageCount > 0 ? Math.round(ts.totalBytes / ts.messageCount) : 0;
+					html += `<div class="perf-row"><span class="perf-label">Avg Message Size</span><span class="perf-value">${formatBytes(avgBytes)}</span></div>`;
+					const largestClass = ts.largestMessageBytes > 102400 ? "red" : "";
+					const largestWarn = ts.largestMessageBytes > 102400 ? '<span class="transport-warn">[!] exceeds 100KB</span>' : "";
+					html += `<div class="perf-row"><span class="perf-label">Largest Message</span><span class="perf-value ${largestClass}">${formatBytes(ts.largestMessageBytes)}${largestWarn}</span></div>`;
+					const lastClass = ts.lastMessageBytes > 102400 ? "red" : "";
+					const lastWarn = ts.lastMessageBytes > 102400 ? '<span class="transport-warn">[!] exceeds 100KB</span>' : "";
+					html += `<div class="perf-row"><span class="perf-label">Last Message</span><span class="perf-value ${lastClass}">${formatBytes(ts.lastMessageBytes)}${lastWarn}</span></div>`;
+				}
 			}
 		}
 

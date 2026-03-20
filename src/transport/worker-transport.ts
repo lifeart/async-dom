@@ -1,5 +1,5 @@
 import type { Message } from "../core/protocol.ts";
-import type { Transport, TransportReadyState } from "./base.ts";
+import type { Transport, TransportReadyState, TransportStats } from "./base.ts";
 
 /**
  * Transport implementation using Web Worker postMessage.
@@ -8,6 +8,8 @@ import type { Transport, TransportReadyState } from "./base.ts";
 export class WorkerTransport implements Transport {
 	private handlers: Array<(message: Message) => void> = [];
 	private _readyState: TransportReadyState = "open";
+	private _statsEnabled = false;
+	private _stats: TransportStats = { messageCount: 0, totalBytes: 0, largestMessageBytes: 0, lastMessageBytes: 0 };
 	onError?: (error: Error) => void;
 	onClose?: () => void;
 
@@ -35,9 +37,22 @@ export class WorkerTransport implements Transport {
 		};
 	}
 
+	enableStats(enabled: boolean): void {
+		this._statsEnabled = enabled;
+	}
+
 	send(message: Message): void {
 		if (this._readyState !== "open") {
 			return;
+		}
+		if (this._statsEnabled) {
+			const size = JSON.stringify(message).length;
+			this._stats.messageCount++;
+			this._stats.totalBytes += size;
+			this._stats.lastMessageBytes = size;
+			if (size > this._stats.largestMessageBytes) {
+				this._stats.largestMessageBytes = size;
+			}
 		}
 		this.worker.postMessage(message);
 	}
@@ -54,6 +69,10 @@ export class WorkerTransport implements Transport {
 	get readyState(): TransportReadyState {
 		return this._readyState;
 	}
+
+	getStats(): TransportStats {
+		return { ...this._stats };
+	}
 }
 
 /**
@@ -63,6 +82,8 @@ export class WorkerTransport implements Transport {
 export class WorkerSelfTransport implements Transport {
 	private handlers: Array<(message: Message) => void> = [];
 	private _readyState: TransportReadyState = "open";
+	private _statsEnabled = false;
+	private _stats: TransportStats = { messageCount: 0, totalBytes: 0, largestMessageBytes: 0, lastMessageBytes: 0 };
 	onError?: (error: Error) => void;
 	onClose?: () => void;
 	private scope: {
@@ -86,9 +107,22 @@ export class WorkerSelfTransport implements Transport {
 		};
 	}
 
+	enableStats(enabled: boolean): void {
+		this._statsEnabled = enabled;
+	}
+
 	send(message: Message): void {
 		if (this._readyState !== "open") {
 			return;
+		}
+		if (this._statsEnabled) {
+			const size = JSON.stringify(message).length;
+			this._stats.messageCount++;
+			this._stats.totalBytes += size;
+			this._stats.lastMessageBytes = size;
+			if (size > this._stats.largestMessageBytes) {
+				this._stats.largestMessageBytes = size;
+			}
 		}
 		this.scope.postMessage(message);
 	}
@@ -103,5 +137,9 @@ export class WorkerSelfTransport implements Transport {
 
 	get readyState(): TransportReadyState {
 		return this._readyState;
+	}
+
+	getStats(): TransportStats {
+		return { ...this._stats };
 	}
 }

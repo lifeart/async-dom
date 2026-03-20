@@ -2,6 +2,13 @@ import type { Message } from "../core/protocol.ts";
 
 export type TransportReadyState = "connecting" | "open" | "closed";
 
+export interface TransportStats {
+	messageCount: number;
+	totalBytes: number;
+	largestMessageBytes: number;
+	lastMessageBytes: number;
+}
+
 export interface Transport {
 	send(message: Message): void;
 	onMessage(handler: (message: Message) => void): void;
@@ -9,4 +16,6 @@ export interface Transport {
 	readonly readyState: TransportReadyState;
 	onError?: (error: Error) => void;
 	onClose?: () => void;
+	getStats?(): TransportStats;
+	enableStats?(enabled: boolean): void;
 }

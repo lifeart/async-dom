@@ -1,6 +1,6 @@
 import { WS_BASE_DELAY_MS, WS_MAX_DELAY_MS, WS_MAX_RETRIES } from "../core/constants.ts";
 import type { Message } from "../core/protocol.ts";
-import type { Transport, TransportReadyState } from "./base.ts";
+import type { Transport, TransportReadyState, TransportStats } from "./base.ts";
 
 export interface WebSocketTransportOptions {
 	maxRetries?: number;
@@ -16,6 +16,7 @@ export class WebSocketTransport implements Transport {
 	private ws: WebSocket | null = null;
 	private handlers: Array<(message: Message) => void> = [];
 	private _readyState: TransportReadyState = "connecting";
+	private _stats: TransportStats = { messageCount: 0, totalBytes: 0, largestMessageBytes: 0, lastMessageBytes: 0 };
 	onError?: (error: Error) => void;
 	onClose?: () => void;
 	private attempt = 0;
@@ -103,7 +104,15 @@ export class WebSocketTransport implements Transport {
 	}
 
 	private sendRaw(message: Message): void {
-		this.ws?.send(JSON.stringify(message));
+		const json = JSON.stringify(message);
+		const bytes = json.length;
+		this._stats.messageCount++;
+		this._stats.totalBytes += bytes;
+		this._stats.lastMessageBytes = bytes;
+		if (bytes > this._stats.largestMessageBytes) {
+			this._stats.largestMessageBytes = bytes;
+		}
+		this.ws?.send(json);
 	}
 
 	send(message: Message): void {
@@ -130,5 +139,9 @@ export class WebSocketTransport implements Transport {
 
 	get readyState(): TransportReadyState {
 		return this._readyState;
+	}
+
+	getStats(): TransportStats {
+		return { ...this._stats };
 	}
 }
