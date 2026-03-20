@@ -36,6 +36,9 @@ export class VirtualDocument {
 	_defaultView: unknown = null;
 	_syncChannel: SyncChannel | null = null;
 
+	private _title = "";
+	private _cookie = "";
+
 	private _ids = new Map<string, VirtualElement>();
 	private _nodeIdToElement = new Map<NodeId, VirtualElement>();
 	private _listenerMap = new Map<string, (e: unknown) => void>();
@@ -359,6 +362,79 @@ export class VirtualDocument {
 			.map((c) => `.${c}`)
 			.join("");
 		return this.querySelectorAll(selector);
+	}
+
+	get title(): string {
+		return this._title;
+	}
+
+	set title(value: string) {
+		this._title = value;
+	}
+
+	get URL(): string {
+		return (this._defaultView as { location?: { href?: string } })?.location?.href ?? "";
+	}
+
+	get location(): unknown {
+		return (this._defaultView as { location?: unknown })?.location ?? null;
+	}
+
+	get cookie(): string {
+		return this._cookie;
+	}
+
+	set cookie(value: string) {
+		this._cookie = value;
+	}
+
+	get readyState(): string {
+		return "complete";
+	}
+
+	get compatMode(): string {
+		return "CSS1Compat";
+	}
+
+	get characterSet(): string {
+		return "UTF-8";
+	}
+
+	get contentType(): string {
+		return "text/html";
+	}
+
+	get visibilityState(): string {
+		return "visible";
+	}
+
+	get hidden(): boolean {
+		return false;
+	}
+
+	get childNodes(): VirtualNode[] {
+		return [this.documentElement];
+	}
+
+	get children(): VirtualElement[] {
+		return [this.documentElement];
+	}
+
+	get firstChild(): VirtualElement {
+		return this.documentElement;
+	}
+
+	contains(node: unknown): boolean {
+		if (node === this) return true;
+		return this.documentElement.contains(node as VirtualNode);
+	}
+
+	get implementation(): { hasFeature(): boolean } {
+		return {
+			hasFeature() {
+				return false;
+			},
+		};
 	}
 
 	get defaultView(): unknown {

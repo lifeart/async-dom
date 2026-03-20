@@ -406,7 +406,13 @@ export class VirtualElement {
 	// --- Text & HTML ---
 
 	get textContent(): string {
-		return this._textContent;
+		if (this.childNodes.length === 0) return this._textContent;
+		let result = "";
+		for (const child of this.childNodes) {
+			if (child.nodeType === 3) result += (child as VirtualTextNode).nodeValue;
+			else if (child.nodeType === 1) result += (child as VirtualElement).textContent;
+		}
+		return result;
 	}
 
 	set textContent(value: string) {
@@ -1031,6 +1037,24 @@ export class VirtualTextNode {
 		this.nodeValue = value;
 	}
 
+	get nextSibling(): VirtualNode | null {
+		if (!this.parentNode) return null;
+		const siblings = this.parentNode.childNodes;
+		const idx = siblings.indexOf(this);
+		return siblings[idx + 1] ?? null;
+	}
+
+	get previousSibling(): VirtualNode | null {
+		if (!this.parentNode) return null;
+		const siblings = this.parentNode.childNodes;
+		const idx = siblings.indexOf(this);
+		return siblings[idx - 1] ?? null;
+	}
+
+	get childNodes(): VirtualNode[] {
+		return [];
+	}
+
 	remove(): void {
 		if (this.parentNode) {
 			this.parentNode.childNodes = this.parentNode.childNodes.filter((c) => c !== this);
@@ -1088,6 +1112,24 @@ export class VirtualCommentNode {
 		return this._nodeValue;
 	}
 
+	get nextSibling(): VirtualNode | null {
+		if (!this.parentNode) return null;
+		const siblings = this.parentNode.childNodes;
+		const idx = siblings.indexOf(this);
+		return siblings[idx + 1] ?? null;
+	}
+
+	get previousSibling(): VirtualNode | null {
+		if (!this.parentNode) return null;
+		const siblings = this.parentNode.childNodes;
+		const idx = siblings.indexOf(this);
+		return siblings[idx - 1] ?? null;
+	}
+
+	get childNodes(): VirtualNode[] {
+		return [];
+	}
+
 	remove(): void {
 		if (this.parentNode) {
 			this.parentNode.childNodes = this.parentNode.childNodes.filter((c) => c !== this);
@@ -1108,16 +1150,17 @@ export class VirtualCommentNode {
 class VirtualClassList {
 	constructor(private element: VirtualElement) {}
 
-	add(name: string): void {
+	add(...names: string[]): void {
 		const classes = this.element.className.split(" ").filter(Boolean);
-		if (!classes.includes(name)) {
-			classes.push(name);
-			this.element.className = classes.join(" ");
+		for (const name of names) {
+			if (!classes.includes(name)) classes.push(name);
 		}
+		this.element.className = classes.join(" ");
 	}
 
-	remove(name: string): void {
-		const classes = this.element.className.split(" ").filter((c) => c !== name && c !== "");
+	remove(...names: string[]): void {
+		const nameSet = new Set(names);
+		const classes = this.element.className.split(" ").filter((c) => c !== "" && !nameSet.has(c));
 		this.element.className = classes.join(" ");
 	}
 
@@ -1138,5 +1181,9 @@ class VirtualClassList {
 		}
 		this.add(name);
 		return true;
+	}
+
+	get length(): number {
+		return this.element.className.split(" ").filter(Boolean).length;
 	}
 }

@@ -6,6 +6,8 @@ import { QueryType, SyncChannel } from "../core/sync-channel.ts";
 import type { Transport } from "../transport/base.ts";
 import { WorkerSelfTransport } from "../transport/worker-transport.ts";
 import { VirtualDocument } from "./document.ts";
+import { VirtualElement } from "./element.ts";
+import { VirtualCustomEvent, VirtualEvent } from "./events.ts";
 import {
 	VirtualIntersectionObserver,
 	VirtualMutationObserver,
@@ -40,6 +42,43 @@ export interface WorkerWindow {
 	MutationObserver: typeof VirtualMutationObserver;
 	ResizeObserver: typeof VirtualResizeObserver;
 	IntersectionObserver: typeof VirtualIntersectionObserver;
+	setTimeout: typeof setTimeout;
+	setInterval: typeof setInterval;
+	clearTimeout: typeof clearTimeout;
+	clearInterval: typeof clearInterval;
+	queueMicrotask: typeof queueMicrotask;
+	performance: typeof performance;
+	fetch: typeof fetch | undefined;
+	URL: typeof URL;
+	URLSearchParams: typeof URLSearchParams;
+	console: typeof console;
+	btoa: typeof btoa;
+	atob: typeof atob;
+	navigator: typeof self.navigator;
+	Event: typeof VirtualEvent;
+	CustomEvent: typeof VirtualCustomEvent;
+	Node: {
+		ELEMENT_NODE: 1;
+		TEXT_NODE: 3;
+		COMMENT_NODE: 8;
+		DOCUMENT_NODE: 9;
+		DOCUMENT_FRAGMENT_NODE: 11;
+	};
+	HTMLElement: typeof VirtualElement;
+	devicePixelRatio: number;
+	matchMedia: (query: string) => {
+		matches: boolean;
+		media: string;
+		addEventListener: () => void;
+		removeEventListener: () => void;
+	};
+	getSelection: () => {
+		rangeCount: number;
+		getRangeAt: () => null;
+		addRange: () => void;
+		removeAllRanges: () => void;
+	};
+	dispatchEvent: (event: unknown) => boolean;
 }
 
 interface WorkerLocation {
@@ -62,6 +101,10 @@ interface WorkerHistory {
 	state: unknown;
 	pushState(state: unknown, title: string, url: string): void;
 	replaceState(state: unknown, title: string, url: string): void;
+	back(): void;
+	forward(): void;
+	go(delta?: number): void;
+	length: number;
 }
 
 interface WorkerLocalStorage {
@@ -240,6 +283,7 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 
 	const history: WorkerHistory = {
 		state: null,
+		length: 1,
 		pushState(state: unknown, title: string, url: string) {
 			history.state = state;
 			updateLocationFromURL(location, url);
@@ -259,6 +303,15 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 				title,
 				url,
 			});
+		},
+		back() {
+			/* no-op in worker */
+		},
+		forward() {
+			/* no-op in worker */
+		},
+		go(_delta?: number) {
+			/* no-op in worker */
 		},
 	};
 
@@ -321,6 +374,48 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 		MutationObserver: VirtualMutationObserver,
 		ResizeObserver: VirtualResizeObserver,
 		IntersectionObserver: VirtualIntersectionObserver,
+		setTimeout,
+		setInterval,
+		clearTimeout,
+		clearInterval,
+		queueMicrotask,
+		performance,
+		fetch: typeof fetch !== "undefined" ? fetch : undefined,
+		URL,
+		URLSearchParams,
+		console,
+		btoa,
+		atob,
+		navigator: self.navigator,
+		Event: VirtualEvent,
+		CustomEvent: VirtualCustomEvent,
+		Node: {
+			ELEMENT_NODE: 1 as const,
+			TEXT_NODE: 3 as const,
+			COMMENT_NODE: 8 as const,
+			DOCUMENT_NODE: 9 as const,
+			DOCUMENT_FRAGMENT_NODE: 11 as const,
+		},
+		HTMLElement: VirtualElement,
+		devicePixelRatio: 1,
+		matchMedia: (query: string) => ({
+			matches: false,
+			media: query,
+			addEventListener() {},
+			removeEventListener() {},
+		}),
+		getSelection: () => ({
+			rangeCount: 0,
+			getRangeAt() {
+				return null;
+			},
+			addRange() {},
+			removeAllRanges() {},
+		}),
+		dispatchEvent: (event: unknown) => {
+			doc.dispatchEvent("", event);
+			return true;
+		},
 	};
 
 	// Override innerWidth/innerHeight with sync-channel-aware getters
