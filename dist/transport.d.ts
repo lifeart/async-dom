@@ -1,4 +1,4 @@
-import { n as TransportReadyState, t as Transport } from "./base.js";
+import { n as TransportReadyState, p as Message, r as TransportStats, t as Transport } from "./base.js";
 import { a as decodeBinaryMessage, c as WebSocketTransportOptions, i as BinaryWorkerTransport, n as WorkerTransport, o as encodeBinaryMessage, r as BinaryWorkerSelfTransport, s as WebSocketTransport, t as WorkerSelfTransport } from "./worker-transport.js";
 
 //#region src/transport/comlink-adapter.d.ts
@@ -25,5 +25,106 @@ interface ComlinkEndpoint {
 }
 declare function createComlinkEndpoint(transport: Transport): ComlinkEndpoint;
 //#endregion
-export { BinaryWorkerSelfTransport, BinaryWorkerTransport, type ComlinkEndpoint, type Transport, type TransportReadyState, WebSocketTransport, type WebSocketTransportOptions, WorkerSelfTransport, WorkerTransport, createComlinkEndpoint, decodeBinaryMessage, encodeBinaryMessage };
+//#region src/transport/shared-worker-transport.d.ts
+/**
+ * Transport implementation using a SharedWorker MessagePort.
+ * Used on the main thread side to communicate with a SharedWorker.
+ */
+declare class SharedWorkerTransport implements Transport {
+  private port;
+  private handlers;
+  private _readyState;
+  private _statsEnabled;
+  private _stats;
+  private _heartbeatInterval;
+  private _heartbeatTimeout;
+  onError?: (error: Error) => void;
+  onClose?: () => void;
+  constructor(port: MessagePort);
+  private _startHeartbeat;
+  private _clearHeartbeatTimeout;
+  private _stopHeartbeat;
+  enableStats(enabled: boolean): void;
+  send(message: Message): void;
+  onMessage(handler: (message: Message) => void): void;
+  close(): void;
+  get readyState(): TransportReadyState;
+  getStats(): TransportStats;
+}
+/**
+ * Transport implementation used inside a SharedWorker.
+ * Communicates with the main thread via a MessagePort received from the connect event.
+ */
+declare class SharedWorkerSelfTransport implements Transport {
+  private port;
+  private handlers;
+  private _readyState;
+  private _statsEnabled;
+  private _stats;
+  onError?: (error: Error) => void;
+  onClose?: () => void;
+  constructor(port: MessagePort);
+  enableStats(enabled: boolean): void;
+  send(message: Message): void;
+  onMessage(handler: (message: Message) => void): void;
+  close(): void;
+  get readyState(): TransportReadyState;
+  getStats(): TransportStats;
+}
+//# sourceMappingURL=shared-worker-transport.d.ts.map
+//#endregion
+//#region src/transport/ws-server-transport.d.ts
+/**
+ * Minimal WebSocket interface that works with any WebSocket server library
+ * (ws, uWebSockets.js, Deno, Bun, etc.) without importing their types.
+ */
+interface WebSocketLike {
+  send(data: string): void;
+  close(code?: number, reason?: string): void;
+  readonly readyState: number;
+  readonly bufferedAmount: number;
+  onmessage: ((event: {
+    data: unknown;
+  }) => void) | null;
+  onclose: ((event: {
+    code: number;
+    reason: string;
+  }) => void) | null;
+  onerror: ((event: unknown) => void) | null;
+}
+/**
+ * Server-side WebSocket transport for async-dom.
+ *
+ * Unlike the client-side WebSocketTransport, this does NOT handle reconnection.
+ * It accepts an already-connected WebSocketLike socket and wraps it with
+ * the Transport interface including backpressure handling.
+ */
+declare class WebSocketServerTransport implements Transport {
+  private socket;
+  private handlers;
+  private _readyState;
+  private _stats;
+  private _statsEnabled;
+  private messageQueue;
+  private drainTimer;
+  onError?: (error: Error) => void;
+  onClose?: () => void;
+  constructor(socket: WebSocketLike);
+  private mapReadyState;
+  send(message: Message): void;
+  private sendRaw;
+  private startDrainCheck;
+  private stopDrainCheck;
+  private flushQueue;
+  onMessage(handler: (message: Message) => void): void;
+  close(): void;
+  get readyState(): TransportReadyState;
+  get bufferedAmount(): number;
+  getStats(): TransportStats;
+  enableStats(enabled: boolean): void;
+}
+//# sourceMappingURL=ws-server-transport.d.ts.map
+
+//#endregion
+export { BinaryWorkerSelfTransport, BinaryWorkerTransport, type ComlinkEndpoint, SharedWorkerSelfTransport, SharedWorkerTransport, type Transport, type TransportReadyState, type WebSocketLike, WebSocketServerTransport, WebSocketTransport, type WebSocketTransportOptions, WorkerSelfTransport, WorkerTransport, createComlinkEndpoint, decodeBinaryMessage, encodeBinaryMessage };
 //# sourceMappingURL=transport.d.ts.map

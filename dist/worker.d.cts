@@ -1,8 +1,50 @@
-import { d as InsertPosition, h as NodeId, i as AppId, s as DomMutation, t as Transport } from "./base.cjs";
+import { c as DomMutation, f as InsertPosition, g as NodeId, i as AppId, t as Transport } from "./base.cjs";
 import { n as DebugOptions } from "./debug.cjs";
 
-//#region src/core/sync-channel.d.ts
+//#region src/platform.d.ts
 
+/**
+ * PlatformHost abstraction for running async-dom in different environments
+ * (Web Worker, Node.js, etc.).
+ *
+ * Only three things need platform abstraction:
+ * 1. navigator (userAgent, language, etc.)
+ * 2. Error handlers (onerror, onunhandledrejection)
+ * 3. beforeunload / shutdown hook
+ */
+interface PlatformHost {
+  navigator: {
+    userAgent: string;
+    language: string;
+    languages: readonly string[];
+    hardwareConcurrency: number;
+  };
+  /**
+   * Install global error and unhandled rejection handlers.
+   * Returns a cleanup function that removes the handlers.
+   */
+  installErrorHandlers(onError: (message: string, error?: Error, filename?: string, lineno?: number, colno?: number) => void, onUnhandledRejection: (reason: unknown) => void): () => void;
+  /**
+   * Register a callback to run before the environment shuts down.
+   * Returns a cleanup function that removes the hook.
+   */
+  onBeforeUnload(callback: () => void): () => void;
+}
+/**
+ * Create a PlatformHost for Web Worker environments (uses `self`).
+ */
+declare function createWorkerPlatform(): PlatformHost;
+/**
+ * Create a PlatformHost for Node.js environments (uses `process`).
+ */
+declare function createNodePlatform(): PlatformHost;
+/**
+ * Auto-detect the current platform and create the appropriate PlatformHost.
+ */
+declare function detectPlatform(): PlatformHost;
+//# sourceMappingURL=platform.d.ts.map
+//#endregion
+//#region src/core/sync-channel.d.ts
 /**
  * SharedArrayBuffer-based synchronous communication channel.
  *
@@ -461,6 +503,11 @@ declare class VirtualDocument {
   };
   get defaultView(): unknown;
   get ownerDocument(): VirtualDocument;
+  /**
+   * Clean up all internal state. Called when the worker DOM instance is being destroyed.
+   * Clears element registries, listener maps, and resets counters.
+   */
+  destroy(): void;
   toJSON(): unknown;
   private _serializeNode;
 }
@@ -557,10 +604,12 @@ interface WorkerDomConfig {
   transport?: Transport;
   debug?: DebugOptions;
   sandbox?: boolean | "global" | "eval";
+  platform?: PlatformHost;
 }
 interface WorkerDomResult {
   document: VirtualDocument;
   window: WorkerWindow;
+  destroy: () => void;
 }
 interface WorkerWindow {
   document: VirtualDocument;
@@ -595,7 +644,7 @@ interface WorkerWindow {
   console: typeof console;
   btoa: typeof btoa;
   atob: typeof atob;
-  navigator: typeof self.navigator;
+  navigator: PlatformHost["navigator"];
   Event: typeof VirtualEvent;
   CustomEvent: typeof VirtualCustomEvent;
   Node: {
@@ -655,5 +704,5 @@ interface WorkerHistory {
  */
 declare function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult;
 //#endregion
-export { MutationCollector, ScopedStorage, VirtualCommentNode, VirtualDocument, VirtualElement, type VirtualNode, VirtualTextNode, WorkerDomConfig, WorkerDomResult, WorkerWindow, createWorkerDom };
+export { MutationCollector, type PlatformHost, ScopedStorage, VirtualCommentNode, VirtualDocument, VirtualElement, type VirtualNode, VirtualTextNode, WorkerDomConfig, WorkerDomResult, WorkerWindow, createNodePlatform, createWorkerDom, createWorkerPlatform, detectPlatform };
 //# sourceMappingURL=worker.d.cts.map

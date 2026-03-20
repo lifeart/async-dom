@@ -1,4 +1,4 @@
-import { s as DomMutation } from "./base.cjs";
+import { c as DomMutation } from "./base.cjs";
 
 //#region src/core/debug.d.ts
 interface DebugOptions {

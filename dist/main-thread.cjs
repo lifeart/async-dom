@@ -3730,6 +3730,8 @@ var EventBridge = class {
 	attach(nodeId, eventName, listenerId) {
 		const node = this.nodeCache.get(nodeId);
 		if (!node) return;
+		const existing = this.listeners.get(listenerId);
+		if (existing) existing.controller.abort();
 		const controller = new AbortController();
 		this.listeners.set(listenerId, {
 			controller,
@@ -4402,6 +4404,18 @@ var ThreadManager = class {
 		});
 		return appId;
 	}
+	createRemoteThread(config) {
+		const appId = generateAppId(config.name);
+		const transport = config.transport;
+		transport.onMessage((message) => {
+			this.notifyHandlers(appId, message);
+		});
+		this.threads.set(appId, {
+			transport,
+			appId
+		});
+		return appId;
+	}
 	createWebSocketThread(config) {
 		const appId = generateAppId(config.name);
 		const transport = new require_ws_transport.WebSocketTransport(config.url, config.options);
@@ -4730,12 +4744,18 @@ function createAsyncDom(config) {
 		}
 	});
 	if (config.worker) addAppInternal(config.worker, config.target);
-	function addAppInternal(worker, mountPoint, shadow, customTransport, onError, name) {
-		const appId = threadManager.createWorkerThread({
+	function addAppInternal(worker, mountPoint, shadow, customTransport, onError, name, enableSyncChannel) {
+		let appId;
+		if (worker) appId = threadManager.createWorkerThread({
 			worker,
 			transport: customTransport,
 			name
 		});
+		else if (customTransport) appId = threadManager.createRemoteThread({
+			transport: customTransport,
+			name
+		});
+		else throw new Error("[async-dom] addAppInternal requires either a worker or a transport");
 		const appNodeCache = new NodeCache();
 		let mountEl = null;
 		if (mountPoint) mountEl = typeof mountPoint === "string" ? document.querySelector(mountPoint) : mountPoint;
@@ -4835,8 +4855,9 @@ function createAsyncDom(config) {
 		};
 		eventBridges.set(appId, bridge);
 		scheduler.setAppCount(renderers.size);
+		const shouldCreateSyncChannel = worker ? true : enableSyncChannel ?? false;
 		let sharedBuffer;
-		if (typeof SharedArrayBuffer !== "undefined") try {
+		if (shouldCreateSyncChannel && typeof SharedArrayBuffer !== "undefined") try {
 			sharedBuffer = new SharedArrayBuffer(65536);
 			const host = new require_sync_channel.SyncChannelHost(sharedBuffer);
 			host.startPolling((query) => handleSyncQuery(appRenderer, query));
@@ -5026,6 +5047,9 @@ function createAsyncDom(config) {
 		},
 		addApp(appConfig) {
 			return addAppInternal(appConfig.worker, appConfig.mountPoint, appConfig.shadow, appConfig.transport, appConfig.onError, appConfig.name);
+		},
+		addRemoteApp(remoteConfig) {
+			return addAppInternal(void 0, remoteConfig.mountPoint, remoteConfig.shadow, remoteConfig.transport, remoteConfig.onError, remoteConfig.name, remoteConfig.enableSyncChannel);
 		},
 		removeApp(appId) {
 			const bridge = eventBridges.get(appId);

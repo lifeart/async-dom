@@ -175,6 +175,9 @@ function createNodeId() {
 function createAppId(id) {
 	return id;
 }
+function createClientId(id) {
+	return id;
+}
 function isMutationMessage(msg) {
 	return msg.type === "mutation";
 }
@@ -380,6 +383,6 @@ var SyncChannelHost = class {
 	}
 };
 //#endregion
-export { resolveDebugHooks as _, DOCUMENT_NODE_ID as a, createAppId as c, isMutationMessage as d, isSystemMessage as f, WarningDescriptions as g, WarningCode as h, BODY_NODE_ID as i, createNodeId as l, MutationEventCorrelation as m, SyncChannel as n, HEAD_NODE_ID as o, DebugStats as p, SyncChannelHost as r, HTML_NODE_ID as s, QueryType as t, isEventMessage as u };
+export { WarningDescriptions as _, DOCUMENT_NODE_ID as a, createAppId as c, isEventMessage as d, isMutationMessage as f, WarningCode as g, MutationEventCorrelation as h, BODY_NODE_ID as i, createClientId as l, DebugStats as m, SyncChannel as n, HEAD_NODE_ID as o, isSystemMessage as p, SyncChannelHost as r, HTML_NODE_ID as s, QueryType as t, createNodeId as u, resolveDebugHooks as v };
 
 //# sourceMappingURL=sync-channel.js.map

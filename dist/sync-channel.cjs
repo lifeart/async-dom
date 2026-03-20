@@ -175,6 +175,9 @@ function createNodeId() {
 function createAppId(id) {
 	return id;
 }
+function createClientId(id) {
+	return id;
+}
 function isMutationMessage(msg) {
 	return msg.type === "mutation";
 }
@@ -450,6 +453,12 @@ Object.defineProperty(exports, "createAppId", {
 	enumerable: true,
 	get: function() {
 		return createAppId;
+	}
+});
+Object.defineProperty(exports, "createClientId", {
+	enumerable: true,
+	get: function() {
+		return createClientId;
 	}
 });
 Object.defineProperty(exports, "createNodeId", {

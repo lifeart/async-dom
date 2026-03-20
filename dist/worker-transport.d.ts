@@ -1,4 +1,4 @@
-import { f as Message, n as TransportReadyState, r as TransportStats, t as Transport } from "./base.js";
+import { n as TransportReadyState, p as Message, r as TransportStats, t as Transport } from "./base.js";
 
 //#region src/transport/ws-transport.d.ts
 interface WebSocketTransportOptions {

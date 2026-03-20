@@ -1,6 +1,6 @@
-import { _ as SerializedError } from "./base.cjs";
+import { v as SerializedError } from "./base.cjs";
 import { n as DebugOptions } from "./debug.cjs";
-import { d as SchedulerConfig, r as AsyncDomInstance } from "./index.cjs";
+import { p as SchedulerConfig, r as AsyncDomInstance } from "./index.cjs";
 import { ReactNode } from "react";
 
 //#region src/react/async-dom-component.d.ts

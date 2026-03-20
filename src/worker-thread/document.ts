@@ -490,6 +490,20 @@ export class VirtualDocument {
 		return this;
 	}
 
+	/**
+	 * Clean up all internal state. Called when the worker DOM instance is being destroyed.
+	 * Clears element registries, listener maps, and resets counters.
+	 */
+	destroy(): void {
+		this._ids.clear();
+		this._nodeIdToElement.clear();
+		this._listenerMap.clear();
+		this._listenerToElement.clear();
+		this._listenerCounter = 0;
+		this._syncChannel = null;
+		this._defaultView = null;
+	}
+
 	toJSON(): unknown {
 		return this._serializeNode(this.documentElement);
 	}

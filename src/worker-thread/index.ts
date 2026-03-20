@@ -3,6 +3,8 @@ import { resolveDebugHooks } from "../core/debug.ts";
 import type { AppId, EventMessage, SerializedLocation } from "../core/protocol.ts";
 import { createAppId, isEventMessage, isSystemMessage } from "../core/protocol.ts";
 import { QueryType, SyncChannel } from "../core/sync-channel.ts";
+import type { PlatformHost } from "../platform.ts";
+import { detectPlatform } from "../platform.ts";
 import type { Transport } from "../transport/base.ts";
 import { WorkerSelfTransport } from "../transport/worker-transport.ts";
 import { VirtualDocument } from "./document.ts";
@@ -20,11 +22,13 @@ export interface WorkerDomConfig {
 	transport?: Transport;
 	debug?: DebugOptions;
 	sandbox?: boolean | "global" | "eval";
+	platform?: PlatformHost;
 }
 
 export interface WorkerDomResult {
 	document: VirtualDocument;
 	window: WorkerWindow;
+	destroy: () => void;
 }
 
 export interface WorkerWindow {
@@ -57,7 +61,7 @@ export interface WorkerWindow {
 	console: typeof console;
 	btoa: typeof btoa;
 	atob: typeof atob;
-	navigator: typeof self.navigator;
+	navigator: PlatformHost["navigator"];
 	Event: typeof VirtualEvent;
 	CustomEvent: typeof VirtualCustomEvent;
 	Node: {
@@ -121,6 +125,7 @@ interface WorkerHistory {
 export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 	const appId = config?.appId ?? createAppId("worker");
 	const transport = config?.transport ?? new WorkerSelfTransport();
+	const platform = config?.platform ?? detectPlatform();
 
 	const doc = new VirtualDocument(appId);
 	doc.collector.setTransport(transport);
@@ -191,50 +196,29 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 		}
 	});
 
-	// Install global error handlers to forward crashes to main thread
-	const workerScope = self as unknown as {
-		onerror:
-			| ((
-					event: ErrorEvent | string,
-					source?: string,
-					lineno?: number,
-					colno?: number,
-					error?: Error,
-			  ) => void)
-			| null;
-		onunhandledrejection: ((event: PromiseRejectionEvent) => void) | null;
-	};
-
-	workerScope.onerror = (
-		event: ErrorEvent | string,
-		source?: string,
-		lineno?: number,
-		colno?: number,
-		error?: Error,
-	) => {
-		const message =
-			typeof event === "string" ? event : ((event as ErrorEvent).message ?? "Unknown worker error");
-		const serializedError: import("../core/protocol.ts").SerializedError = {
-			message,
-			stack: error?.stack,
-			name: error?.name,
-			filename: source ?? (typeof event !== "string" ? (event as ErrorEvent).filename : undefined),
-			lineno: lineno ?? (typeof event !== "string" ? (event as ErrorEvent).lineno : undefined),
-			colno: colno ?? (typeof event !== "string" ? (event as ErrorEvent).colno : undefined),
-		};
-		transport.send({ type: "error", appId, error: serializedError });
-	};
-
-	workerScope.onunhandledrejection = (event: PromiseRejectionEvent) => {
-		const reason = event.reason;
-		const serializedError: import("../core/protocol.ts").SerializedError = {
-			message: reason instanceof Error ? reason.message : String(reason),
-			stack: reason instanceof Error ? reason.stack : undefined,
-			name: reason instanceof Error ? reason.name : "UnhandledRejection",
-			isUnhandledRejection: true,
-		};
-		transport.send({ type: "error", appId, error: serializedError });
-	};
+	// Install global error handlers to forward crashes to main thread via platform
+	const cleanupErrorHandlers = platform.installErrorHandlers(
+		(message, error, filename, lineno, colno) => {
+			const serializedError: import("../core/protocol.ts").SerializedError = {
+				message,
+				stack: error?.stack,
+				name: error?.name,
+				filename,
+				lineno,
+				colno,
+			};
+			transport.send({ type: "error", appId, error: serializedError });
+		},
+		(reason) => {
+			const serializedError: import("../core/protocol.ts").SerializedError = {
+				message: reason instanceof Error ? reason.message : String(reason),
+				stack: reason instanceof Error ? reason.stack : undefined,
+				name: reason instanceof Error ? reason.name : "UnhandledRejection",
+				isUnhandledRejection: true,
+			};
+			transport.send({ type: "error", appId, error: serializedError });
+		},
+	);
 
 	// Send ready message after setup
 	transport.send({ type: "ready", appId });
@@ -267,10 +251,8 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 		}
 	}, 2000);
 
-	// Ensure we clear the interval on worker termination
-	if (typeof self !== "undefined" && "addEventListener" in self) {
-		self.addEventListener("beforeunload", () => clearInterval(perfEntriesInterval));
-	}
+	// Ensure we clear the interval on worker termination via platform
+	const cleanupBeforeUnload = platform.onBeforeUnload(() => clearInterval(perfEntriesInterval));
 
 	// Scoped storage instances with app-specific prefixes
 	const storagePrefix = `__async_dom_${appId}_`;
@@ -436,7 +418,7 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 		console,
 		btoa,
 		atob,
-		navigator: self.navigator,
+		navigator: platform.navigator,
 		Event: VirtualEvent,
 		CustomEvent: VirtualCustomEvent,
 		Node: {
@@ -513,8 +495,9 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 				get(target, prop) {
 					if (prop === Symbol.unscopables) return undefined;
 					if (prop in target) return target[prop];
-					// Fall through to real worker globals for builtins
-					if (prop in self) return (self as unknown as Record<string | symbol, unknown>)[prop];
+					// Fall through to real globals for builtins
+					if (prop in globalThis)
+						return (globalThis as unknown as Record<string | symbol, unknown>)[prop];
 					return undefined;
 				},
 				set(target, prop, value) {
@@ -537,7 +520,7 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 	}
 
 	if (sandboxMode === "global" || sandboxMode === true) {
-		const workerGlobal = self as unknown as Record<string, unknown>;
+		const workerGlobal = globalThis as unknown as Record<string, unknown>;
 
 		// Direct assignments for regular properties
 		workerGlobal.document = doc;
@@ -588,9 +571,20 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 		resolveDebugHooks(config.debug);
 	}
 
-	return { document: doc, window: win };
+	// Destroy function to clean up all resources
+	function destroy(): void {
+		doc.destroy();
+		clearInterval(perfEntriesInterval);
+		cleanupErrorHandlers();
+		cleanupBeforeUnload();
+		transport.close();
+	}
+
+	return { document: doc, window: win, destroy };
 }
 
+export type { PlatformHost } from "../platform.ts";
+export { createNodePlatform, createWorkerPlatform, detectPlatform } from "../platform.ts";
 export { VirtualDocument } from "./document.ts";
 export type { VirtualNode } from "./element.ts";
 export { VirtualCommentNode, VirtualElement, VirtualTextNode } from "./element.ts";

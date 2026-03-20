@@ -1,5 +1,90 @@
-import { _ as resolveDebugHooks, c as createAppId, f as isSystemMessage, l as createNodeId, n as SyncChannel, t as QueryType, u as isEventMessage } from "./sync-channel.js";
+import { c as createAppId, d as isEventMessage, n as SyncChannel, p as isSystemMessage, t as QueryType, u as createNodeId, v as resolveDebugHooks } from "./sync-channel.js";
 import { t as WorkerSelfTransport } from "./worker-transport.js";
+//#region src/platform.ts
+/**
+* Create a PlatformHost for Web Worker environments (uses `self`).
+*/
+function createWorkerPlatform() {
+	return {
+		navigator: {
+			userAgent: self.navigator.userAgent,
+			language: self.navigator.language,
+			languages: self.navigator.languages,
+			hardwareConcurrency: self.navigator.hardwareConcurrency
+		},
+		installErrorHandlers(onError, onUnhandledRejection) {
+			const workerScope = self;
+			const prevOnError = workerScope.onerror;
+			const prevOnRejection = workerScope.onunhandledrejection;
+			workerScope.onerror = (event, source, lineno, colno, error) => {
+				onError(typeof event === "string" ? event : event.message ?? "Unknown worker error", error, source ?? (typeof event !== "string" ? event.filename : void 0), lineno ?? (typeof event !== "string" ? event.lineno : void 0), colno ?? (typeof event !== "string" ? event.colno : void 0));
+			};
+			workerScope.onunhandledrejection = (event) => {
+				onUnhandledRejection(event.reason);
+			};
+			return () => {
+				workerScope.onerror = prevOnError;
+				workerScope.onunhandledrejection = prevOnRejection;
+			};
+		},
+		onBeforeUnload(callback) {
+			if (typeof self !== "undefined" && "addEventListener" in self) {
+				self.addEventListener("beforeunload", callback);
+				return () => {
+					self.removeEventListener("beforeunload", callback);
+				};
+			}
+			return () => {};
+		}
+	};
+}
+/**
+* Create a PlatformHost for Node.js environments (uses `process`).
+*/
+function createNodePlatform() {
+	const os = typeof globalThis !== "undefined" ? globalThis : {};
+	return {
+		navigator: {
+			userAgent: `Node.js/${typeof process !== "undefined" ? process.version : "unknown"}`,
+			language: "en-US",
+			languages: ["en-US"],
+			hardwareConcurrency: typeof os.navigator === "object" && os.navigator !== null && "hardwareConcurrency" in os.navigator ? os.navigator.hardwareConcurrency ?? 1 : 1
+		},
+		installErrorHandlers(onError, onUnhandledRejection) {
+			if (typeof process === "undefined") return () => {};
+			const onUncaught = (err) => {
+				onError(err.message, err, void 0, void 0, void 0);
+			};
+			const onRejection = (reason) => {
+				onUnhandledRejection(reason);
+			};
+			process.on("uncaughtException", onUncaught);
+			process.on("unhandledRejection", onRejection);
+			return () => {
+				process.removeListener("uncaughtException", onUncaught);
+				process.removeListener("unhandledRejection", onRejection);
+			};
+		},
+		onBeforeUnload(callback) {
+			if (typeof process === "undefined") return () => {};
+			const handler = () => {
+				callback();
+			};
+			process.on("beforeExit", handler);
+			return () => {
+				process.removeListener("beforeExit", handler);
+			};
+		}
+	};
+}
+/**
+* Auto-detect the current platform and create the appropriate PlatformHost.
+*/
+function detectPlatform() {
+	if (typeof self !== "undefined" && typeof self.navigator !== "undefined") return createWorkerPlatform();
+	return createNodePlatform();
+}
+//#endregion
 //#region src/worker-thread/selector-engine.ts
 function parseSimpleSelector(input) {
 	const sel = {};
@@ -1897,6 +1982,19 @@ var VirtualDocument = class {
 	get ownerDocument() {
 		return this;
 	}
+	/**
+	* Clean up all internal state. Called when the worker DOM instance is being destroyed.
+	* Clears element registries, listener maps, and resets counters.
+	*/
+	destroy() {
+		this._ids.clear();
+		this._nodeIdToElement.clear();
+		this._listenerMap.clear();
+		this._listenerToElement.clear();
+		this._listenerCounter = 0;
+		this._syncChannel = null;
+		this._defaultView = null;
+	}
 	toJSON() {
 		return this._serializeNode(this.documentElement);
 	}
@@ -2032,6 +2130,7 @@ var ScopedStorage = class {
 function createWorkerDom(config) {
 	const appId = config?.appId ?? createAppId("worker");
 	const transport = config?.transport ?? new WorkerSelfTransport();
+	const platform = config?.platform ?? detectPlatform();
 	const doc = new VirtualDocument(appId);
 	doc.collector.setTransport(transport);
 	transport.onMessage((message) => {
@@ -2086,24 +2185,21 @@ function createWorkerDom(config) {
 			});
 		}
 	});
-	const workerScope = self;
-	workerScope.onerror = (event, source, lineno, colno, error) => {
+	const cleanupErrorHandlers = platform.installErrorHandlers((message, error, filename, lineno, colno) => {
 		const serializedError = {
-			message: typeof event === "string" ? event : event.message ?? "Unknown worker error",
+			message,
 			stack: error?.stack,
 			name: error?.name,
-			filename: source ?? (typeof event !== "string" ? event.filename : void 0),
-			lineno: lineno ?? (typeof event !== "string" ? event.lineno : void 0),
-			colno: colno ?? (typeof event !== "string" ? event.colno : void 0)
+			filename,
+			lineno,
+			colno
 		};
 		transport.send({
 			type: "error",
 			appId,
 			error: serializedError
 		});
-	};
-	workerScope.onunhandledrejection = (event) => {
-		const reason = event.reason;
+	}, (reason) => {
 		const serializedError = {
 			message: reason instanceof Error ? reason.message : String(reason),
 			stack: reason instanceof Error ? reason.stack : void 0,
@@ -2115,7 +2211,7 @@ function createWorkerDom(config) {
 			appId,
 			error: serializedError
 		});
-	};
+	});
 	transport.send({
 		type: "ready",
 		appId
@@ -2139,7 +2235,7 @@ function createWorkerDom(config) {
 			performance.clearMeasures(e.name);
 		} catch {}
 	}, 2e3);
-	if (typeof self !== "undefined" && "addEventListener" in self) self.addEventListener("beforeunload", () => clearInterval(perfEntriesInterval));
+	const cleanupBeforeUnload = platform.onBeforeUnload(() => clearInterval(perfEntriesInterval));
 	const storagePrefix = `__async_dom_${appId}_`;
 	const localStorage = new ScopedStorage(storagePrefix, "localStorage", () => doc._syncChannel, QueryType.WindowProperty);
 	const sessionStorage = new ScopedStorage(`${storagePrefix}session_`, "sessionStorage", () => null, QueryType.WindowProperty);
@@ -2282,7 +2378,7 @@ function createWorkerDom(config) {
 		console,
 		btoa,
 		atob,
-		navigator: self.navigator,
+		navigator: platform.navigator,
 		Event: VirtualEvent,
 		CustomEvent: VirtualCustomEvent,
 		Node: {
@@ -2347,7 +2443,7 @@ function createWorkerDom(config) {
 			get(target, prop) {
 				if (prop === Symbol.unscopables) return void 0;
 				if (prop in target) return target[prop];
-				if (prop in self) return self[prop];
+				if (prop in globalThis) return globalThis[prop];
 			},
 			set(target, prop, value) {
 				target[prop] = value;
@@ -2357,7 +2453,7 @@ function createWorkerDom(config) {
 		return new Function("window", "self", "globalThis", "document", `with(window) {\n\t\t\t\treturn (function() { ${code} }).call(window);\n\t\t\t}`)(sandbox, sandbox, sandbox, doc);
 	};
 	if (sandboxMode === "global" || sandboxMode === true) {
-		const workerGlobal = self;
+		const workerGlobal = globalThis;
 		workerGlobal.document = doc;
 		workerGlobal.window = win;
 		workerGlobal.location = win.location;
@@ -2396,12 +2492,20 @@ function createWorkerDom(config) {
 		flush: () => doc.collector.flushSync()
 	};
 	if (config?.debug?.logMutations) resolveDebugHooks(config.debug);
+	function destroy() {
+		doc.destroy();
+		clearInterval(perfEntriesInterval);
+		cleanupErrorHandlers();
+		cleanupBeforeUnload();
+		transport.close();
+	}
 	return {
 		document: doc,
-		window: win
+		window: win,
+		destroy
 	};
 }
 //#endregion
-export { MutationCollector, ScopedStorage, VirtualCommentNode, VirtualDocument, VirtualElement, VirtualTextNode, createWorkerDom };
+export { MutationCollector, ScopedStorage, VirtualCommentNode, VirtualDocument, VirtualElement, VirtualTextNode, createNodePlatform, createWorkerDom, createWorkerPlatform, detectPlatform };
 
 //# sourceMappingURL=worker.js.map

@@ -19,6 +19,7 @@ exports.WorkerSelfTransport = require_worker_transport.WorkerSelfTransport;
 exports.WorkerTransport = require_worker_transport.WorkerTransport;
 exports.createAppId = require_sync_channel.createAppId;
 exports.createAsyncDom = require_main_thread.createAsyncDom;
+exports.createClientId = require_sync_channel.createClientId;
 exports.createNodeId = require_sync_channel.createNodeId;
 exports.decodeBinaryMessage = require_ws_transport.decodeBinaryMessage;
 exports.encodeBinaryMessage = require_ws_transport.encodeBinaryMessage;

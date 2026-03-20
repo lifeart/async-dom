@@ -1,6 +1,6 @@
-import { _ as SerializedError } from "./base.js";
+import { v as SerializedError } from "./base.js";
 import { n as DebugOptions } from "./debug.js";
-import { d as SchedulerConfig, r as AsyncDomInstance } from "./index.js";
+import { p as SchedulerConfig, r as AsyncDomInstance } from "./index.js";
 
 //#region src/svelte/index.d.ts
 interface AsyncDomActionOptions {

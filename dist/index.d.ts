@@ -1,4 +1,4 @@
-import { _ as SerializedError, f as Message, g as Priority, h as NodeId, i as AppId, s as DomMutation, t as Transport } from "./base.js";
+import { _ as Priority, c as DomMutation, g as NodeId, i as AppId, p as Message, t as Transport, v as SerializedError } from "./base.js";
 import { a as MutationLogEntry, l as WarningLogEntry, n as DebugOptions } from "./debug.js";
 import { c as WebSocketTransportOptions } from "./worker-transport.js";
 
@@ -257,6 +257,10 @@ interface WorkerConfig {
   /** Human-readable name for this app (shown in DevTools instead of a random hash) */
   name?: string;
 }
+interface RemoteConfig {
+  transport: Transport;
+  name?: string;
+}
 interface WebSocketConfig {
   url: string;
   options?: WebSocketTransportOptions;
@@ -271,6 +275,7 @@ declare class ThreadManager {
   private threads;
   private messageHandlers;
   createWorkerThread(config: WorkerConfig): AppId;
+  createRemoteThread(config: RemoteConfig): AppId;
   createWebSocketThread(config: WebSocketConfig): AppId;
   sendToThread(appId: AppId, message: Message): void;
   broadcast(message: Message): void;
@@ -298,11 +303,20 @@ interface AppConfig {
   transport?: Transport;
   onError?: (error: SerializedError, appId: AppId) => void;
 }
+interface RemoteAppConfig {
+  transport: Transport;
+  name?: string;
+  mountPoint?: string | Element;
+  shadow?: boolean | ShadowRootInit;
+  onError?: (error: SerializedError, appId: AppId) => void;
+  enableSyncChannel?: boolean;
+}
 interface AsyncDomInstance {
   start(): void;
   stop(): void;
   destroy(): void;
   addApp(config: AppConfig): AppId;
+  addRemoteApp(config: RemoteAppConfig): AppId;
   removeApp(appId: AppId): void;
 }
 /**
@@ -316,5 +330,5 @@ interface AsyncDomInstance {
  */
 declare function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance;
 //#endregion
-export { ThreadManager as a, DomRenderer as c, SchedulerConfig as d, sanitizeHTML as f, createAsyncDom as i, EventBridge as l, AsyncDomConfig as n, WebSocketConfig as o, AsyncDomInstance as r, WorkerConfig as s, AppConfig as t, FrameScheduler as u };
+export { createAsyncDom as a, WebSocketConfig as c, EventBridge as d, FrameScheduler as f, RemoteAppConfig as i, WorkerConfig as l, sanitizeHTML as m, AsyncDomConfig as n, RemoteConfig as o, SchedulerConfig as p, AsyncDomInstance as r, ThreadManager as s, AppConfig as t, DomRenderer as u };
 //# sourceMappingURL=index.d.ts.map

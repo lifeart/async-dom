@@ -11,6 +11,9 @@ type NodeId = number & {
 type AppId = string & {
   readonly __brand: "AppId";
 };
+type ClientId = string & {
+  readonly __brand: "ClientId";
+};
 declare const BODY_NODE_ID: NodeId;
 declare const HEAD_NODE_ID: NodeId;
 declare const HTML_NODE_ID: NodeId;
@@ -24,6 +27,7 @@ declare function createNodeId(): NodeId;
  */
 
 declare function createAppId(id: string): AppId;
+declare function createClientId(id: string): ClientId;
 type InsertPosition = "beforebegin" | "afterbegin" | "beforeend" | "afterend";
 type DomMutation = {
   action: "createNode";
@@ -194,6 +198,7 @@ interface EventMessage {
   appId: AppId;
   listenerId: string;
   event: SerializedEvent;
+  clientId?: string;
 }
 interface SerializedLocation {
   hash: string;
@@ -261,6 +266,22 @@ type SystemMessage = {
   type: "perfEntries";
   appId: AppId;
   entries: PerfEntryData[];
+} | {
+  type: "ping";
+} | {
+  type: "pong";
+} | {
+  type: "ack";
+  lastUid: number;
+} | {
+  type: "clientConnect";
+  clientId: string;
+  metadata?: Record<string, unknown>;
+} | {
+  type: "clientDisconnect";
+  clientId: string;
+} | {
+  type: "snapshotComplete";
 };
 /** Serialized performance entry sent from worker to main thread (Feature 16). */
 interface PerfEntryData {
@@ -272,7 +293,7 @@ interface PerfEntryData {
 type Message = MutationMessage | EventMessage | SystemMessage;
 //#endregion
 //#region src/transport/base.d.ts
-type TransportReadyState = "connecting" | "open" | "closed";
+type TransportReadyState = "connecting" | "open" | "reconnecting" | "closed";
 interface TransportStats {
   messageCount: number;
   totalBytes: number;
@@ -288,9 +309,11 @@ interface Transport {
   onClose?: () => void;
   getStats?(): TransportStats;
   enableStats?(enabled: boolean): void;
+  maxMessageSize?: number;
+  bufferedAmount?: number;
 }
 //# sourceMappingURL=base.d.ts.map
 
 //#endregion
-export { createNodeId as S, SerializedError as _, BODY_NODE_ID as a, SystemMessage as b, EventMessage as c, InsertPosition as d, Message as f, Priority as g, NodeId as h, AppId as i, HEAD_NODE_ID as l, MutationMessage as m, TransportReadyState as n, DOCUMENT_NODE_ID as o, MutationAction as p, TransportStats as r, DomMutation as s, Transport as t, HTML_NODE_ID as u, SerializedEvent as v, createAppId as x, SerializedLocation as y };
+export { createClientId as C, createAppId as S, Priority as _, BODY_NODE_ID as a, SerializedLocation as b, DomMutation as c, HTML_NODE_ID as d, InsertPosition as f, NodeId as g, MutationMessage as h, AppId as i, EventMessage as l, MutationAction as m, TransportReadyState as n, ClientId as o, Message as p, TransportStats as r, DOCUMENT_NODE_ID as s, Transport as t, HEAD_NODE_ID as u, SerializedError as v, createNodeId as w, SystemMessage as x, SerializedEvent as y };
 //# sourceMappingURL=base.d.ts.map
