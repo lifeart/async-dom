@@ -387,11 +387,8 @@ describe("VirtualDocument.getElementById", () => {
 		expect(doc.getElementById("removable")).toBe(el);
 
 		doc.body.removeChild(el);
-		// _cleanupFromDocument does not unregister id attribute entries —
-		// confirm behaviour matches actual implementation
-		// (id is only unregistered on setAttribute overwrite, not on DOM removal)
-		// so this test verifies the current actual behaviour
-		expect(doc.getElementById("removable")).toBe(el);
+		// After removal from DOM, getElementById should return null
+		expect(doc.getElementById("removable")).toBeNull();
 	});
 });
 
@@ -933,5 +930,107 @@ describe("VirtualDocument register/unregister helpers", () => {
 			bubbles: false,
 		});
 		expect(calls).toHaveLength(1); // No new calls
+	});
+});
+
+// ─── Regression tests ─────────────────────────────────────────────────────────
+
+describe("regression: structural elements are resolvable by nodeId", () => {
+	let doc: VirtualDocument;
+
+	beforeEach(() => {
+		doc = new VirtualDocument(createAppId("test"));
+	});
+
+	it("body is registered in _nodeIdToElement so events can target it", () => {
+		// Register body explicitly (as the framework would for events)
+		doc.registerElement(doc.body._nodeId, doc.body);
+
+		let resolvedTarget: unknown = null;
+		doc.addEventListener("click", (e) => {
+			resolvedTarget = (e as { target: unknown }).target;
+		});
+
+		const listenerId = Array.from(
+			(doc as unknown as { _listenerMap: Map<string, unknown> })._listenerMap.keys(),
+		)[0];
+
+		doc.dispatchEvent(listenerId, { type: "click", target: doc.body._nodeId });
+		expect(resolvedTarget).toBe(doc.body);
+	});
+
+	it("head is registered in _nodeIdToElement so events can target it", () => {
+		doc.registerElement(doc.head._nodeId, doc.head);
+
+		let resolvedTarget: unknown = null;
+		doc.addEventListener("focus", (e) => {
+			resolvedTarget = (e as { target: unknown }).target;
+		});
+
+		const listenerId = Array.from(
+			(doc as unknown as { _listenerMap: Map<string, unknown> })._listenerMap.keys(),
+		)[0];
+
+		doc.dispatchEvent(listenerId, { type: "focus", target: doc.head._nodeId });
+		expect(resolvedTarget).toBe(doc.head);
+	});
+
+	it("documentElement is registered in _nodeIdToElement so events can target it", () => {
+		doc.registerElement(doc.documentElement._nodeId, doc.documentElement);
+
+		let resolvedTarget: unknown = null;
+		doc.addEventListener("scroll", (e) => {
+			resolvedTarget = (e as { target: unknown }).target;
+		});
+
+		const listenerId = Array.from(
+			(doc as unknown as { _listenerMap: Map<string, unknown> })._listenerMap.keys(),
+		)[0];
+
+		doc.dispatchEvent(listenerId, { type: "scroll", target: doc.documentElement._nodeId });
+		expect(resolvedTarget).toBe(doc.documentElement);
+	});
+});
+
+describe("regression: getElementById returns null after DOM removal (was: stale entry)", () => {
+	let doc: VirtualDocument;
+
+	beforeEach(() => {
+		doc = new VirtualDocument(createAppId("test"));
+	});
+
+	it("removeChild on element with id makes getElementById return null", () => {
+		const el = doc.createElement("div");
+		el.setAttribute("id", "will-be-removed");
+		doc.body.appendChild(el);
+
+		expect(doc.getElementById("will-be-removed")).toBe(el);
+
+		doc.body.removeChild(el);
+
+		expect(doc.getElementById("will-be-removed")).toBeNull();
+	});
+
+	it("remove() on element with id makes getElementById return null", () => {
+		const el = doc.createElement("div");
+		el.id = "removable-via-remove";
+		doc.body.appendChild(el);
+
+		expect(doc.getElementById("removable-via-remove")).toBe(el);
+
+		el.remove();
+
+		expect(doc.getElementById("removable-via-remove")).toBeNull();
+	});
+
+	it("replaceChild on element with id unregisters the old id", () => {
+		const old = doc.createElement("div");
+		old.id = "old-element";
+		doc.body.appendChild(old);
+
+		const fresh = doc.createElement("span");
+		doc.body.replaceChild(fresh, old);
+
+		expect(doc.getElementById("old-element")).toBeNull();
 	});
 });

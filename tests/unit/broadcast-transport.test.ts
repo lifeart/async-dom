@@ -639,4 +639,117 @@ describe("BroadcastTransport", () => {
 			expect(lateClient.sent).toHaveLength(0);
 		});
 	});
+
+	// ─── Regression tests ───────────────────────────────────────────────────
+
+	describe("regression: failed client detected when send succeeds but readyState becomes closed", () => {
+		it("client that transitions to 'closed' readyState after send is removed on next broadcast", () => {
+			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+			const bt = new BroadcastTransport();
+			const silentlyClosingTransport = createMockTransport();
+			const goodClient = createMockTransport();
+
+			bt.addClient(createClientId("silently-closing"), silentlyClosingTransport);
+			bt.addClient(createClientId("good"), goodClient);
+
+			// Clear snapshotComplete messages
+			silentlyClosingTransport.sent.length = 0;
+			goodClient.sent.length = 0;
+
+			// Simulate the transport closing silently mid-send (readyState becomes closed
+			// but send() does not throw — the close happens during the send call)
+			const originalSend = silentlyClosingTransport.send.bind(silentlyClosingTransport);
+			silentlyClosingTransport.send = (msg) => {
+				originalSend(msg);
+				// Transition to closed without throwing
+				silentlyClosingTransport.simulateClose();
+			};
+
+			bt.send(makeMutation(1));
+
+			// The silently-closed client must be removed
+			expect(bt.getClientCount()).toBe(1);
+			expect(bt.getClientIds()).not.toContain(createClientId("silently-closing"));
+			// The good client still received the message
+			expect(goodClient.sent.find((m) => m.type === "mutation")).toBeDefined();
+
+			consoleSpy.mockRestore();
+		});
+	});
+
+	describe("regression: removeClient closes the underlying transport", () => {
+		it("transport.close() is called when removeClient is invoked", () => {
+			const bt = new BroadcastTransport();
+			const transport = createMockTransport();
+			const clientId = createClientId("close-test");
+
+			bt.addClient(clientId, transport);
+			expect(transport._closed).toBe(false);
+
+			bt.removeClient(clientId);
+
+			expect(transport._closed).toBe(true);
+		});
+
+		it("transport.close() is called even when removeClient is triggered by send() failure", () => {
+			vi.spyOn(console, "error").mockImplementation(() => {});
+
+			const bt = new BroadcastTransport();
+			// Allow snapshotComplete (1 send), fail on broadcast
+			const failingTransport = createMockTransport({ throwAfterSends: 1 });
+
+			bt.addClient(createClientId("fail-close"), failingTransport);
+			bt.send(makeMutation(1));
+
+			// After removal due to send failure, transport must be closed
+			expect(failingTransport._closed).toBe(true);
+		});
+	});
+
+	describe("regression: close() clears handlers array", () => {
+		it("handlers registered before close() are cleared so no further events are forwarded", () => {
+			const bt = new BroadcastTransport();
+			const received: Message[] = [];
+			bt.onMessage((m) => received.push(m));
+
+			const client = createMockTransport();
+			bt.addClient(createClientId("c"), client);
+			received.length = 0;
+
+			bt.close();
+
+			// Attempt to send a message after close — should not reach any handler
+			// (BroadcastTransport.send() returns early when closed, but we also
+			// verify handlers are cleaned up by checking the internal array is empty)
+			const handlersArray = (bt as unknown as { handlers: unknown[] }).handlers;
+			expect(handlersArray).toHaveLength(0);
+		});
+
+		it("after close(), handlers do not fire for any retained client message simulation", () => {
+			const bt = new BroadcastTransport();
+			const received: Message[] = [];
+			bt.onMessage((m) => received.push(m));
+
+			const client = createMockTransport();
+			bt.addClient(createClientId("d"), client);
+			received.length = 0;
+
+			bt.close();
+			received.length = 0;
+
+			// Since close() cleared handlers, simulating a message on the already-removed
+			// client should not reach any onMessage handler
+			// (client was removed by close(); its onMessage handler routes to bt.handlers
+			//  which is now empty)
+			client.simulateMessage({
+				type: "event" as const,
+				appId: createAppId("app"),
+				listenerId: "x",
+				event: { type: "click", target: null, currentTarget: null },
+			});
+
+			expect(received.filter((m) => m.type === "event")).toHaveLength(0);
+		});
+	});
 });

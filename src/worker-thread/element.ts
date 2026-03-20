@@ -416,6 +416,16 @@ export class VirtualElement {
 	}
 
 	set textContent(value: string) {
+		// Per DOM spec, setting textContent removes all children first
+		for (const child of this.childNodes) {
+			if (child instanceof VirtualElement) {
+				child._cleanupFromDocument();
+			} else if (this._ownerDocument) {
+				this._ownerDocument.unregisterElement(child._nodeId);
+			}
+			child.parentNode = null;
+		}
+		this.childNodes.length = 0;
 		this._textContent = value;
 		const mutation: DomMutation = {
 			action: "setTextContent",
@@ -430,8 +440,17 @@ export class VirtualElement {
 	}
 
 	set innerHTML(value: string) {
+		this._textContent = "";
 		this._innerHTML = value;
-		// Clear children
+		// Clear children — cleanup document registrations first
+		for (const child of this.childNodes) {
+			if (child instanceof VirtualElement) {
+				child._cleanupFromDocument();
+			} else if (this._ownerDocument) {
+				this._ownerDocument.unregisterElement(child._nodeId);
+			}
+			child.parentNode = null;
+		}
 		this.childNodes.length = 0;
 		const mutation: DomMutation = {
 			action: "setHTML",
@@ -617,7 +636,7 @@ export class VirtualElement {
 
 	removeEventListener(_name: string, callback: (e: unknown) => void): void {
 		for (const [listenerId, cb] of this._eventListeners.entries()) {
-			if (cb === callback) {
+			if (cb === callback && this._listenerEventNames.get(listenerId) === _name) {
 				this._eventListeners.delete(listenerId);
 				this._listenerEventNames.delete(listenerId);
 				this._ownerDocument?.unregisterListener(listenerId);
@@ -654,6 +673,11 @@ export class VirtualElement {
 		this._listenerEventNames.clear();
 		this._onHandlers.clear();
 		if (this._ownerDocument) {
+			// Unregister id attribute from the _ids map so getElementById no longer finds this element
+			const elId = this._attributes.get("id");
+			if (elId) {
+				this._ownerDocument.unregisterElementById(elId);
+			}
 			this._ownerDocument.unregisterElement(this._nodeId);
 		}
 		for (const child of this.childNodes) {
@@ -1156,7 +1180,17 @@ export class VirtualTextNode {
 	}
 
 	cloneNode(_deep?: boolean): VirtualTextNode {
-		return new VirtualTextNode(this._nodeValue, createNodeId(), this.collector);
+		const id = createNodeId();
+		const clone = new VirtualTextNode(this._nodeValue, id, this.collector);
+		clone._ownerDocument = this._ownerDocument;
+		const mutation: DomMutation = {
+			action: "createNode",
+			id,
+			tag: "#text",
+			textContent: this._nodeValue,
+		};
+		this.collector.add(mutation);
+		return clone;
 	}
 }
 
@@ -1231,7 +1265,16 @@ export class VirtualCommentNode {
 	}
 
 	cloneNode(_deep?: boolean): VirtualCommentNode {
-		return new VirtualCommentNode(this._nodeValue, createNodeId(), this.collector);
+		const id = createNodeId();
+		const clone = new VirtualCommentNode(this._nodeValue, id, this.collector);
+		clone._ownerDocument = this._ownerDocument;
+		const mutation: DomMutation = {
+			action: "createComment",
+			id,
+			textContent: this._nodeValue,
+		};
+		this.collector.add(mutation);
+		return clone;
 	}
 }
 

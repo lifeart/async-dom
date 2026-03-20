@@ -77,6 +77,8 @@ export class WebSocketServerTransport implements Transport {
 
 		// Wire error
 		this.socket.onerror = (event: unknown) => {
+			this.stopDrainCheck();
+			this.messageQueue.length = 0;
 			this.onError?.(event instanceof Error ? event : new Error("WebSocket error"));
 		};
 	}
@@ -154,6 +156,11 @@ export class WebSocketServerTransport implements Transport {
 	}
 
 	private flushQueue(): void {
+		// Fix 5: don't waste cycles flushing a closed transport
+		if (this._readyState === "closed") {
+			this.messageQueue.length = 0;
+			return;
+		}
 		while (this.messageQueue.length > 0) {
 			// Re-check backpressure while flushing
 			if (this.socket.bufferedAmount > HIGH_WATER_MARK) {

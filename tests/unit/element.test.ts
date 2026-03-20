@@ -1079,4 +1079,163 @@ describe("Element", () => {
 			expect(el.ownerDocument).toBe(doc);
 		});
 	});
+
+	// ─── Regression tests ─────────────────────────────────────────────────────
+
+	describe("regression: innerHTML setter clears _textContent", () => {
+		it("setting innerHTML after textContent clears the old textContent value", () => {
+			const el = doc.createElement("div");
+			el.textContent = "old text";
+			expect(el.textContent).toBe("old text");
+			// Setting innerHTML must clear _textContent so textContent no longer
+			// returns the stale string once childNodes is empty.
+			el.innerHTML = "<b>new</b>";
+			// After innerHTML, childNodes is empty (virtual) so textContent falls
+			// back to _textContent; that value must have been cleared to "".
+			expect(el.textContent).toBe("");
+		});
+
+		it("innerHTML setter leaves _textContent empty, not the old value", () => {
+			const el = doc.createElement("div");
+			el.textContent = "stale";
+			el.innerHTML = "";
+			expect(el.textContent).toBe("");
+		});
+	});
+
+	describe("regression: textContent setter clears childNodes", () => {
+		it("setting textContent removes existing child and nulls its parentNode", () => {
+			const parent = doc.createElement("div");
+			const child = doc.createElement("span");
+			parent.appendChild(child);
+			expect(parent.childNodes).toHaveLength(1);
+
+			parent.textContent = "replaced";
+
+			expect(parent.childNodes).toHaveLength(0);
+			expect(child.parentNode).toBeNull();
+		});
+
+		it("textContent returns the new value (not child text) after setter clears children", () => {
+			const parent = doc.createElement("div");
+			parent.appendChild(doc.createTextNode("hello"));
+			parent.textContent = "world";
+			// childNodes is empty, so textContent must return _textContent
+			expect(parent.textContent).toBe("world");
+		});
+	});
+
+	describe("regression: removeEventListener matches by event name", () => {
+		it("removing 'click' listener leaves 'mouseover' listener intact", () => {
+			const el = doc.createElement("div");
+			let clickFired = false;
+			let mouseoverFired = false;
+			const clickHandler = () => { clickFired = true; };
+			const mouseoverHandler = () => { mouseoverFired = true; };
+
+			el.addEventListener("click", clickHandler);
+			el.addEventListener("mouseover", mouseoverHandler);
+
+			// Remove only click
+			el.removeEventListener("click", clickHandler);
+
+			el.dispatchEvent({ type: "click" });
+			el.dispatchEvent({ type: "mouseover" });
+
+			expect(clickFired).toBe(false);
+			expect(mouseoverFired).toBe(true);
+		});
+
+		it("removing 'click' does not remove same fn registered for 'mouseover'", () => {
+			const el = doc.createElement("div");
+			let count = 0;
+			const handler = () => { count++; };
+
+			el.addEventListener("click", handler);
+			el.addEventListener("mouseover", handler);
+
+			el.removeEventListener("click", handler);
+
+			el.dispatchEvent({ type: "mouseover" });
+			expect(count).toBe(1); // mouseover listener still fires
+		});
+	});
+
+	describe("regression: cloneNode(true) works for elements with text children", () => {
+		it("deep clone has text child with same content", () => {
+			const parent = doc.createElement("div");
+			const text = doc.createTextNode("hello");
+			parent.appendChild(text);
+
+			const clone = parent.cloneNode(true);
+
+			expect(clone.childNodes).toHaveLength(1);
+			const clonedText = clone.childNodes[0] as VirtualTextNode;
+			expect(clonedText.nodeType).toBe(3);
+			expect(clonedText.nodeValue).toBe("hello");
+		});
+
+		it("deep clone text child is a new instance with a different _nodeId", () => {
+			const parent = doc.createElement("div");
+			const text = doc.createTextNode("test");
+			parent.appendChild(text);
+
+			const clone = parent.cloneNode(true);
+			const clonedText = clone.childNodes[0] as VirtualTextNode;
+
+			expect(clonedText).not.toBe(text);
+			expect(clonedText._nodeId).not.toBe(text._nodeId);
+		});
+
+		it("cloneNode emits mutations (createNode) for each cloned text child", () => {
+			const parent = doc.createElement("div");
+			parent.appendChild(doc.createTextNode("content"));
+			doc.collector.flushSync();
+
+			parent.cloneNode(true);
+
+			expect(doc.collector.pendingCount).toBeGreaterThan(0);
+		});
+	});
+
+	describe("regression: remove() unregisters id from document._ids", () => {
+		it("getElementById returns null after element with id is removed from DOM", () => {
+			const el = doc.createElement("div");
+			el.setAttribute("id", "tracked");
+			doc.body.appendChild(el);
+
+			expect(doc.getElementById("tracked")).toBe(el);
+
+			el.remove();
+
+			// After removal, the id must be unregistered
+			expect(doc.getElementById("tracked")).toBeNull();
+		});
+
+		it("getElementById returns null after removeChild on element with id", () => {
+			const el = doc.createElement("section");
+			el.setAttribute("id", "section-one");
+			doc.body.appendChild(el);
+
+			expect(doc.getElementById("section-one")).toBe(el);
+
+			doc.body.removeChild(el);
+
+			expect(doc.getElementById("section-one")).toBeNull();
+		});
+
+		it("nested element ids are also unregistered on parent removal", () => {
+			const outer = doc.createElement("div");
+			const inner = doc.createElement("span");
+			inner.setAttribute("id", "inner-id");
+			outer.appendChild(inner);
+			doc.body.appendChild(outer);
+
+			expect(doc.getElementById("inner-id")).toBe(inner);
+
+			outer.remove();
+
+			expect(doc.getElementById("inner-id")).toBeNull();
+		});
+	});
 });

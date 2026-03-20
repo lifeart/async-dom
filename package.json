@@ -21,7 +21,8 @@
     },
     "./vite-plugin": {
       "types": "./dist/vite-plugin.d.ts",
-      "import": "./dist/vite-plugin.js"
+      "import": "./dist/vite-plugin.js",
+      "require": "./dist/vite-plugin.cjs"
     },
     "./react": {
       "types": "./dist/react.d.ts",

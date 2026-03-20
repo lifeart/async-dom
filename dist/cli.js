@@ -449,7 +449,7 @@ async function init(args) {
 }
 function printHelp() {
 	console.log(`
-async-dom - Asynchronous DOM rendering CLI
+@lifeart/async-dom - Asynchronous DOM rendering CLI
 
 Usage:
   async-dom init [name] [--template <template>]
@@ -461,8 +461,8 @@ Templates:
   ${AVAILABLE_TEMPLATES.join(", ")}
 
 Examples:
-  npx async-dom init my-app
-  npx async-dom init my-app --template react-ts
+  npx @lifeart/async-dom init my-app
+  npx @lifeart/async-dom init my-app --template react-ts
 `);
 }
 async function main() {

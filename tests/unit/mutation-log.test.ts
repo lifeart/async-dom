@@ -149,4 +149,85 @@ describe("MutationLog", () => {
 			expect(replayed[0].mutations).toEqual(mutations);
 		});
 	});
+
+	// ─── Regression tests ───────────────────────────────────────────────────
+
+	describe("regression: ring buffer maintains correct order after wrapping", () => {
+		it("after filling beyond capacity, oldest entries are evicted and remaining are in insertion order", () => {
+			const log = new MutationLog({ maxEntries: 4 });
+
+			// Fill to capacity
+			log.append(makeMutation(1));
+			log.append(makeMutation(2));
+			log.append(makeMutation(3));
+			log.append(makeMutation(4));
+
+			// Overflow — uid=1 must be evicted
+			log.append(makeMutation(5));
+
+			const uids = log.getReplayMessages().map((m) => m.uid);
+			expect(uids).toEqual([2, 3, 4, 5]);
+			expect(uids[0]).toBe(2); // oldest kept is 2
+			expect(uids[uids.length - 1]).toBe(5); // newest is 5
+		});
+
+		it("multiple wraps keep only the newest maxEntries entries in insertion order", () => {
+			const log = new MutationLog({ maxEntries: 3 });
+
+			for (let i = 1; i <= 10; i++) {
+				log.append(makeMutation(i));
+			}
+
+			const uids = log.getReplayMessages().map((m) => m.uid);
+			// After 10 appends with cap 3: only 8, 9, 10 remain
+			expect(uids).toEqual([8, 9, 10]);
+		});
+
+		it("size() never exceeds maxEntries after many wrapping appends", () => {
+			const log = new MutationLog({ maxEntries: 5 });
+
+			for (let i = 0; i < 50; i++) {
+				log.append(makeMutation(i));
+			}
+
+			expect(log.size()).toBe(5);
+		});
+
+		it("single overflow: size stays at maxEntries, not maxEntries+1", () => {
+			const log = new MutationLog({ maxEntries: 2 });
+			log.append(makeMutation(1));
+			log.append(makeMutation(2));
+			log.append(makeMutation(3)); // triggers eviction
+
+			expect(log.size()).toBe(2);
+			const uids = log.getReplayMessages().map((m) => m.uid);
+			expect(uids).toEqual([2, 3]);
+		});
+	});
+
+	describe("regression: negative maxEntries is clamped to 0 and stores nothing", () => {
+		it("negative maxEntries stores no entries", () => {
+			const log = new MutationLog({ maxEntries: -1 });
+			log.append(makeMutation(1));
+			log.append(makeMutation(2));
+
+			expect(log.size()).toBe(0);
+			expect(log.getReplayMessages()).toEqual([]);
+		});
+
+		it("very negative maxEntries stores no entries", () => {
+			const log = new MutationLog({ maxEntries: -999999 });
+			log.append(makeMutation(42));
+
+			expect(log.size()).toBe(0);
+		});
+
+		it("maxEntries of -0 behaves as 0 and stores nothing", () => {
+			const log = new MutationLog({ maxEntries: -0 });
+			log.append(makeMutation(1));
+
+			// -0 is === 0 in JS, so this is the same as maxEntries:0
+			expect(log.size()).toBe(0);
+		});
+	});
 });

@@ -38,11 +38,18 @@ export class BroadcastTransport implements Transport {
 			this.log.append(message);
 		}
 
-		// Fix C: collect failed clients, then remove after iteration
+		// Collect failed clients, then remove after iteration.
+		// A client is considered failed if send() throws OR if the transport
+		// transitions to "closed" during send (e.g. sendRaw swallows the exception
+		// but closes the underlying socket).
 		const failedClientIds: ClientId[] = [];
 		for (const [clientId, transport] of this.clients) {
 			try {
 				transport.send(message);
+				// Fix 1: detect transports that closed silently during send
+				if (transport.readyState === "closed") {
+					failedClientIds.push(clientId);
+				}
 			} catch (err) {
 				console.error(`[async-dom] Failed to send to client ${clientId}:`, err);
 				failedClientIds.push(clientId);
@@ -61,10 +68,13 @@ export class BroadcastTransport implements Transport {
 		if (this._readyState === "closed") return;
 		this._readyState = "closed";
 
-		// Remove all clients (this also fires disconnect callbacks)
+		// Remove all clients (this also fires disconnect callbacks and closes transports)
 		for (const clientId of [...this.clients.keys()]) {
 			this.removeClient(clientId);
 		}
+
+		// Fix 3: clear handler array so retained references can be GC'd
+		this.handlers.length = 0;
 
 		this.log.clear();
 		this.onClose?.();
@@ -149,11 +159,19 @@ export class BroadcastTransport implements Transport {
 		const transport = this.clients.get(clientId);
 		if (!transport) return;
 
-		// Fix F: nullify transport.onClose before doing anything else to
-		// prevent re-entrant calls (e.g. if close() triggers onClose again)
+		// Nullify transport.onClose before doing anything else to prevent
+		// re-entrant calls (e.g. if close() triggers onClose again)
 		transport.onClose = undefined;
 
 		this.clients.delete(clientId);
+
+		// Fix 2: close the underlying transport so the socket is torn down,
+		// drain timer stops, and no further messages are queued.
+		try {
+			transport.close();
+		} catch {
+			// Already closed — ignore
+		}
 
 		// Notify source of disconnection
 		for (const h of this.handlers) {

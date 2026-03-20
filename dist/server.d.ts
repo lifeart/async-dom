@@ -27,9 +27,14 @@ interface MutationLogConfig {
 }
 /**
  * Ring buffer that stores recent MutationMessages for replay to new clients.
+ *
+ * Uses a fixed-capacity circular buffer with O(1) append and O(n) replay,
+ * avoiding the O(n) cost of Array.shift() for eviction.
  */
 declare class MutationLog {
-  private entries;
+  private buffer;
+  private head;
+  private count;
   private maxEntries;
   constructor(config?: MutationLogConfig);
   append(message: MutationMessage): void;

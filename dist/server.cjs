@@ -35,26 +35,42 @@ function createServerApp(options) {
 //#region src/server/mutation-log.ts
 /**
 * Ring buffer that stores recent MutationMessages for replay to new clients.
+*
+* Uses a fixed-capacity circular buffer with O(1) append and O(n) replay,
+* avoiding the O(n) cost of Array.shift() for eviction.
 */
 var MutationLog = class {
-	entries = [];
+	buffer;
+	head = 0;
+	count = 0;
 	maxEntries;
 	constructor(config) {
 		this.maxEntries = Math.max(0, config?.maxEntries ?? 1e4);
+		this.buffer = this.maxEntries > 0 ? new Array(this.maxEntries) : [];
 	}
 	append(message) {
 		if (this.maxEntries === 0) return;
-		this.entries.push(message);
-		if (this.entries.length > this.maxEntries) this.entries.shift();
+		if (this.count < this.maxEntries) {
+			const writeIndex = (this.head + this.count) % this.maxEntries;
+			this.buffer[writeIndex] = message;
+			this.count++;
+		} else {
+			this.buffer[this.head] = message;
+			this.head = (this.head + 1) % this.maxEntries;
+		}
 	}
 	getReplayMessages() {
-		return this.entries.slice();
+		const result = new Array(this.count);
+		for (let i = 0; i < this.count; i++) result[i] = this.buffer[(this.head + i) % this.maxEntries];
+		return result;
 	}
 	size() {
-		return this.entries.length;
+		return this.count;
 	}
 	clear() {
-		this.entries.length = 0;
+		this.head = 0;
+		this.count = 0;
+		this.buffer.fill(void 0);
 	}
 };
 //#endregion
@@ -82,6 +98,7 @@ var BroadcastTransport = class {
 		const failedClientIds = [];
 		for (const [clientId, transport] of this.clients) try {
 			transport.send(message);
+			if (transport.readyState === "closed") failedClientIds.push(clientId);
 		} catch (err) {
 			console.error(`[async-dom] Failed to send to client ${clientId}:`, err);
 			failedClientIds.push(clientId);
@@ -95,6 +112,7 @@ var BroadcastTransport = class {
 		if (this._readyState === "closed") return;
 		this._readyState = "closed";
 		for (const clientId of [...this.clients.keys()]) this.removeClient(clientId);
+		this.handlers.length = 0;
 		this.log.clear();
 		this.onClose?.();
 	}
@@ -151,6 +169,9 @@ var BroadcastTransport = class {
 		if (!transport) return;
 		transport.onClose = void 0;
 		this.clients.delete(clientId);
+		try {
+			transport.close();
+		} catch {}
 		for (const h of this.handlers) try {
 			h({
 				type: "clientDisconnect",

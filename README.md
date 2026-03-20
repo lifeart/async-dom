@@ -1,4 +1,4 @@
-# async-dom
+# @lifeart/async-dom
 
 [![CI](https://github.com/lifeart/async-dom/actions/workflows/ci.yml/badge.svg)](https://github.com/lifeart/async-dom/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/@lifeart/async-dom)](https://www.npmjs.com/package/@lifeart/async-dom)
@@ -265,9 +265,10 @@ await streaming.ready;
 import { createAsyncDom } from "@lifeart/async-dom";
 import { WebSocketTransport } from "@lifeart/async-dom/transport";
 
-const asyncDom = createAsyncDom({ container: document.getElementById("app") });
+const asyncDom = createAsyncDom({ target: document.getElementById("app")! });
 const transport = new WebSocketTransport("ws://localhost:8080");
-asyncDom.addRemoteApp("shared-app", transport);
+asyncDom.addRemoteApp({ transport, name: "shared-app" });
+asyncDom.start();
 ```
 
 **`StreamingServerInstance` API**
@@ -318,7 +319,7 @@ dom.addApp({
 | `@lifeart/async-dom/vue`       | Vue `<AsyncDom>` component + `useAsyncDom` composable |
 | `@lifeart/async-dom/svelte`    | Svelte `asyncDom` action                     |
 | `@lifeart/async-dom/vite-plugin` | Vite plugin (COOP/COEP headers, binary transport, error overlay) |
-| `@lifeart/async-dom/server`   | Server-side runner (`createServerApp`, `WebSocketServerTransport`) |
+| `@lifeart/async-dom/server`   | Server-side runner (`createServerApp`, `createStreamingServer`, `BroadcastTransport`, `MutationLog`, `WebSocketServerTransport`) |
 
 ---
 

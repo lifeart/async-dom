@@ -669,6 +669,8 @@ var VirtualElement = class VirtualElement {
 		return result;
 	}
 	set textContent(value) {
+		for (const child of this.childNodes) child.parentNode = null;
+		this.childNodes.length = 0;
 		this._textContent = value;
 		const mutation = {
 			action: "setTextContent",
@@ -681,6 +683,7 @@ var VirtualElement = class VirtualElement {
 		return this._innerHTML;
 	}
 	set innerHTML(value) {
+		this._textContent = "";
 		this._innerHTML = value;
 		this.childNodes.length = 0;
 		const mutation = {
@@ -825,7 +828,7 @@ var VirtualElement = class VirtualElement {
 		return this._eventListeners.get(listenerId);
 	}
 	removeEventListener(_name, callback) {
-		for (const [listenerId, cb] of this._eventListeners.entries()) if (cb === callback) {
+		for (const [listenerId, cb] of this._eventListeners.entries()) if (cb === callback && this._listenerEventNames.get(listenerId) === _name) {
 			this._eventListeners.delete(listenerId);
 			this._listenerEventNames.delete(listenerId);
 			this._ownerDocument?.unregisterListener(listenerId);
@@ -853,7 +856,11 @@ var VirtualElement = class VirtualElement {
 		this._eventListeners.clear();
 		this._listenerEventNames.clear();
 		this._onHandlers.clear();
-		if (this._ownerDocument) this._ownerDocument.unregisterElement(this._nodeId);
+		if (this._ownerDocument) {
+			const elId = this._attributes.get("id");
+			if (elId) this._ownerDocument.unregisterElementById(elId);
+			this._ownerDocument.unregisterElement(this._nodeId);
+		}
 		for (const child of this.childNodes) if (child instanceof VirtualElement) child._cleanupFromDocument();
 		else if (this._ownerDocument) this._ownerDocument.unregisterElement(child._nodeId);
 	}
@@ -1275,7 +1282,17 @@ var VirtualTextNode = class VirtualTextNode {
 		this.collector.add(mutation);
 	}
 	cloneNode(_deep) {
-		return new VirtualTextNode(this._nodeValue, createNodeId(), this.collector);
+		const id = createNodeId();
+		const clone = new VirtualTextNode(this._nodeValue, id, this.collector);
+		clone._ownerDocument = this._ownerDocument;
+		const mutation = {
+			action: "createNode",
+			id,
+			tag: "#text",
+			textContent: this._nodeValue
+		};
+		this.collector.add(mutation);
+		return clone;
 	}
 };
 /**
@@ -1332,7 +1349,16 @@ var VirtualCommentNode = class VirtualCommentNode {
 		this.collector.add(mutation);
 	}
 	cloneNode(_deep) {
-		return new VirtualCommentNode(this._nodeValue, createNodeId(), this.collector);
+		const id = createNodeId();
+		const clone = new VirtualCommentNode(this._nodeValue, id, this.collector);
+		clone._ownerDocument = this._ownerDocument;
+		const mutation = {
+			action: "createComment",
+			id,
+			textContent: this._nodeValue
+		};
+		this.collector.add(mutation);
+		return clone;
 	}
 };
 var VirtualClassList = class {
@@ -1660,6 +1686,9 @@ var VirtualDocument = class {
 		this.documentElement._ownerDocument = this;
 		this.head._ownerDocument = this;
 		this.body._ownerDocument = this;
+		this._nodeIdToElement.set(3, this.documentElement);
+		this._nodeIdToElement.set(2, this.head);
+		this._nodeIdToElement.set(1, this.body);
 		this.documentElement.appendChild(this.head);
 		this.documentElement.appendChild(this.body);
 		this.collector.flush();

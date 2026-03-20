@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0-alpha.2
+
+### Added
+- Multi-client streaming server: `createStreamingServer`, `BroadcastTransport`, `MutationLog` — one server-side app instance streams to multiple browser clients simultaneously with full mutation replay on late join
+- Package renamed to `@lifeart/async-dom` (scoped publish)
+- Comprehensive test coverage additions across transport, scheduler, renderer, and streaming modules
+
 ## 2.0.0-alpha.1
 
 Complete rewrite of @lifeart/async-dom as a modern TypeScript library.

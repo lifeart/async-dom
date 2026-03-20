@@ -50,6 +50,8 @@ var WebSocketServerTransport = class {
 			this.onClose?.();
 		};
 		this.socket.onerror = (event) => {
+			this.stopDrainCheck();
+			this.messageQueue.length = 0;
 			this.onError?.(event instanceof Error ? event : /* @__PURE__ */ new Error("WebSocket error"));
 		};
 	}
@@ -101,6 +103,10 @@ var WebSocketServerTransport = class {
 		}
 	}
 	flushQueue() {
+		if (this._readyState === "closed") {
+			this.messageQueue.length = 0;
+			return;
+		}
 		while (this.messageQueue.length > 0) {
 			if (this.socket.bufferedAmount > HIGH_WATER_MARK) return;
 			const msg = this.messageQueue.shift();

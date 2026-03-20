@@ -57,6 +57,11 @@ export class VirtualDocument {
 		this.head._ownerDocument = this;
 		this.body._ownerDocument = this;
 
+		// Register structural elements so _resolveTarget can find them by NodeId
+		this._nodeIdToElement.set(HTML_NODE_ID, this.documentElement);
+		this._nodeIdToElement.set(HEAD_NODE_ID, this.head);
+		this._nodeIdToElement.set(BODY_NODE_ID, this.body);
+
 		this.documentElement.appendChild(this.head);
 		this.documentElement.appendChild(this.body);
 
