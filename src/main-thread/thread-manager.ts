@@ -30,13 +30,10 @@ export class ThreadManager {
 
 	createWorkerThread(config: WorkerConfig): AppId {
 		const appId = generateAppId();
-		const useBinary =
-			typeof __ASYNC_DOM_BINARY__ !== "undefined" && __ASYNC_DOM_BINARY__;
+		const useBinary = typeof __ASYNC_DOM_BINARY__ !== "undefined" && __ASYNC_DOM_BINARY__;
 		const transport =
 			config.transport ??
-			(useBinary
-				? new BinaryWorkerTransport(config.worker)
-				: new WorkerTransport(config.worker));
+			(useBinary ? new BinaryWorkerTransport(config.worker) : new WorkerTransport(config.worker));
 
 		transport.onMessage((message) => {
 			this.notifyHandlers(appId, message);

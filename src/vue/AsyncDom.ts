@@ -58,6 +58,7 @@ export const AsyncDom = defineComponent({
 	}>,
 
 	setup(props, { emit, slots }) {
+		// biome-ignore lint/correctness/useHookAtTopLevel: Vue composable, not a React hook
 		const { containerRef, instance } = useAsyncDom({
 			worker: props.worker,
 			scheduler: props.scheduler,

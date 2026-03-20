@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from "react";
-import type { AsyncDomInstance } from "../main-thread/index.ts";
 import type { DebugOptions, SchedulerConfig, SerializedError } from "../index.ts";
+import type { AsyncDomInstance } from "../main-thread/index.ts";
 import { useAsyncDom } from "./use-async-dom.ts";
 
 export interface AsyncDomProps {

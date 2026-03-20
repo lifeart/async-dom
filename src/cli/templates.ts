@@ -14,10 +14,7 @@ export interface TemplateFile {
  * @returns Array of files to write to disk.
  * @throws If the template name is not recognized.
  */
-export function getTemplate(
-	template: string,
-	name: string,
-): TemplateFile[] {
+export function getTemplate(template: string, name: string): TemplateFile[] {
 	switch (template) {
 		case "vanilla-ts":
 			return vanillaTs(name);

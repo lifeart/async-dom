@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Mock the main-thread module before importing React adapter
 vi.mock("../../src/main-thread/index.ts", () => ({
@@ -32,7 +32,6 @@ describe("react adapter", () => {
 
 	it("useAsyncDom returns containerRef and instance", async () => {
 		// We need to test this in a React context
-		const React = await import("react");
 		const { renderHook } = await import("@testing-library/react");
 		const { useAsyncDom } = await import("../../src/react/use-async-dom.ts");
 

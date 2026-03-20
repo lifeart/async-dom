@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { asyncDomPlugin } from "../../src/vite-plugin/index.ts";
 import type { Plugin } from "vite";
+import { describe, expect, it, vi } from "vitest";
+import { asyncDomPlugin } from "../../src/vite-plugin/index.ts";
 
 describe("asyncDomPlugin", () => {
 	it("returns a plugin with name 'async-dom'", () => {
@@ -155,7 +155,7 @@ describe("asyncDomPlugin", () => {
 		const errorHandler = hotHandlers.get("async-dom:error");
 		expect(errorHandler).toBeDefined();
 
-		errorHandler!({ message: "Test error", stack: "Error: Test error\n  at worker.ts:1" });
+		errorHandler?.({ message: "Test error", stack: "Error: Test error\n  at worker.ts:1" });
 
 		expect(mockServer.hot.send).toHaveBeenCalledWith({
 			type: "error",

@@ -50,9 +50,7 @@ async function init(args: string[]): Promise<void> {
 
 	// Validate template
 	if (!AVAILABLE_TEMPLATES.includes(template as (typeof AVAILABLE_TEMPLATES)[number])) {
-		console.error(
-			`Unknown template: ${template}. Available: ${AVAILABLE_TEMPLATES.join(", ")}`,
-		);
+		console.error(`Unknown template: ${template}. Available: ${AVAILABLE_TEMPLATES.join(", ")}`);
 		process.exit(1);
 	}
 

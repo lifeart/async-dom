@@ -14,6 +14,7 @@ let running = false;
 let generation = 0;
 let speed = 200;
 let timerId: ReturnType<typeof setTimeout> | null = null;
+let aliveCount = 0;
 
 // --- Initialize with random pattern ---
 function randomize() {
@@ -21,7 +22,8 @@ function randomize() {
 		grid[i] = Math.random() > 0.65 ? 1 : 0;
 	}
 	generation = 0;
-	renderGrid();
+	recount();
+	renderFullGrid();
 	updateStats();
 }
 
@@ -57,12 +59,16 @@ function seedPatterns() {
 	grid[(cy + 1) * COLS + cx] = 1;
 	grid[(cy + 1) * COLS + cx + 1] = 1;
 	grid[(cy + 2) * COLS + cx + 1] = 1;
-	renderGrid();
+	recount();
+	renderFullGrid();
 	updateStats();
 }
 
 // --- Game of Life rules ---
 function step() {
+	// Save current grid into nextGrid so we can diff after swap
+	nextGrid.set(grid);
+
 	for (let row = 0; row < ROWS; row++) {
 		for (let col = 0; col < COLS; col++) {
 			let neighbors = 0;
@@ -75,25 +81,29 @@ function step() {
 				}
 			}
 			const idx = row * COLS + col;
-			nextGrid[idx] = grid[idx]
+			const alive = grid[idx];
+			const next = alive
 				? neighbors === 2 || neighbors === 3
 					? 1
 					: 0
 				: neighbors === 3
 					? 1
 					: 0;
+			// Write new state back into nextGrid (overwriting the copy)
+			nextGrid[idx] = next;
+			aliveCount += next - alive;
 		}
 	}
+	// Swap: grid = new state, nextGrid = old state (for dirty diffing)
 	const tmp = grid;
 	grid = nextGrid;
 	nextGrid = tmp;
 	generation++;
 }
 
-function countAlive(): number {
-	let count = 0;
-	for (let i = 0; i < CELL_COUNT; i++) count += grid[i];
-	return count;
+function recount(): void {
+	aliveCount = 0;
+	for (let i = 0; i < CELL_COUNT; i++) aliveCount += grid[i];
 }
 
 // --- Build DOM ---
@@ -117,7 +127,7 @@ playBtn.setAttribute(
 );
 
 const stepBtn = document.createElement("button");
-stepBtn.textContent = "\u23E9 Step";
+stepBtn.textContent = "\u23ED Step";
 stepBtn.setAttribute(
 	"style",
 	"background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 13px;",
@@ -145,7 +155,7 @@ clearBtn.setAttribute(
 );
 
 const speedUpBtn = document.createElement("button");
-speedUpBtn.textContent = "\u23E9";
+speedUpBtn.textContent = "+";
 speedUpBtn.setAttribute(
 	"style",
 	"background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; margin-left: auto;",
@@ -156,7 +166,7 @@ speedLabel.setAttribute("style", "color: #8b949e; font-size: 12px; min-width: 75
 speedLabel.textContent = `${speed}ms/gen`;
 
 const speedDownBtn = document.createElement("button");
-speedDownBtn.textContent = "\u23EA";
+speedDownBtn.textContent = "\u2212";
 speedDownBtn.setAttribute(
 	"style",
 	"background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px;",
@@ -206,9 +216,10 @@ for (let i = 0; i < CELL_COUNT; i++) {
 	const cell = document.createElement("div");
 	cell.setAttribute(
 		"style",
-		"aspect-ratio: 1; background: #0d1117; border: 1px solid #161b22; transition: background 0.15s;",
+		"aspect-ratio: 1; background: #0d1117; border: 1px solid #161b22;",
 	);
 	cell.addEventListener("click", () => {
+		aliveCount += grid[i] ? -1 : 1;
 		grid[i] = grid[i] ? 0 : 1;
 		renderCell(i);
 		updateStats();
@@ -217,18 +228,26 @@ for (let i = 0; i < CELL_COUNT; i++) {
 	gridEl.appendChild(cell);
 }
 
-// --- Rendering ---
+// --- Rendering (dirty-cell tracking: only update changed cells) ---
 function renderCell(i: number) {
 	cells[i].style["background"] = grid[i] ? "#39d353" : "#0d1117";
 }
 
-function renderGrid() {
+function renderFullGrid() {
 	for (let i = 0; i < CELL_COUNT; i++) renderCell(i);
+}
+
+function renderDirtyGrid() {
+	for (let i = 0; i < CELL_COUNT; i++) {
+		if (grid[i] !== nextGrid[i]) {
+			renderCell(i);
+		}
+	}
 }
 
 function updateStats() {
 	genDisplay.textContent = `Generation: ${generation}`;
-	aliveDisplay.textContent = `Alive: ${countAlive()} / ${CELL_COUNT}`;
+	aliveDisplay.textContent = `Alive: ${aliveCount} / ${CELL_COUNT}`;
 }
 
 // --- Simulation controls ---
@@ -253,7 +272,8 @@ function stopSimulation() {
 function tick() {
 	if (!running) return;
 	step();
-	renderGrid();
+	// nextGrid now holds the old state after swap — diff against it
+	renderDirtyGrid();
 	updateStats();
 	timerId = setTimeout(tick, speed);
 }
@@ -265,7 +285,7 @@ playBtn.addEventListener("click", () => {
 stepBtn.addEventListener("click", () => {
 	stopSimulation();
 	step();
-	renderGrid();
+	renderDirtyGrid();
 	updateStats();
 });
 
@@ -283,18 +303,27 @@ clearBtn.addEventListener("click", () => {
 	stopSimulation();
 	grid.fill(0);
 	generation = 0;
-	renderGrid();
+	aliveCount = 0;
+	renderFullGrid();
 	updateStats();
 });
 
 speedUpBtn.addEventListener("click", () => {
 	speed = Math.max(16, speed - 50);
 	speedLabel.textContent = `${speed}ms/gen`;
+	if (running && timerId !== null) {
+		clearTimeout(timerId);
+		timerId = setTimeout(tick, speed);
+	}
 });
 
 speedDownBtn.addEventListener("click", () => {
 	speed = Math.min(1000, speed + 50);
 	speedLabel.textContent = `${speed}ms/gen`;
+	if (running && timerId !== null) {
+		clearTimeout(timerId);
+		timerId = setTimeout(tick, speed);
+	}
 });
 
 // Initialize

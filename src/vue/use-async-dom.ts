@@ -1,13 +1,6 @@
-import {
-	onBeforeUnmount,
-	onMounted,
-	ref,
-	shallowRef,
-	type Ref,
-	type ShallowRef,
-} from "vue";
-import type { AsyncDomInstance } from "../main-thread/index.ts";
+import { onBeforeUnmount, onMounted, type Ref, ref, type ShallowRef, shallowRef } from "vue";
 import type { DebugOptions, SchedulerConfig, SerializedError } from "../index.ts";
+import type { AsyncDomInstance } from "../main-thread/index.ts";
 import { resolveDebugOption } from "../shared/resolve-debug.ts";
 
 export interface UseAsyncDomOptions {

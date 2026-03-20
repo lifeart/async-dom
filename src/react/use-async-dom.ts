@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { AsyncDomInstance } from "../main-thread/index.ts";
 import type { DebugOptions, SchedulerConfig, SerializedError } from "../index.ts";
+import type { AsyncDomInstance } from "../main-thread/index.ts";
 import { resolveDebugOption } from "../shared/resolve-debug.ts";
 
 export interface UseAsyncDomOptions {

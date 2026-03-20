@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Mock the main-thread module
 vi.mock("../../src/main-thread/index.ts", () => ({

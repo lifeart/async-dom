@@ -11,14 +11,14 @@ let centerX = -0.5;
 let centerY = 0;
 let zoom = 1;
 
-// --- Color Palette (ultra-black for set, smooth gradient outside) ---
+// --- Color Palette (HSL-based for vivid fractal colors) ---
 function iterToColor(iter: number, maxIter: number): string {
 	if (iter >= maxIter) return "#000000";
 	const t = iter / maxIter;
-	const r = Math.floor(9 * (1 - t) * t * t * t * 255);
-	const g = Math.floor(15 * (1 - t) * (1 - t) * t * t * 255);
-	const b = Math.floor(8.5 * (1 - t) * (1 - t) * (1 - t) * t * 255);
-	return `rgb(${r},${g},${b})`;
+	const hue = (240 + 360 * t) % 360;
+	const sat = 80;
+	const lum = 10 + 40 * Math.sqrt(t);
+	return `hsl(${hue | 0},${sat}%,${lum | 0}%)`;
 }
 
 // --- Mandelbrot with smooth coloring ---
@@ -33,9 +33,12 @@ function mandelbrot(cx: number, cy: number): number {
 		iter++;
 	}
 	if (iter < MAX_ITER) {
-		const logZn = Math.log(x * x + y * y) / 2;
-		const nu = Math.log(logZn / Math.log(2)) / Math.log(2);
-		iter = iter + 1 - nu;
+		const zn = x * x + y * y;
+		if (zn > 1) {
+			const logZn = Math.log(zn) / 2;
+			const nu = Math.log(logZn / Math.log(2)) / Math.log(2);
+			iter = iter + 1 - nu;
+		}
 	}
 	return iter;
 }
@@ -54,7 +57,7 @@ header.setAttribute(
 );
 
 const coordsDisplay = document.createElement("span");
-coordsDisplay.textContent = `Center: (${centerX.toFixed(4)}, ${centerY.toFixed(4)}) | Zoom: ${zoom.toFixed(1)}x`;
+coordsDisplay.textContent = `Center: (${centerX.toFixed(6)}, ${centerY.toFixed(6)}) | Zoom: ${zoom.toFixed(1)}x`;
 
 const resetBtn = document.createElement("button");
 resetBtn.textContent = "Reset View";

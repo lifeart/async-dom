@@ -1,5 +1,5 @@
-import type { AsyncDomInstance } from "../main-thread/index.ts";
 import type { DebugOptions, SchedulerConfig, SerializedError } from "../index.ts";
+import type { AsyncDomInstance } from "../main-thread/index.ts";
 import { resolveDebugOption } from "../shared/resolve-debug.ts";
 
 export interface AsyncDomActionOptions {
@@ -73,6 +73,6 @@ export function asyncDom(
 	};
 }
 
+export type { DebugOptions, SerializedError } from "../index.ts";
 // Re-export key types for convenience
 export type { AsyncDomInstance, SchedulerConfig } from "../main-thread/index.ts";
-export type { DebugOptions, SerializedError } from "../index.ts";

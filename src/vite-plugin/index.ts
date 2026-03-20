@@ -52,12 +52,7 @@ function addCrossOriginHeaders(server: ViteDevServer, enabled: boolean): void {
  * ```
  */
 export function asyncDomPlugin(options: AsyncDomPluginOptions = {}): Plugin {
-	const {
-		headers = true,
-		debug,
-		binaryTransport = true,
-		workerErrorOverlay = true,
-	} = options;
+	const { headers = true, debug, binaryTransport = true, workerErrorOverlay = true } = options;
 
 	return {
 		name: "async-dom",

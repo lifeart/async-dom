@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { getTemplate, AVAILABLE_TEMPLATES } from "../../src/cli/templates.ts";
+import { describe, expect, it } from "vitest";
+import { AVAILABLE_TEMPLATES, getTemplate } from "../../src/cli/templates.ts";
 
 describe("CLI templates", () => {
 	it("has vanilla-ts, react-ts, vue-ts templates", () => {
