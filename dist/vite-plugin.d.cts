@@ -25,7 +25,7 @@ interface AsyncDomPluginOptions {
  * ```ts
  * // vite.config.ts
  * import { defineConfig } from "vite";
- * import { asyncDomPlugin } from "async-dom/vite-plugin";
+ * import { asyncDomPlugin } from "@lifeart/async-dom/vite-plugin";
  *
  * export default defineConfig({
  *   plugins: [asyncDomPlugin()],

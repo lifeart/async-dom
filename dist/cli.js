@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as readline from "node:readline";
@@ -44,7 +45,7 @@ function vanillaTs(name) {
 				devDependencies: {
 					typescript: "^5.8.0",
 					vite: "^6.0.0",
-					"async-dom": "latest"
+					"@lifeart/async-dom": "latest"
 				}
 			}, null, 2)
 		},
@@ -66,7 +67,7 @@ function vanillaTs(name) {
 		},
 		{
 			path: "src/main.ts",
-			content: `import { createAsyncDom } from "async-dom";
+			content: `import { createAsyncDom } from "@lifeart/async-dom";
 
 const worker = new Worker(new URL("./app.worker.ts", import.meta.url), {
   type: "module",
@@ -82,7 +83,7 @@ instance.start();
 		},
 		{
 			path: "src/app.worker.ts",
-			content: `import { createWorkerDom } from "async-dom/worker";
+			content: `import { createWorkerDom } from "@lifeart/async-dom/worker";
 
 const { document } = createWorkerDom();
 
@@ -130,7 +131,7 @@ document.body.appendChild(counter);
 		{
 			path: "vite.config.ts",
 			content: `import { defineConfig } from "vite";
-import { asyncDomPlugin } from "async-dom/vite-plugin";
+import { asyncDomPlugin } from "@lifeart/async-dom/vite-plugin";
 
 export default defineConfig({
   plugins: [asyncDomPlugin()],
@@ -163,7 +164,7 @@ function reactTs(name) {
 					"@vitejs/plugin-react": "^4.0.0",
 					typescript: "^5.8.0",
 					vite: "^6.0.0",
-					"async-dom": "latest"
+					"@lifeart/async-dom": "latest"
 				}
 			}, null, 2)
 		},
@@ -198,7 +199,7 @@ createRoot(document.getElementById("root")!).render(
 		},
 		{
 			path: "src/App.tsx",
-			content: `import { AsyncDom } from "async-dom/react";
+			content: `import { AsyncDom } from "@lifeart/async-dom/react";
 
 export function App() {
   return (
@@ -213,7 +214,7 @@ export function App() {
 		},
 		{
 			path: "src/app.worker.ts",
-			content: `import { createWorkerDom } from "async-dom/worker";
+			content: `import { createWorkerDom } from "@lifeart/async-dom/worker";
 
 const { document } = createWorkerDom();
 
@@ -254,7 +255,7 @@ document.body.appendChild(heading);
 			path: "vite.config.ts",
 			content: `import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { asyncDomPlugin } from "async-dom/vite-plugin";
+import { asyncDomPlugin } from "@lifeart/async-dom/vite-plugin";
 
 export default defineConfig({
   plugins: [react(), asyncDomPlugin()],
@@ -283,7 +284,7 @@ function vueTs(name) {
 					typescript: "^5.8.0",
 					"vue-tsc": "^2.0.0",
 					vite: "^6.0.0",
-					"async-dom": "latest"
+					"@lifeart/async-dom": "latest"
 				}
 			}, null, 2)
 		},
@@ -314,7 +315,7 @@ createApp(App).mount("#app");
 		{
 			path: "src/App.vue",
 			content: `<script setup lang="ts">
-import { AsyncDom } from "async-dom/vue";
+import { AsyncDom } from "@lifeart/async-dom/vue";
 
 function onReady(instance: any) {
   console.log("async-dom ready", instance);
@@ -332,7 +333,7 @@ function onReady(instance: any) {
 		},
 		{
 			path: "src/app.worker.ts",
-			content: `import { createWorkerDom } from "async-dom/worker";
+			content: `import { createWorkerDom } from "@lifeart/async-dom/worker";
 
 const { document } = createWorkerDom();
 
@@ -377,7 +378,7 @@ declare module "*.vue" {
 			path: "vite.config.ts",
 			content: `import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
-import { asyncDomPlugin } from "async-dom/vite-plugin";
+import { asyncDomPlugin } from "@lifeart/async-dom/vite-plugin";
 
 export default defineConfig({
   plugins: [vue(), asyncDomPlugin()],

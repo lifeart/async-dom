@@ -13,7 +13,7 @@ import { n as WebSocketServerTransport, t as WebSocketLike } from "./ws-server-t
  * Usage:
  * ```ts
  * import * as Comlink from 'comlink';
- * import { createComlinkEndpoint } from 'async-dom/transport';
+ * import { createComlinkEndpoint } from '@lifeart/async-dom/transport';
  *
  * const endpoint = createComlinkEndpoint(transport);
  * const api = Comlink.wrap(endpoint);

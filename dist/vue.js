@@ -14,7 +14,7 @@ import { defineComponent, h, onBeforeUnmount, onMounted, ref, shallowRef } from 
 * @example
 * ```vue
 * <script setup lang="ts">
-* import { useAsyncDom } from "async-dom/vue";
+* import { useAsyncDom } from "@lifeart/async-dom/vue";
 *
 * const { containerRef, instance } = useAsyncDom({
 *   worker: "./my-worker.ts",

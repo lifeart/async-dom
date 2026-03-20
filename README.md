@@ -224,6 +224,76 @@ const app = createServerApp({
 socket.on("close", () => app.destroy());
 ```
 
+### Multi-Client Streaming (Optional)
+
+Stream one server-side app instance to multiple browser clients simultaneously. Each client receives full DOM mutation replay on connect and can send events back to the shared app.
+
+**Server (`streaming-server.ts`)**
+
+```ts
+import { createStreamingServer } from "@lifeart/async-dom/server";
+import { WebSocketServer } from "ws";
+
+const streaming = createStreamingServer({
+  createApp: ({ document }) => {
+    const div = document.createElement("div");
+    div.textContent = "Hello from server!";
+    document.body.appendChild(div);
+
+    setInterval(() => {
+      div.textContent = `Server time: ${new Date().toLocaleTimeString()}`;
+    }, 1000);
+  },
+  broadcast: {
+    mutationLog: { maxEntries: 5000 },
+    maxClients: 100,
+  },
+});
+
+const wss = new WebSocketServer({ port: 8080 });
+wss.on("connection", (ws) => {
+  const clientId = streaming.handleConnection(ws);
+  console.log(`Client ${clientId} connected`);
+});
+
+await streaming.ready;
+```
+
+**Client** — no special client-side code needed, use the standard transport:
+
+```ts
+import { createAsyncDom } from "@lifeart/async-dom";
+import { WebSocketTransport } from "@lifeart/async-dom/transport";
+
+const asyncDom = createAsyncDom({ container: document.getElementById("app") });
+const transport = new WebSocketTransport("ws://localhost:8080");
+asyncDom.addRemoteApp("shared-app", transport);
+```
+
+**`StreamingServerInstance` API**
+
+| Method / Property | Description |
+| ----------------- | ----------- |
+| `handleConnection(socket, clientId?)` | Register a new WebSocket client; returns the assigned `clientId` |
+| `disconnectClient(clientId)` | Remove a specific client |
+| `getClientCount()` | Number of currently connected clients |
+| `getClientIds()` | Array of all active client IDs |
+| `getDom()` | Access the underlying WorkerDom instance |
+| `destroy()` | Shut down the app and disconnect all clients |
+| `ready` | Promise that resolves when the app has finished initializing |
+
+**Features**
+
+- Late-joining clients automatically receive a replay of all past mutations before switching to the live stream.
+- A client disconnect does not affect the server app or other clients.
+- Events from each client are tagged with the originating `clientId` before reaching the app.
+- Mutation log size and maximum client count are configurable.
+- Backpressure is managed independently per client.
+
+`createServerApp` remains available for single-client (one app per connection) use cases.
+
+---
+
 ### Named Apps (DevTools)
 
 ```ts

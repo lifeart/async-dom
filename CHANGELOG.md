@@ -2,7 +2,7 @@
 
 ## 2.0.0-alpha.1
 
-Complete rewrite of async-dom as a modern TypeScript library.
+Complete rewrite of @lifeart/async-dom as a modern TypeScript library.
 
 ### Added
 - TypeScript with strict mode and discriminated union message protocol

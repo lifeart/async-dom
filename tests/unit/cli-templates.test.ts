@@ -32,13 +32,13 @@ describe("CLI templates", () => {
 		it("imports createAsyncDom in main.ts", () => {
 			const files = getTemplate("vanilla-ts", "my-app");
 			const main = files.find((f) => f.path === "src/main.ts")!;
-			expect(main.content).toContain('import { createAsyncDom } from "async-dom"');
+			expect(main.content).toContain('import { createAsyncDom } from "@lifeart/async-dom"');
 		});
 
 		it("imports createWorkerDom in worker", () => {
 			const files = getTemplate("vanilla-ts", "my-app");
 			const worker = files.find((f) => f.path === "src/app.worker.ts")!;
-			expect(worker.content).toContain('import { createWorkerDom } from "async-dom/worker"');
+			expect(worker.content).toContain('import { createWorkerDom } from "@lifeart/async-dom/worker"');
 		});
 
 		it("vite config uses asyncDomPlugin", () => {
@@ -61,7 +61,7 @@ describe("CLI templates", () => {
 		it("uses AsyncDom component in App.tsx", () => {
 			const files = getTemplate("react-ts", "my-app");
 			const app = files.find((f) => f.path === "src/App.tsx")!;
-			expect(app.content).toContain('import { AsyncDom } from "async-dom/react"');
+			expect(app.content).toContain('import { AsyncDom } from "@lifeart/async-dom/react"');
 			expect(app.content).toContain("<AsyncDom");
 		});
 
@@ -85,7 +85,7 @@ describe("CLI templates", () => {
 		it("uses AsyncDom component in App.vue", () => {
 			const files = getTemplate("vue-ts", "my-app");
 			const app = files.find((f) => f.path === "src/App.vue")!;
-			expect(app.content).toContain('import { AsyncDom } from "async-dom/vue"');
+			expect(app.content).toContain('import { AsyncDom } from "@lifeart/async-dom/vue"');
 		});
 
 		it("has vue dependency", () => {
