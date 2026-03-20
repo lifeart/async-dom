@@ -205,6 +205,21 @@ export class VirtualDocument {
 			}
 		}
 
+		// Sync media state from event to target element
+		if (targetEl && typeof targetEl === "object") {
+			const mediaState: Record<string, unknown> = {};
+			if (evt.currentTime !== undefined) mediaState.currentTime = evt.currentTime;
+			if (evt.duration !== undefined) mediaState.duration = evt.duration;
+			if (evt.paused !== undefined) mediaState.paused = evt.paused;
+			if (evt.ended !== undefined) mediaState.ended = evt.ended;
+			if (evt.readyState !== undefined) mediaState.readyState = evt.readyState;
+			if (Object.keys(mediaState).length > 0 && "_updateMediaState" in targetEl) {
+				(targetEl as { _updateMediaState: (s: Record<string, unknown>) => void })._updateMediaState(
+					mediaState,
+				);
+			}
+		}
+
 		// Check document-level listeners first
 		const docListener = this._listenerMap.get(listenerId);
 		if (docListener) {

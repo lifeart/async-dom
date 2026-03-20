@@ -223,6 +223,16 @@ function serializeEvent(e: Event): SerializedEvent {
 		base.selectedIndex = target.selectedIndex;
 	}
 
+	// Serialize media element state for media events
+	const mediaTarget = e.target;
+	if (mediaTarget instanceof HTMLMediaElement) {
+		base.currentTime = mediaTarget.currentTime;
+		base.duration = Number.isFinite(mediaTarget.duration) ? mediaTarget.duration : 0;
+		base.paused = mediaTarget.paused;
+		base.ended = mediaTarget.ended;
+		base.readyState = mediaTarget.readyState;
+	}
+
 	if (e instanceof FocusEvent) {
 		base.relatedTarget = e.relatedTarget instanceof Element ? getNodeId(e.relatedTarget) : null;
 	}

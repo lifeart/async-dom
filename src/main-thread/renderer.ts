@@ -78,6 +78,22 @@ const ALLOWED_PROPERTIES = new Set([
 	"rowSpan",
 ]);
 
+const ALLOWED_METHODS = new Set([
+	"play",
+	"pause",
+	"load",
+	"focus",
+	"blur",
+	"click",
+	"scrollIntoView",
+	"requestFullscreen",
+	"select",
+	"setCustomValidity",
+	"reportValidity",
+	"showModal",
+	"close",
+]);
+
 const SVG_TAGS = new Set([
 	"svg",
 	"path",
@@ -249,6 +265,9 @@ export class DomRenderer {
 				break;
 			case "insertAdjacentHTML":
 				this.insertAdjacentHTML(mutation.id, mutation.position, mutation.html);
+				break;
+			case "callMethod":
+				this.callMethod(mutation.id, mutation.method, mutation.args);
 				break;
 		}
 
@@ -501,6 +520,19 @@ export class DomRenderer {
 		if (!this.permissions.allowBodyAppend) return;
 		const node = this.nodeCache.get(id);
 		if (node) (this.root.body as unknown as Node).appendChild(node);
+	}
+
+	private callMethod(id: NodeId, method: string, args: unknown[]): void {
+		const node = this.nodeCache.get(id);
+		if (!node) return;
+		if (!ALLOWED_METHODS.has(method)) {
+			console.warn(`[async-dom] Blocked callMethod: "${method}" is not allowed`);
+			return;
+		}
+		const fn = (node as unknown as Record<string, unknown>)[method];
+		if (typeof fn === "function") {
+			(fn as (...a: unknown[]) => unknown).apply(node, args);
+		}
 	}
 
 	/**

@@ -509,6 +509,52 @@ export class VirtualElement {
 		if (state.selectedIndex !== undefined) this._selectedIndex = state.selectedIndex;
 	}
 
+	// --- Media Properties ---
+
+	private _currentTime = 0;
+	private _duration = 0;
+	private _paused = true;
+	private _ended = false;
+	private _readyState = 0;
+
+	get currentTime(): number {
+		return this._currentTime;
+	}
+
+	set currentTime(v: number) {
+		this._currentTime = v;
+		this.collector.add({
+			action: "setProperty",
+			id: this._nodeId,
+			property: "currentTime",
+			value: v,
+		});
+	}
+
+	get duration(): number {
+		return this._duration;
+	}
+
+	get paused(): boolean {
+		return this._paused;
+	}
+
+	get ended(): boolean {
+		return this._ended;
+	}
+
+	get readyState(): number {
+		return this._readyState;
+	}
+
+	_updateMediaState(state: Record<string, unknown>): void {
+		if (state.currentTime !== undefined) this._currentTime = state.currentTime as number;
+		if (state.duration !== undefined) this._duration = state.duration as number;
+		if (state.paused !== undefined) this._paused = state.paused as boolean;
+		if (state.ended !== undefined) this._ended = state.ended as boolean;
+		if (state.readyState !== undefined) this._readyState = state.readyState as number;
+	}
+
 	// --- Class ---
 
 	get className(): string {
@@ -933,11 +979,53 @@ export class VirtualElement {
 	}
 
 	focus(): void {
-		// no-op stub
+		this.collector.add({ action: "callMethod", id: this._nodeId, method: "focus", args: [] });
 	}
 
 	blur(): void {
-		// no-op stub
+		this.collector.add({ action: "callMethod", id: this._nodeId, method: "blur", args: [] });
+	}
+
+	play(): void {
+		this.collector.add({ action: "callMethod", id: this._nodeId, method: "play", args: [] });
+	}
+
+	pause(): void {
+		this.collector.add({ action: "callMethod", id: this._nodeId, method: "pause", args: [] });
+	}
+
+	load(): void {
+		this.collector.add({ action: "callMethod", id: this._nodeId, method: "load", args: [] });
+	}
+
+	click(): void {
+		this.collector.add({ action: "callMethod", id: this._nodeId, method: "click", args: [] });
+	}
+
+	scrollIntoView(options?: unknown): void {
+		this.collector.add({
+			action: "callMethod",
+			id: this._nodeId,
+			method: "scrollIntoView",
+			args: options ? [options] : [],
+		});
+	}
+
+	select(): void {
+		this.collector.add({ action: "callMethod", id: this._nodeId, method: "select", args: [] });
+	}
+
+	showModal(): void {
+		this.collector.add({
+			action: "callMethod",
+			id: this._nodeId,
+			method: "showModal",
+			args: [],
+		});
+	}
+
+	close(): void {
+		this.collector.add({ action: "callMethod", id: this._nodeId, method: "close", args: [] });
 	}
 
 	getBoundingClientRect(): {

@@ -29,6 +29,7 @@ export const MutOp = {
 	InsertAdjacentHTML: 19,
 	ConfigureEvent: 20,
 	RemoveEventListener: 21,
+	CallMethod: 22,
 } as const;
 
 export type MutOpValue = (typeof MutOp)[keyof typeof MutOp];
@@ -212,6 +213,12 @@ export class BinaryMutationEncoder {
 				this.writeU8(MutOp.RemoveEventListener);
 				this.writeNodeId(mutation.id);
 				this.writeStr(mutation.listenerId);
+				break;
+			case "callMethod":
+				this.writeU8(MutOp.CallMethod);
+				this.writeNodeId(mutation.id);
+				this.writeStr(mutation.method);
+				this.writeStr(JSON.stringify(mutation.args));
 				break;
 		}
 	}
@@ -441,6 +448,12 @@ export class BinaryMutationDecoder {
 					id: this.readNodeId(),
 					listenerId: this.readStr(),
 				};
+			case MutOp.CallMethod: {
+				const id = this.readNodeId();
+				const method = this.readStr();
+				const argsStr = this.readStr();
+				return { action: "callMethod", id, method, args: JSON.parse(argsStr) };
+			}
 			default:
 				throw new Error(`Unknown mutation opcode: ${op}`);
 		}

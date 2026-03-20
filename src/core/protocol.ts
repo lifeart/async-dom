@@ -88,7 +88,8 @@ export type DomMutation =
 			preventDefault: boolean;
 			passive?: boolean;
 	  }
-	| { action: "removeEventListener"; id: NodeId; listenerId: string };
+	| { action: "removeEventListener"; id: NodeId; listenerId: string }
+	| { action: "callMethod"; id: NodeId; method: string; args: unknown[] };
 
 export type MutationAction = DomMutation["action"];
 
@@ -150,6 +151,12 @@ export interface SerializedEvent {
 	value?: string;
 	checked?: boolean;
 	selectedIndex?: number;
+	// Media element state
+	currentTime?: number;
+	duration?: number;
+	paused?: boolean;
+	ended?: boolean;
+	readyState?: number;
 }
 
 // Main thread → Worker events
