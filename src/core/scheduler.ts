@@ -18,6 +18,8 @@ export interface FrameLogEntry {
 	totalMs: number;
 	actionCount: number;
 	timingBreakdown: Map<string, number>;
+	/** Feature 18: per-app mutation counts and deferred counts per frame */
+	perApp?: Map<string, { mutations: number; deferred: number }>;
 }
 
 const MAX_FRAME_LOG = 30;
@@ -254,6 +256,10 @@ export class FrameScheduler {
 		const deferred: PrioritizedMutation[] = [];
 		const frameTimingBreakdown = new Map<string, number>();
 
+		// Feature 18: per-app mutation/deferred counts for this frame
+		const perAppMutations = new Map<string, number>();
+		const perAppDeferred = new Map<string, number>();
+
 		// Reset per-app budgets at the start of each frame when multi-app
 		if (this.appCount > 1) {
 			this.appBudgets.clear();
@@ -281,6 +287,9 @@ export class FrameScheduler {
 				const maxPerApp = Math.ceil(maxActions / this.appCount);
 				if (appBudget >= maxPerApp) {
 					deferred.push(item);
+					// Feature 18: track deferred count per app
+					const appKey = String(item.appId);
+					perAppDeferred.set(appKey, (perAppDeferred.get(appKey) ?? 0) + 1);
 					continue;
 				}
 				this.appBudgets.set(item.appId, appBudget + 1);
@@ -289,6 +298,12 @@ export class FrameScheduler {
 			const actionStart = performance.now();
 			applier(item.mutation, item.appId, item.batchUid);
 			const actionTime = performance.now() - actionStart;
+
+			// Feature 18: track mutation count per app
+			{
+				const appKey = String(item.appId);
+				perAppMutations.set(appKey, (perAppMutations.get(appKey) ?? 0) + 1);
+			}
 			this.recordTiming(item.mutation.action, actionTime);
 			frameTimingBreakdown.set(
 				item.mutation.action,
@@ -316,11 +331,26 @@ export class FrameScheduler {
 			}
 			this.timePerLastFrame = delta;
 			this.totalActionsLastFrame = processed;
+
+			// Feature 18: build per-app breakdown
+			let perApp: Map<string, { mutations: number; deferred: number }> | undefined;
+			if (perAppMutations.size > 0 || perAppDeferred.size > 0) {
+				perApp = new Map();
+				const allApps = new Set([...perAppMutations.keys(), ...perAppDeferred.keys()]);
+				for (const appKey of allApps) {
+					perApp.set(appKey, {
+						mutations: perAppMutations.get(appKey) ?? 0,
+						deferred: perAppDeferred.get(appKey) ?? 0,
+					});
+				}
+			}
+
 			this.frameLog.push({
 				frameId: this.frameId,
 				totalMs: delta,
 				actionCount: processed,
 				timingBreakdown: frameTimingBreakdown,
+				perApp,
 			});
 			if (this.frameLog.length > MAX_FRAME_LOG) {
 				this.frameLog.shift();

@@ -239,6 +239,39 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 	// Send ready message after setup
 	transport.send({ type: "ready", appId });
 
+	// Feature 16: Periodically send worker performance entries to main thread
+	const perfEntriesInterval = setInterval(() => {
+		if (typeof performance === "undefined" || !performance.getEntriesByType) return;
+		const measures = performance.getEntriesByType("measure").filter(
+			(e) => e.name.startsWith("async-dom:"),
+		);
+		if (measures.length === 0) return;
+		const entries = measures.map((e) => ({
+			name: e.name,
+			startTime: e.startTime,
+			duration: e.duration,
+			entryType: e.entryType,
+		}));
+		transport.send({
+			type: "perfEntries",
+			appId,
+			entries,
+		});
+		// Clear measures to avoid re-sending
+		for (const e of measures) {
+			try {
+				performance.clearMeasures(e.name);
+			} catch {
+				// not critical
+			}
+		}
+	}, 2000);
+
+	// Ensure we clear the interval on worker termination
+	if (typeof self !== "undefined" && "addEventListener" in self) {
+		self.addEventListener("beforeunload", () => clearInterval(perfEntriesInterval));
+	}
+
 	// Scoped storage instances with app-specific prefixes
 	const storagePrefix = `__async_dom_${appId}_`;
 	const localStorage = new ScopedStorage(

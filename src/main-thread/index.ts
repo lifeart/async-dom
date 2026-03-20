@@ -1,7 +1,8 @@
 import type { DebugOptions } from "../core/debug.ts";
-import { DebugStats, resolveDebugHooks } from "../core/debug.ts";
+import { DebugStats, MutationEventCorrelation, resolveDebugHooks } from "../core/debug.ts";
+import { CausalityTracker } from "../debug/causality-graph.ts";
 import { NodeCache } from "../core/node-cache.ts";
-import type { AppId, DomMutation, Message, NodeId } from "../core/protocol.ts";
+import type { AppId, DomMutation, Message, NodeId, PerfEntryData } from "../core/protocol.ts";
 import {
 	BODY_NODE_ID,
 	DOCUMENT_NODE_ID,
@@ -99,6 +100,16 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 	const syncHosts = new Map<AppId, SyncChannelHost>();
 	const debugHooks = resolveDebugHooks(config.debug);
 	const debugStats = new DebugStats();
+
+	// Feature 15: Causality tracker for building event -> batch -> node DAG
+	const causalityTracker = new CausalityTracker();
+
+	// Feature 16: Worker CPU profiler entries storage
+	const workerPerfEntries = new Map<AppId, PerfEntryData[]>();
+	const MAX_PERF_ENTRIES = 200;
+
+	// Feature 19: Mutation-to-event correlation index
+	const mutationCorrelation = new MutationEventCorrelation();
 
 	// Per-app DomRenderer map (each has its own NodeCache)
 	const renderers = new Map<AppId, DomRenderer>();
@@ -323,6 +334,21 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				scheduler.recordWorkerLatency(message.sentAt);
 			}
 			scheduler.enqueue(message.mutations, appId, message.priority ?? "normal", message.uid);
+
+			// Feature 15: record causal batch
+			if (message.causalEvent) {
+				const nodeIds = message.mutations
+					.filter((m) => "id" in m)
+					.map((m) => (m as { id: number }).id);
+				causalityTracker.recordBatch(
+					message.uid,
+					nodeIds,
+					message.mutations.length,
+					message.causalEvent,
+				);
+				// Feature 19: register batch event for correlation
+				mutationCorrelation.registerBatchEvent(message.uid, message.causalEvent);
+			}
 			return;
 		}
 		// Handle event timing results from the worker
@@ -337,6 +363,22 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			}
 			return;
 		}
+
+		// Feature 16: handle worker performance entries
+		if (isSystemMessage(message) && message.type === "perfEntries") {
+			const perfMsg = message as { type: "perfEntries"; appId: AppId; entries: PerfEntryData[] };
+			let entries = workerPerfEntries.get(appId);
+			if (!entries) {
+				entries = [];
+				workerPerfEntries.set(appId, entries);
+			}
+			entries.push(...perfMsg.entries);
+			if (entries.length > MAX_PERF_ENTRIES) {
+				entries.splice(0, entries.length - MAX_PERF_ENTRIES);
+			}
+			return;
+		}
+
 		// Cache debug results from worker threads
 		if (isSystemMessage(message) && message.type === "debugResult") {
 			const debugMsg = message as { type: "debugResult"; query: string; result: unknown };
@@ -681,6 +723,18 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 					break;
 				}
 			},
+			// Feature 15: Causality graph
+			getCausalityTracker: () => causalityTracker,
+			// Feature 16: Worker CPU profiler entries
+			getWorkerPerfEntries: () => {
+				const result: Record<string, PerfEntryData[]> = {};
+				for (const [appId, entries] of workerPerfEntries) {
+					result[String(appId)] = entries.slice();
+				}
+				return result;
+			},
+			// Feature 19: Mutation-to-event correlation
+			getMutationCorrelation: () => mutationCorrelation,
 		};
 
 		// Inject the in-page devtools panel
@@ -698,6 +752,8 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		debugHooks.onMutation = (entry) => {
 			origOnMutation?.(entry);
 			captureMutation(entry);
+			// Feature 19: index mutation for "Why Updated?" lookups
+			mutationCorrelation.indexMutation(entry);
 		};
 		debugHooks.onWarning = (entry) => {
 			origOnWarning?.(entry);

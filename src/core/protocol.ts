@@ -103,6 +103,8 @@ export interface MutationMessage {
 	mutations: DomMutation[];
 	priority?: Priority;
 	sentAt?: number;
+	/** Causal event that triggered this batch (Feature 15: Causality Graph). */
+	causalEvent?: { eventType: string; listenerId: string; timestamp: number };
 }
 
 // Serialized event data sent from main thread to worker
@@ -211,7 +213,16 @@ export type SystemMessage =
 	| { type: "queryResult"; uid: number; result: unknown }
 	| { type: "debugQuery"; query: string }
 	| { type: "debugResult"; query: string; result: unknown }
-	| { type: "eventTimingResult"; listenerId: string; eventType: string; dispatchMs: number; mutationCount: number; transportMs: number };
+	| { type: "eventTimingResult"; listenerId: string; eventType: string; dispatchMs: number; mutationCount: number; transportMs: number }
+	| { type: "perfEntries"; appId: AppId; entries: PerfEntryData[] };
+
+/** Serialized performance entry sent from worker to main thread (Feature 16). */
+export interface PerfEntryData {
+	name: string;
+	startTime: number;
+	duration: number;
+	entryType: string;
+}
 
 export type Message = MutationMessage | EventMessage | SystemMessage;
 
