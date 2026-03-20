@@ -1,6 +1,6 @@
 {
   "name": "async-dom",
-  "version": "2.0.0-alpha.1",
+  "version": "2.0.0-alpha.2",
   "description": "Asynchronous DOM rendering — offload UI to Web Workers with frame-budgeted scheduling",
   "type": "module",
   "exports": {
@@ -37,6 +37,11 @@
       "types": "./dist/svelte.d.ts",
       "import": "./dist/svelte.js",
       "require": "./dist/svelte.cjs"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js",
+      "require": "./dist/server.cjs"
     }
   },
   "main": "./dist/index.cjs",

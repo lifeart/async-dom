@@ -10,6 +10,7 @@ export default defineConfig({
 		vue: "src/vue/index.ts",
 		svelte: "src/svelte/index.ts",
 		cli: "src/cli/index.ts",
+		server: "src/server/index.ts",
 	},
 	format: ["esm", "cjs"],
 	dts: true,

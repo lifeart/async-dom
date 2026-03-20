@@ -167,17 +167,88 @@ import { AsyncDom } from "@lifeart/async-dom/vue";
 
 ---
 
+## Remote Transports
+
+async-dom supports running the worker DOM in a SharedWorker, on a remote server via WebSocket, or any custom transport.
+
+### Remote App (no local Worker)
+
+```ts
+import { createAsyncDom } from "@lifeart/async-dom";
+import { WebSocketTransport } from "@lifeart/async-dom/transport";
+
+const dom = createAsyncDom({ target: document.getElementById("app")! });
+
+// Connect to a remote server running the app
+dom.addRemoteApp({
+  transport: new WebSocketTransport("ws://localhost:3000"),
+  name: "remote-app",
+  mountPoint: "#app",
+});
+
+dom.start();
+```
+
+### SharedWorker Transport
+
+```ts
+import { createAsyncDom } from "@lifeart/async-dom";
+import { SharedWorkerTransport } from "@lifeart/async-dom/transport";
+
+const sw = new SharedWorker("/my-worker.js", { type: "module" });
+const transport = new SharedWorkerTransport(sw.port);
+
+const dom = createAsyncDom({ target: document.getElementById("app")! });
+dom.addRemoteApp({ transport, name: "shared-worker-app" });
+dom.start();
+```
+
+### Server-Side Rendering (Node.js)
+
+```ts
+import { createServerApp } from "@lifeart/async-dom/server";
+import { WebSocketServerTransport } from "@lifeart/async-dom/server";
+
+// Inside a WebSocket connection handler:
+const transport = new WebSocketServerTransport(socket);
+const app = createServerApp({
+  transport,
+  appModule: ({ document }) => {
+    const div = document.createElement("div");
+    div.textContent = "Server-rendered via async-dom";
+    document.body.appendChild(div);
+  },
+});
+
+// Clean up on disconnect:
+socket.on("close", () => app.destroy());
+```
+
+### Named Apps (DevTools)
+
+```ts
+dom.addApp({
+  name: "dashboard",  // visible in DevTools instead of random hash
+  worker: new Worker("./dashboard.worker.ts", { type: "module" }),
+  mountPoint: "#dashboard",
+  shadow: true,
+});
+```
+
+---
+
 ## Package Exports
 
 | Import path           | Purpose                                      |
 | --------------------- | -------------------------------------------- |
 | `@lifeart/async-dom`           | Main thread API (`createAsyncDom`)           |
 | `@lifeart/async-dom/worker`    | Worker thread API (virtual `document`)       |
-| `@lifeart/async-dom/transport` | Transport backends (Worker, Binary, WS, Comlink) |
+| `@lifeart/async-dom/transport` | Transport backends (Worker, Binary, WS, SharedWorker, Comlink) |
 | `@lifeart/async-dom/react`     | React `<AsyncDom>` component + `useAsyncDom` hook |
 | `@lifeart/async-dom/vue`       | Vue `<AsyncDom>` component + `useAsyncDom` composable |
 | `@lifeart/async-dom/svelte`    | Svelte `asyncDom` action                     |
 | `@lifeart/async-dom/vite-plugin` | Vite plugin (COOP/COEP headers, binary transport, error overlay) |
+| `@lifeart/async-dom/server`   | Server-side runner (`createServerApp`, `WebSocketServerTransport`) |
 
 ---
 
