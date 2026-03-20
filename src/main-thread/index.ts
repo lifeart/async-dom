@@ -70,6 +70,8 @@ export interface AsyncDomConfig {
 
 export interface AppConfig {
 	worker: Worker;
+	/** Human-readable name for this app (shown in DevTools instead of a random hash) */
+	name?: string;
 	mountPoint?: string | Element;
 	shadow?: boolean | ShadowRootInit;
 	transport?: import("../transport/base.ts").Transport;
@@ -407,8 +409,9 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		shadow?: boolean | ShadowRootInit,
 		customTransport?: import("../transport/base.ts").Transport,
 		onError?: (error: import("../core/protocol.ts").SerializedError, appId: AppId) => void,
+		name?: string,
 	): AppId {
-		const appId = threadManager.createWorkerThread({ worker, transport: customTransport });
+		const appId = threadManager.createWorkerThread({ worker, transport: customTransport, name });
 
 		// Per-app NodeCache and DomRenderer for isolation
 		const appNodeCache = new NodeCache();
@@ -832,6 +835,7 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				appConfig.shadow,
 				appConfig.transport,
 				appConfig.onError,
+				appConfig.name,
 			);
 		},
 

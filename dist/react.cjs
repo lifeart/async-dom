@@ -26,6 +26,7 @@ let react = require("react");
 function useAsyncDom(options) {
 	const containerRef = (0, react.useRef)(null);
 	const [instance, setInstance] = (0, react.useState)(null);
+	const instanceRef = (0, react.useRef)(null);
 	const workerRef = (0, react.useRef)(options.worker);
 	workerRef.current = options.worker;
 	const onReadyRef = (0, react.useRef)(options.onReady);
@@ -54,15 +55,15 @@ function useAsyncDom(options) {
 				debug: require_resolve_debug.resolveDebugOption(debugRef.current)
 			});
 			inst.start();
+			instanceRef.current = inst;
 			setInstance(inst);
 			onReadyRef.current?.(inst);
 		});
 		return () => {
 			cancelled = true;
-			setInstance((prev) => {
-				prev?.destroy();
-				return null;
-			});
+			instanceRef.current?.destroy();
+			instanceRef.current = null;
+			setInstance(null);
 		};
 	}, []);
 	return {

@@ -85,17 +85,26 @@ function sanitizeNode(node) {
 //#region src/core/node-cache.ts
 /**
 * Cache for mapping NodeIds to real DOM nodes on the main thread.
+* Supports both forward (NodeId → Node) and reverse (Node → NodeId) lookups.
 */
 var NodeCache = class {
 	cache = /* @__PURE__ */ new Map();
+	reverseCache = /* @__PURE__ */ new WeakMap();
 	get(id) {
 		if (id === 4) return document;
 		return this.cache.get(id) ?? null;
 	}
+	/** Reverse lookup: get the NodeId for a real DOM node. */
+	getId(node) {
+		return this.reverseCache.get(node) ?? null;
+	}
 	set(id, node) {
 		this.cache.set(id, node);
+		this.reverseCache.set(node, id);
 	}
 	delete(id) {
+		const node = this.cache.get(id);
+		if (node) this.reverseCache.delete(node);
 		this.cache.delete(id);
 	}
 	clear() {
@@ -2253,6 +2262,18 @@ function createDevtoolsPanel() {
 		}, 250);
 	}
 	refreshBtn.addEventListener("click", requestTreeRefresh);
+	/** Reset UI state that is specific to a particular app when switching apps. */
+	function resetPerAppState() {
+		snapshot1 = null;
+		snapshot2 = null;
+		showDiff = false;
+		currentDiff = null;
+		selectedNodeForSidebar = null;
+		showCoalesced = false;
+		lastRenderedLogLength = 0;
+		if (replayState) exitReplayMode();
+		expandedFrameId = null;
+	}
 	function updateAppBar() {
 		const dt = getDevtools();
 		if (!dt) return;
@@ -2274,7 +2295,10 @@ function createDevtoolsPanel() {
 			btn.className = `app-btn${id === selectedAppId ? " active" : ""}`;
 			btn.textContent = id;
 			btn.addEventListener("click", () => {
-				selectedAppId = id;
+				if (selectedAppId !== id) {
+					selectedAppId = id;
+					resetPerAppState();
+				}
 				updateAppBar();
 				renderActiveTab();
 			});
@@ -3728,7 +3752,7 @@ var EventBridge = class {
 			const configKey = `${nodeId}_${eventName}`;
 			if (this.eventConfig.get(configKey)?.preventDefault) domEvent.preventDefault();
 			const serializeStart = performance.now();
-			const serialized = serializeEvent(domEvent);
+			const serialized = serializeEvent(domEvent, this.nodeCache);
 			const serializeMs = performance.now() - serializeStart;
 			const sentAt = Date.now();
 			this.eventTraces.push({
@@ -3812,22 +3836,24 @@ const PASSIVE_EVENTS = new Set([
 function isPassiveEvent(name) {
 	return PASSIVE_EVENTS.has(name);
 }
-function getNodeId(el) {
+function getNodeId(el, cache) {
 	if (!el) return null;
-	const asyncId = el.__asyncDomId;
-	if (asyncId != null) return String(asyncId);
-	return el.getAttribute("data-async-dom-id") ?? el.id ?? null;
+	if (cache) {
+		const id = cache.getId(el);
+		if (id != null) return String(id);
+	}
+	return el.id ?? null;
 }
 /**
 * Serialize a DOM event to a plain object that can be transferred via postMessage.
 * Only includes properties relevant to the event type.
 */
-function serializeEvent(e) {
+function serializeEvent(e, cache) {
 	const composedTarget = e.composedPath?.()[0] ?? e.target;
 	const base = {
 		type: e.type,
-		target: getNodeId(composedTarget),
-		currentTarget: getNodeId(e.currentTarget),
+		target: getNodeId(composedTarget, cache),
+		currentTarget: getNodeId(e.currentTarget, cache),
 		bubbles: e.bubbles,
 		cancelable: e.cancelable,
 		composed: e.composed,
@@ -3853,7 +3879,7 @@ function serializeEvent(e) {
 		base.ctrlKey = e.ctrlKey;
 		base.metaKey = e.metaKey;
 		base.shiftKey = e.shiftKey;
-		base.relatedTarget = getNodeId(e.relatedTarget);
+		base.relatedTarget = getNodeId(e.relatedTarget, cache);
 		base.detail = e.detail;
 	}
 	if (e instanceof KeyboardEvent) {
@@ -3886,7 +3912,7 @@ function serializeEvent(e) {
 		base.ended = mediaTarget.ended;
 		base.readyState = mediaTarget.readyState;
 	}
-	if (e instanceof FocusEvent) base.relatedTarget = e.relatedTarget instanceof Element ? getNodeId(e.relatedTarget) : null;
+	if (e instanceof FocusEvent) base.relatedTarget = e.relatedTarget instanceof Element ? getNodeId(e.relatedTarget, cache) : null;
 	if (e instanceof WheelEvent) Object.assign(base, {
 		deltaX: e.deltaX,
 		deltaY: e.deltaY,
@@ -4152,9 +4178,6 @@ var DomRenderer = class {
 		let node;
 		if (SVG_TAGS.has(lowerTag)) node = document.createElementNS(SVG_NS, lowerTag);
 		else node = document.createElement(tag);
-		const idStr = String(id);
-		node.setAttribute("data-async-dom-id", idStr);
-		node.__asyncDomId = id;
 		if (textContent) node.textContent = textContent;
 		this.nodeCache.set(id, node);
 	}
@@ -4207,9 +4230,9 @@ var DomRenderer = class {
 		const parent = this.nodeCache.get(parentId);
 		const child = this.nodeCache.get(childId);
 		if (parent && child?.parentNode) {
-			child.parentNode.removeChild(child);
+			this._cleanupSubtreeListeners(child, childId);
 			this.nodeCache.delete(childId);
-			this.onNodeRemoved?.(childId);
+			child.parentNode.removeChild(child);
 		}
 	}
 	insertBefore(parentId, newId, refId) {
@@ -4357,15 +4380,13 @@ var DomRenderer = class {
 	*/
 	_cleanupSubtreeListeners(node, id) {
 		this.onNodeRemoved?.(id);
-		if ("children" in node) {
-			const el = node;
-			for (let i = 0; i < el.children.length; i++) {
-				const child = el.children[i];
-				const childId = child.__asyncDomId;
-				if (childId) {
-					this._cleanupSubtreeListeners(child, childId);
-					this.nodeCache.delete(childId);
-				}
+		const children = node.childNodes;
+		for (let i = 0; i < children.length; i++) {
+			const child = children[i];
+			const childId = this.nodeCache.getId(child);
+			if (childId) {
+				this._cleanupSubtreeListeners(child, childId);
+				this.nodeCache.delete(childId);
 			}
 		}
 	}
@@ -4380,7 +4401,7 @@ var ThreadManager = class {
 	threads = /* @__PURE__ */ new Map();
 	messageHandlers = [];
 	createWorkerThread(config) {
-		const appId = generateAppId();
+		const appId = generateAppId(config.name);
 		const useBinary = typeof __ASYNC_DOM_BINARY__ !== "undefined" && __ASYNC_DOM_BINARY__;
 		const transport = config.transport ?? (useBinary ? new BinaryWorkerTransport(config.worker) : new WorkerTransport(config.worker));
 		transport.onMessage((message) => {
@@ -4393,7 +4414,7 @@ var ThreadManager = class {
 		return appId;
 	}
 	createWebSocketThread(config) {
-		const appId = generateAppId();
+		const appId = generateAppId(config.name);
 		const transport = new WebSocketTransport(config.url, config.options);
 		transport.onMessage((message) => {
 			this.notifyHandlers(appId, message);
@@ -4431,7 +4452,8 @@ var ThreadManager = class {
 		for (const handler of this.messageHandlers) handler(appId, message);
 	}
 };
-function generateAppId() {
+function generateAppId(name) {
+	if (name) return createAppId(name);
 	return createAppId(Math.random().toString(36).slice(2, 7));
 }
 //#endregion
@@ -4719,10 +4741,11 @@ function createAsyncDom(config) {
 		}
 	});
 	if (config.worker) addAppInternal(config.worker, config.target);
-	function addAppInternal(worker, mountPoint, shadow, customTransport, onError) {
+	function addAppInternal(worker, mountPoint, shadow, customTransport, onError, name) {
 		const appId = threadManager.createWorkerThread({
 			worker,
-			transport: customTransport
+			transport: customTransport,
+			name
 		});
 		const appNodeCache = new NodeCache();
 		let mountEl = null;
@@ -5013,7 +5036,7 @@ function createAsyncDom(config) {
 			}
 		},
 		addApp(appConfig) {
-			return addAppInternal(appConfig.worker, appConfig.mountPoint, appConfig.shadow, appConfig.transport, appConfig.onError);
+			return addAppInternal(appConfig.worker, appConfig.mountPoint, appConfig.shadow, appConfig.transport, appConfig.onError, appConfig.name);
 		},
 		removeApp(appId) {
 			const bridge = eventBridges.get(appId);

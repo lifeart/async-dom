@@ -24,6 +24,7 @@ import { createElement, useEffect, useRef, useState } from "react";
 function useAsyncDom(options) {
 	const containerRef = useRef(null);
 	const [instance, setInstance] = useState(null);
+	const instanceRef = useRef(null);
 	const workerRef = useRef(options.worker);
 	workerRef.current = options.worker;
 	const onReadyRef = useRef(options.onReady);
@@ -52,15 +53,15 @@ function useAsyncDom(options) {
 				debug: resolveDebugOption(debugRef.current)
 			});
 			inst.start();
+			instanceRef.current = inst;
 			setInstance(inst);
 			onReadyRef.current?.(inst);
 		});
 		return () => {
 			cancelled = true;
-			setInstance((prev) => {
-				prev?.destroy();
-				return null;
-			});
+			instanceRef.current?.destroy();
+			instanceRef.current = null;
+			setInstance(null);
 		};
 	}, []);
 	return {

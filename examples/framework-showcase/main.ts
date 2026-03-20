@@ -34,6 +34,7 @@ requestAnimationFrame(tick);
 
 // --- 1. React panel: Mandelbrot worker (shadow DOM isolated) ---
 asyncDom.addApp({
+	name: "mandelbrot",
 	worker: new Worker(new URL("./mandelbrot-worker.ts", import.meta.url), { type: "module" }),
 	mountPoint: "#react-root",
 	shadow: true,
@@ -43,6 +44,7 @@ markReady(reactStatus, "React worker");
 
 // --- 2. Vue panel: Game of Life worker (shadow DOM isolated) ---
 asyncDom.addApp({
+	name: "gameoflife",
 	worker: new Worker(new URL("./gameoflife-worker.ts", import.meta.url), { type: "module" }),
 	mountPoint: "#vue-root",
 	shadow: true,
@@ -52,6 +54,7 @@ markReady(vueStatus, "Vue worker");
 
 // --- 3. Svelte panel: Particles worker (shadow DOM isolated) ---
 asyncDom.addApp({
+	name: "particles",
 	worker: new Worker(new URL("./particles-worker.ts", import.meta.url), { type: "module" }),
 	mountPoint: "#svelte-root",
 	shadow: true,

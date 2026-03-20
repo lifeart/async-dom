@@ -8,11 +8,15 @@ import { WebSocketTransport, type WebSocketTransportOptions } from "../transport
 export interface WorkerConfig {
 	worker: Worker;
 	transport?: Transport;
+	/** Human-readable name for this app (shown in DevTools instead of a random hash) */
+	name?: string;
 }
 
 export interface WebSocketConfig {
 	url: string;
 	options?: WebSocketTransportOptions;
+	/** Human-readable name for this app (shown in DevTools instead of a random hash) */
+	name?: string;
 }
 
 interface ThreadConnection {
@@ -29,7 +33,7 @@ export class ThreadManager {
 	private messageHandlers: Array<(appId: AppId, message: Message) => void> = [];
 
 	createWorkerThread(config: WorkerConfig): AppId {
-		const appId = generateAppId();
+		const appId = generateAppId(config.name);
 		const useBinary = typeof __ASYNC_DOM_BINARY__ !== "undefined" && __ASYNC_DOM_BINARY__;
 		const transport =
 			config.transport ??
@@ -44,7 +48,7 @@ export class ThreadManager {
 	}
 
 	createWebSocketThread(config: WebSocketConfig): AppId {
-		const appId = generateAppId();
+		const appId = generateAppId(config.name);
 		const transport = new WebSocketTransport(config.url, config.options);
 
 		transport.onMessage((message) => {
@@ -97,6 +101,7 @@ export class ThreadManager {
 	}
 }
 
-function generateAppId(): AppId {
+function generateAppId(name?: string): AppId {
+	if (name) return createAppId(name);
 	return createAppId(Math.random().toString(36).slice(2, 7));
 }

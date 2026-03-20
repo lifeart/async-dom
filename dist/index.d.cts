@@ -116,10 +116,14 @@ declare class FrameScheduler {
 //#region src/core/node-cache.d.ts
 /**
  * Cache for mapping NodeIds to real DOM nodes on the main thread.
+ * Supports both forward (NodeId → Node) and reverse (Node → NodeId) lookups.
  */
 declare class NodeCache {
   private cache;
+  private reverseCache;
   get(id: NodeId): Node | null;
+  /** Reverse lookup: get the NodeId for a real DOM node. */
+  getId(node: Node): NodeId | null;
   set(id: NodeId, node: Node): void;
   delete(id: NodeId): void;
   clear(): void;
@@ -250,10 +254,14 @@ declare class DomRenderer {
 interface WorkerConfig {
   worker: Worker;
   transport?: Transport;
+  /** Human-readable name for this app (shown in DevTools instead of a random hash) */
+  name?: string;
 }
 interface WebSocketConfig {
   url: string;
   options?: WebSocketTransportOptions;
+  /** Human-readable name for this app (shown in DevTools instead of a random hash) */
+  name?: string;
 }
 /**
  * Manages multiple worker/WebSocket connections, routing messages
@@ -283,6 +291,8 @@ interface AsyncDomConfig {
 }
 interface AppConfig {
   worker: Worker;
+  /** Human-readable name for this app (shown in DevTools instead of a random hash) */
+  name?: string;
   mountPoint?: string | Element;
   shadow?: boolean | ShadowRootInit;
   transport?: Transport;
