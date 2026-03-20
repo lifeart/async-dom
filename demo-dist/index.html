@@ -3,127 +3,1071 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>async-dom — Examples</title>
+  <title>async-dom — Run UI Frameworks in Web Workers</title>
+  <meta name="description" content="Move React, Vue, and Svelte into Web Workers. Protect content from AI scrapers, keep the main thread at 60fps, and isolate business logic — structurally.">
+  <meta property="og:title" content="async-dom — Your DOM is just a projection">
+  <meta property="og:description" content="Move entire UI frameworks into Web Workers. Structural content protection, 60fps rendering, multi-framework isolation.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://lifeart.github.io/async-dom/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="async-dom — Your DOM is just a projection">
+  <meta name="twitter:description" content="Run React, Vue, Svelte in Web Workers. AI scraping defense, 60fps performance, zero framework runtime on main thread.">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; }
-    .header { text-align: center; padding: 48px 16px 32px; }
-    .header h1 { font-size: 2.5rem; font-weight: 700; }
-    .header h1 span { color: #58a6ff; }
-    .header p { color: #8b949e; margin-top: 8px; font-size: 1.1rem; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; max-width: 960px; margin: 0 auto; padding: 0 20px 60px; }
-    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 24px; transition: border-color 0.2s; }
-    .card:hover { border-color: #58a6ff; }
-    .card h2 { font-size: 1.2rem; margin-bottom: 8px; }
-    .card h2 a { color: #58a6ff; text-decoration: none; }
-    .card h2 a:hover { text-decoration: underline; }
-    .card p { color: #8b949e; font-size: 0.9rem; line-height: 1.5; }
-    .card .tags { margin-top: 12px; }
-    .card .tag { display: inline-block; background: #1f2937; color: #9ca3af; font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; margin-right: 4px; }
-    .footer { text-align: center; padding: 32px; color: #8b949e; font-size: 0.85rem; }
-    .footer a { color: #58a6ff; text-decoration: none; }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1a2332;
+      --bg-surface: #0d1117;
+      --border: #1e293b;
+      --border-hover: #3b82f6;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.15);
+      --green: #10b981;
+      --orange: #f59e0b;
+      --red: #ef4444;
+      --purple: #a855f7;
+      --react: #61dafb;
+      --vue: #42b883;
+      --svelte: #ff3e00;
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+      --mono: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ── Navigation ── */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(10, 14, 23, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+    }
+    .nav-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 56px;
+    }
+    .nav-logo { font-weight: 700; font-size: 1.1rem; color: var(--text); text-decoration: none; letter-spacing: -0.02em; }
+    .nav-logo span { color: var(--accent); }
+    .nav-links { display: flex; gap: 28px; align-items: center; }
+    .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      background: var(--accent); color: #fff; padding: 6px 16px; border-radius: 6px;
+      font-size: 0.8rem; font-weight: 600; text-decoration: none; transition: opacity 0.2s;
+    }
+    .nav-cta:hover { opacity: 0.9; }
+
+    @media (max-width: 768px) {
+      .nav-links { gap: 16px; }
+      .nav-links a.hide-mobile { display: none; }
+    }
+
+    /* ── Shared ── */
+    .section { padding: 100px 24px; }
+    .container { max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      display: inline-block; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--accent); margin-bottom: 12px;
+    }
+    .section-title { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; margin-bottom: 16px; }
+    .section-subtitle { color: var(--text-muted); font-size: 1.1rem; max-width: 640px; line-height: 1.7; }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 160px 24px 100px;
+      text-align: center;
+      position: relative;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 800px; height: 600px;
+      background: radial-gradient(ellipse at center, rgba(59,130,246,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2);
+      padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; color: var(--accent);
+      font-weight: 500; margin-bottom: 24px;
+    }
+    .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+    .hero h1 {
+      font-size: clamp(2.5rem, 6vw, 4rem); font-weight: 800;
+      letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 20px;
+      background: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, var(--accent) 0%, #818cf8 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: 1.2rem; color: var(--text-muted); max-width: 620px;
+      margin: 0 auto 40px; line-height: 1.7;
+    }
+    .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 24px; border-radius: 8px; font-size: 0.9rem; font-weight: 600;
+      text-decoration: none; transition: all 0.2s; border: none; cursor: pointer;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-secondary { background: var(--bg-card); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--text-dim); background: var(--bg-card-hover); }
+
+    .hero-install {
+      margin-top: 40px;
+      display: inline-flex; align-items: center; gap: 12px;
+      background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 20px; font-family: var(--mono); font-size: 0.9rem; color: var(--text-muted);
+    }
+    .hero-install code { color: var(--text); }
+    .hero-install .copy-btn {
+      background: none; border: none; color: var(--text-dim); cursor: pointer;
+      padding: 4px; border-radius: 4px; transition: color 0.2s;
+    }
+    .hero-install .copy-btn:hover { color: var(--text); }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      display: flex; justify-content: center; gap: 48px; flex-wrap: wrap;
+      padding: 48px 24px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    .stat { text-align: center; }
+    .stat-value { font-size: 1.6rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em; }
+    .stat-label { font-size: 0.8rem; color: var(--text-dim); margin-top: 2px; }
+
+    /* ── Problem section ── */
+    .problems-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px; margin-top: 48px;
+    }
+    .problem-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 28px; transition: border-color 0.2s;
+    }
+    .problem-card:hover { border-color: var(--border-hover); }
+    .problem-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; margin-bottom: 16px;
+    }
+    .problem-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.01em; }
+    .problem-card p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; }
+    .problem-card .stat-highlight { color: var(--accent); font-weight: 600; }
+
+    /* ── How it works ── */
+    .how-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 32px; margin-top: 48px;
+    }
+    .how-step { text-align: center; position: relative; }
+    .how-number {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--accent-glow); border: 2px solid var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; font-weight: 700; color: var(--accent);
+      margin: 0 auto 16px;
+    }
+    .how-step h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+    .how-step p { color: var(--text-muted); font-size: 0.85rem; line-height: 1.6; }
+
+    .arch-diagram {
+      margin-top: 48px; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 32px; overflow-x: auto;
+    }
+    .arch-diagram pre {
+      font-family: var(--mono); font-size: 0.8rem; color: var(--text-muted);
+      line-height: 1.6; white-space: pre;
+    }
+    .arch-diagram .hl-worker { color: var(--accent); }
+    .arch-diagram .hl-main { color: var(--green); }
+    .arch-diagram .hl-transport { color: var(--orange); }
+
+    /* ── Audience tabs ── */
+    .audience-section { background: var(--bg-surface); }
+    .audience-tabs {
+      display: flex; gap: 4px; margin-top: 32px;
+      background: var(--bg-card); border-radius: 10px; padding: 4px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .audience-tab {
+      padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer;
+      font-family: var(--font); font-size: 0.85rem; font-weight: 600;
+      color: var(--text-muted); background: transparent; transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .audience-tab:hover { color: var(--text); }
+    .audience-tab.active { background: var(--accent); color: #fff; }
+    .audience-panels { margin-top: 32px; }
+    .audience-panel { display: none; }
+    .audience-panel.active { display: block; }
+    .audience-panel h3 { font-size: 1.4rem; font-weight: 700; margin-bottom: 12px; letter-spacing: -0.02em; }
+    .audience-panel .lead { color: var(--text-muted); font-size: 1rem; margin-bottom: 24px; line-height: 1.7; max-width: 700px; }
+    .benefit-list { list-style: none; display: grid; gap: 12px; }
+    .benefit-list li {
+      display: flex; gap: 12px; align-items: flex-start;
+      background: var(--bg-card); border: 1px solid var(--border);
+      padding: 16px 20px; border-radius: 10px; font-size: 0.9rem; line-height: 1.5;
+    }
+    .benefit-list .icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+    .benefit-list strong { color: var(--text); }
+    .benefit-list span { color: var(--text-muted); }
+
+    /* ── Code preview ── */
+    .code-section .code-tabs {
+      display: flex; gap: 0; margin-top: 48px;
+      border-bottom: 1px solid var(--border);
+    }
+    .code-tab {
+      padding: 10px 20px; border: none; cursor: pointer;
+      font-family: var(--font); font-size: 0.85rem; font-weight: 500;
+      color: var(--text-dim); background: transparent; transition: all 0.2s;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+    }
+    .code-tab:hover { color: var(--text-muted); }
+    .code-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .code-panels { margin-top: 0; }
+    .code-panel { display: none; }
+    .code-panel.active { display: block; }
+    .code-block {
+      background: var(--bg-card); border: 1px solid var(--border); border-top: none;
+      border-radius: 0 0 12px 12px; padding: 24px; overflow-x: auto;
+    }
+    .code-block pre {
+      font-family: var(--mono); font-size: 0.85rem; line-height: 1.7;
+      color: var(--text-muted);
+    }
+    .code-block .kw { color: #c084fc; }
+    .code-block .str { color: #86efac; }
+    .code-block .fn { color: #93c5fd; }
+    .code-block .cm { color: var(--text-dim); }
+    .code-block .tag { color: var(--react); }
+    .code-block .attr { color: var(--orange); }
+
+    /* ── Demos grid ── */
+    .demos-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px; margin-top: 48px;
+    }
+    .demo-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 22px; transition: all 0.2s; text-decoration: none; display: block;
+    }
+    .demo-card:hover { border-color: var(--border-hover); transform: translateY(-2px); }
+    .demo-card h3 { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .demo-card p { color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 12px; }
+    .demo-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .demo-tag {
+      font-size: 0.7rem; font-weight: 500; padding: 2px 8px; border-radius: 10px;
+      background: rgba(59, 130, 246, 0.1); color: var(--accent);
+    }
+    .demo-card.showcase {
+      grid-column: 1 / -1; border-color: rgba(59, 130, 246, 0.3);
+      background: linear-gradient(135deg, rgba(59,130,246,0.05) 0%, rgba(168,85,247,0.05) 100%);
+    }
+    .demo-card.react { border-color: rgba(97, 218, 251, 0.3); }
+    .demo-card.react .demo-tag { background: rgba(97,218,251,0.1); color: var(--react); }
+    .demo-card.vue { border-color: rgba(66, 184, 131, 0.3); }
+    .demo-card.vue .demo-tag { background: rgba(66,184,131,0.1); color: var(--vue); }
+    .demo-card.svelte { border-color: rgba(255, 62, 0, 0.3); }
+    .demo-card.svelte .demo-tag { background: rgba(255,62,0,0.1); color: var(--svelte); }
+
+    /* ── Comparison table ── */
+    .comparison-table {
+      margin-top: 48px; overflow-x: auto;
+    }
+    .comparison-table table {
+      width: 100%; border-collapse: collapse; font-size: 0.85rem;
+    }
+    .comparison-table th {
+      text-align: left; padding: 12px 16px; border-bottom: 2px solid var(--border);
+      color: var(--text); font-weight: 600;
+    }
+    .comparison-table td {
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .comparison-table tr:hover td { background: rgba(59, 130, 246, 0.03); }
+    .comparison-table .check { color: var(--green); font-weight: 700; }
+    .comparison-table .cross { color: var(--text-dim); }
+    .comparison-table .highlight-col { color: var(--accent); font-weight: 600; }
+
+    /* ── CTA section ── */
+    .cta-section {
+      text-align: center;
+      background: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg) 100%);
+    }
+    .cta-section .section-title { max-width: 600px; margin: 0 auto 16px; }
+    .cta-section .section-subtitle { margin: 0 auto 32px; }
+    .cta-links {
+      display: flex; justify-content: center; gap: 24px; flex-wrap: wrap;
+      margin-top: 24px; font-size: 0.9rem;
+    }
+    .cta-links a { color: var(--accent); text-decoration: none; font-weight: 500; }
+    .cta-links a:hover { text-decoration: underline; }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center; padding: 40px 24px; border-top: 1px solid var(--border);
+      color: var(--text-dim); font-size: 0.8rem;
+    }
+    .footer a { color: var(--text-muted); text-decoration: none; }
+    .footer a:hover { color: var(--text); }
+    .footer-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 12px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .section { padding: 64px 16px; }
+      .hero { padding: 120px 16px 64px; }
+      .section-title { font-size: 1.7rem; }
+      .stats-bar { gap: 24px; padding: 32px 16px; }
+      .audience-tabs { gap: 2px; }
+      .audience-tab { padding: 8px 12px; font-size: 0.8rem; }
+      .how-grid { grid-template-columns: 1fr 1fr; }
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1><span>async-dom</span> Examples</h1>
-    <p>UI in Web Workers — frame-budgeted rendering at 60 fps</p>
-  </div>
-  <div class="grid">
-    <div class="card">
-      <h2><a href="./vanilla/">7000 Nodes Grid</a></h2>
-      <p>Interactive color grid with 7,000 DOM nodes rendered from a worker. Click to score, hover to highlight, periodic color updates.</p>
-      <div class="tags">
-        <span class="tag">performance</span>
-        <span class="tag">events</span>
-        <span class="tag">scheduler</span>
-      </div>
-    </div>
-    <div class="card">
-      <h2><a href="./counter/">Counter</a></h2>
-      <p>Minimal example — increment/decrement buttons with click handlers and textContent updates.</p>
-      <div class="tags">
-        <span class="tag">beginner</span>
-        <span class="tag">events</span>
-      </div>
-    </div>
-    <div class="card">
-      <h2><a href="./todo/">Todo List</a></h2>
-      <p>Todo app with input sync, keyboard events, dynamic add/remove, classList toggling, and checkbox state.</p>
-      <div class="tags">
-        <span class="tag">input sync</span>
-        <span class="tag">dynamic DOM</span>
-        <span class="tag">classList</span>
-      </div>
-    </div>
-    <div class="card">
-      <h2><a href="./multi-app/">Multi-App Isolation</a></h2>
-      <p>Two worker apps in separate shadow roots — fully isolated CSS. Color picker + stopwatch side by side.</p>
-      <div class="tags">
-        <span class="tag">shadow DOM</span>
-        <span class="tag">isolation</span>
-        <span class="tag">multi-app</span>
-      </div>
-    </div>
-    <div class="card">
-      <h2><a href="./audio-player/">Audio Player</a></h2>
-      <p>Audio playback controlled from a Web Worker — play(), pause(), currentTime, timeupdate events, all via callMethod mutations.</p>
-      <div class="tags">
-        <span class="tag">callMethod</span>
-        <span class="tag">media API</span>
-        <span class="tag">events</span>
-      </div>
-    </div>
-    <div class="card">
-      <h2><a href="./vanilla/?debug">DevTools Panel</a></h2>
-      <p>The 7000-node grid with the built-in debug panel enabled. Virtual DOM tree, scheduler stats, mutation log, warnings.</p>
-      <div class="tags">
-        <span class="tag">devtools</span>
-        <span class="tag">debugging</span>
-        <span class="tag">flamechart</span>
-      </div>
-    </div>
-    <div class="card" style="border-color: #1f4a6f;">
-      <h2><a href="./react-mandelbrot/" style="color: #61dafb;">React: Mandelbrot Explorer</a></h2>
-      <p>Interactive fractal renderer — 4,800 pixels computed in a Web Worker. Click to zoom into infinite detail. React &lt;AsyncDom&gt; component with fallback &amp; onReady.</p>
-      <div class="tags">
-        <span class="tag" style="background: #1a3a5c; color: #61dafb;">React</span>
-        <span class="tag">adapter</span>
-        <span class="tag">heavy compute</span>
-      </div>
-    </div>
-    <div class="card" style="border-color: #1f4a3a;">
-      <h2><a href="./vue-gameoflife/" style="color: #42b883;">Vue: Game of Life</a></h2>
-      <p>Conway's Game of Life on a 60&times;40 grid — simulation logic and 2,400 cell DOM updates all in a Web Worker. Vue &lt;AsyncDom&gt; component with fallback slot &amp; @ready.</p>
-      <div class="tags">
-        <span class="tag" style="background: #1a3a2a; color: #42b883;">Vue</span>
-        <span class="tag">adapter</span>
-        <span class="tag">simulation</span>
-      </div>
-    </div>
-    <div class="card" style="border-color: #4a1a00;">
-      <h2><a href="./svelte-particles/" style="color: #ff3e00;">Svelte: Particle Life</a></h2>
-      <p>Particle simulation with emergent behaviors &mdash; 320 particles with attraction/repulsion rules rendered on a 60&times;60 grid. Svelte <code>use:asyncDom</code> action driving the worker.</p>
-      <div class="tags">
-        <span class="tag" style="background: #3a1a00; color: #ff3e00;">Svelte</span>
-        <span class="tag">adapter</span>
-        <span class="tag">simulation</span>
-      </div>
-    </div>
-    <div class="card" style="border-color: #58a6ff; grid-column: 1 / -1;">
-      <h2><a href="./framework-showcase/">&#127775; Framework Showcase: React + Vue + Svelte on One Page</a></h2>
-      <p>Three workers running simultaneously &mdash; Mandelbrot, Game of Life, and Particle simulation &mdash; each in its own shadow DOM. <strong>Zero framework runtime on the main thread.</strong> Just async-dom + Web Workers + DevTools.</p>
-      <div class="tags">
-        <span class="tag" style="background: #1a3a5c; color: #61dafb;">React worker</span>
-        <span class="tag" style="background: #1a3a2a; color: #42b883;">Vue worker</span>
-        <span class="tag" style="background: #3a1a00; color: #ff3e00;">Svelte worker</span>
-        <span class="tag">shadow DOM</span>
-        <span class="tag">devtools</span>
-      </div>
+
+<!-- ── Navigation ── -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo"><span>async</span>-dom</a>
+    <div class="nav-links">
+      <a href="#problems" class="hide-mobile">Why</a>
+      <a href="#how">How</a>
+      <a href="#audiences">Use Cases</a>
+      <a href="#demos">Demos</a>
+      <a href="https://github.com/lifeart/async-dom" class="nav-cta">GitHub</a>
     </div>
   </div>
-  <div class="footer">
-    <a href="https://github.com/lifeart/async-dom">GitHub</a> · MIT License
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero">
+  <div class="hero-badge">
+    <span class="dot"></span>
+    v2.0 alpha — React, Vue, Svelte adapters
   </div>
+  <h1>Your DOM is just <em>a projection</em></h1>
+  <p class="hero-sub">
+    Move your entire UI framework into a Web Worker. The main thread receives only
+    serialized mutations. Content is structurally invisible to scrapers, bots, and AI crawlers.
+  </p>
+  <div class="hero-actions">
+    <a href="#demos" class="btn btn-primary">See Live Demos</a>
+    <a href="https://github.com/lifeart/async-dom" class="btn btn-secondary">View on GitHub</a>
+  </div>
+  <div class="hero-install">
+    <code>npm install async-dom</code>
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('npm install async-dom')" title="Copy">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 10.5V3a1.5 1.5 0 011.5-1.5H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</section>
+
+<!-- ── Stats ── -->
+<div class="stats-bar">
+  <div class="stat">
+    <div class="stat-value">60 fps</div>
+    <div class="stat-label">Frame-budgeted rendering</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">~21 KB</div>
+    <div class="stat-label">Main + Worker (gzip)</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">634</div>
+    <div class="stat-label">Tests passing</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">3</div>
+    <div class="stat-label">Framework adapters</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">0</div>
+    <div class="stat-label">Framework KB on main thread</div>
+  </div>
+</div>
+
+<!-- ── Problem ── -->
+<section class="section" id="problems">
+  <div class="container">
+    <span class="section-label">The Problem</span>
+    <h2 class="section-title">The web wasn't built for today's threats</h2>
+    <p class="section-subtitle">
+      Content theft is industrialized. Performance expectations are brutal.
+      Traditional architecture exposes everything.
+    </p>
+    <div class="problems-grid">
+      <div class="problem-card">
+        <div class="problem-icon" style="background: rgba(239,68,68,0.1); color: var(--red);">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <h3>AI scrapers ignore your rules</h3>
+        <p>
+          Cloudflare blocked <span class="stat-highlight">416 billion AI bot requests</span> in one year.
+          OpenAI's crawl-to-referral ratio is 1,700:1. <code>robots.txt</code> is voluntarily ignored.
+          Your content trains models that compete with you.
+        </p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-icon" style="background: rgba(245,158,11,0.1); color: var(--orange);">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        </div>
+        <h3>The main thread is a bottleneck</h3>
+        <p>
+          JavaScript is single-threaded. Your framework, your business logic, third-party scripts,
+          and user input all fight for <span class="stat-highlight">16ms per frame</span>.
+          Modern devices have 4-8 cores. Traditional web apps use one.
+        </p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-icon" style="background: rgba(168,85,247,0.1); color: var(--purple);">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke="currentColor" stroke-width="2"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <h3>Everything is exposed</h3>
+        <p>
+          Source code in bundles. Data structures in the DOM. Auth tokens accessible to XSS.
+          Business logic readable by anyone with DevTools. Browser extensions with full access.
+          <span class="stat-highlight">There's no architectural boundary.</span>
+        </p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-icon" style="background: rgba(16,185,129,0.1); color: var(--green);">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M9 12h6m-3-3v6m-7 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <h3>Copyright has no technical enforcement</h3>
+        <p>
+          The NYT sued OpenAI. Danish publishers followed. The <span class="stat-highlight">$236 billion DRM market</span>
+          proves demand for protection. But web content has none. <code>robots.txt</code> is a polite request, not a wall.
+        </p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-icon" style="background: rgba(59,130,246,0.1); color: var(--accent);">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zm0 8a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2z" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <h3>Micro-frontends need real isolation</h3>
+        <p>
+          iframes are slow and limited. Shared globals collide. CSS leaks across boundaries.
+          Running multiple frameworks on one page is a hack.
+          <span class="stat-highlight">Teams need true sandboxing.</span>
+        </p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-icon" style="background: rgba(236,72,153,0.1); color: #ec4899;">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3>Low-power devices can't keep up</h3>
+        <p>
+          Smart TVs, kiosks, IoT displays, and budget phones choke on modern frameworks.
+          <span class="stat-highlight">You can't ship lighter code.</span> But you can move computation
+          to a more capable machine and stream only the rendering instructions.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── How It Works ── -->
+<section class="section" id="how" style="background: var(--bg-surface);">
+  <div class="container">
+    <span class="section-label">The Solution</span>
+    <h2 class="section-title">Your app runs in a Worker. The DOM is a projection.</h2>
+    <p class="section-subtitle">
+      async-dom provides a virtual <code>document</code> and <code>window</code> inside a Web Worker.
+      Your framework thinks it's talking to the real DOM. It isn't.
+    </p>
+    <div class="how-grid">
+      <div class="how-step">
+        <div class="how-number">1</div>
+        <h3>Write normal code</h3>
+        <p>Use React, Vue, Svelte, or vanilla JS. The virtual DOM API is comprehensive — querySelector, classList, dataset, events, all of it.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-number">2</div>
+        <h3>Mutations are collected</h3>
+        <p>Every createElement, appendChild, setAttribute is intercepted, batched, and coalesced in the worker.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-number">3</div>
+        <h3>Transported efficiently</h3>
+        <p>A 22-opcode binary codec with string deduplication serializes mutations. Also supports postMessage and WebSocket.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-number">4</div>
+        <h3>Applied at 60 fps</h3>
+        <p>A frame-budgeted scheduler on the main thread applies mutations with priority sorting and viewport culling. Never drops below 60fps.</p>
+      </div>
+    </div>
+    <div class="arch-diagram">
+      <pre>
+<span class="hl-worker">  Worker Thread                     </span><span class="hl-main">  Main Thread</span>
+<span class="hl-worker">  ┌──────────────────────┐          </span><span class="hl-main">  ┌───────────────────────┐</span>
+<span class="hl-worker">  │  VirtualDocument      │          </span><span class="hl-main">  │  ThreadManager         │</span>
+<span class="hl-worker">  │  (full DOM API)       │          </span><span class="hl-main">  │  (per-app routing)     │</span>
+<span class="hl-worker">  │        │              │          </span><span class="hl-main">  │        │               │</span>
+<span class="hl-worker">  │  MutationCollector    │          </span><span class="hl-main">  │  FrameScheduler        │</span>
+<span class="hl-worker">  │  (batch + coalesce)   │          </span><span class="hl-main">  │  (budget + priority)   │</span>
+<span class="hl-worker">  └────────┬─────────────┘          </span><span class="hl-main">  │        │               │</span>
+           │                           <span class="hl-main">  │  DomRenderer(s)        │</span>
+      <span class="hl-transport">Transport ─────────────────────></span><span class="hl-main">  │  (apply to real DOM)   │</span>
+    <span class="hl-transport">  (binary / postMessage / WS)       </span><span class="hl-main">  │        │               │</span>
+           │                           <span class="hl-main">  │  EventBridge           │</span>
+           │ <span class="hl-transport">&lt;─── Events ────────────</span><span class="hl-main">  │  (DOM → Worker)        │</span>
+           │                           <span class="hl-main">  │        │               │</span>
+           │ <span class="hl-transport">&lt;─── Sync Reads ──────></span><span class="hl-main">  │  SyncChannelHost       │</span>
+           │  <span class="hl-transport">(SharedArrayBuffer)        </span><span class="hl-main">  │  (Atomics.notify)      │</span>
+<span class="hl-worker">  ┌────────┴─────────────┐          </span><span class="hl-main">  └───────────────────────┘</span>
+<span class="hl-worker">  │  SyncChannel          │</span>
+<span class="hl-worker">  │  (blocking reads)     │</span>
+<span class="hl-worker">  └──────────────────────┘</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ── Audience-specific value props ── -->
+<section class="section audience-section" id="audiences">
+  <div class="container">
+    <span class="section-label">Who is this for</span>
+    <h2 class="section-title">Built for every stakeholder</h2>
+    <p class="section-subtitle">
+      Different roles, different priorities. async-dom addresses them all.
+    </p>
+    <div class="audience-tabs" role="tablist">
+      <button class="audience-tab active" data-tab="security" role="tab">Security Teams</button>
+      <button class="audience-tab" data-tab="cto" role="tab">CTOs & Architects</button>
+      <button class="audience-tab" data-tab="dev" role="tab">Developers</button>
+      <button class="audience-tab" data-tab="seo" role="tab">SEO & Marketing</button>
+      <button class="audience-tab" data-tab="legal" role="tab">Legal & Compliance</button>
+    </div>
+    <div class="audience-panels">
+
+      <!-- Security -->
+      <div class="audience-panel active" data-panel="security">
+        <h3>Structural defense, not configuration</h3>
+        <p class="lead">
+          Worker isolation is enforced at the browser engine level. No <code>shadowRoot</code> workaround,
+          no extension bypass, no polite requests to behave. This is architecture, not policy.
+        </p>
+        <ul class="benefit-list">
+          <li>
+            <span class="icon">&#128274;</span>
+            <div><strong>XSS containment.</strong> <span>Malicious scripts on the main thread cannot reach worker internal state. All data passes through postMessage — a natural serialization boundary.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128272;</span>
+            <div><strong>Token isolation.</strong> <span>Auth tokens, session state, and API keys stored in the worker are inaccessible to compromised main-thread scripts or browser extensions.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128736;</span>
+            <div><strong>Anti-scraping by architecture.</strong> <span>Empty HTML payload. Procedural DOM structure. Dynamic class names. Honeypot injection. Behavioral gating. Not a cat-and-mouse game — a structural barrier.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128737;</span>
+            <div><strong>Built-in sanitization.</strong> <span>HTML sanitizer strips scripts, iframes, on* handlers, javascript: URIs. Property allowlist. Attribute filtering. Defense in depth.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#129302;</span>
+            <div><strong>Bot detection at the app layer.</strong> <span>The worker controls rendering. Detect non-human patterns (no mouse events, impossibly fast navigation) and alter output in real-time.</span></div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- CTO -->
+      <div class="audience-panel" data-panel="cto">
+        <h3>Ship faster. Scale smarter. Sleep better.</h3>
+        <p class="lead">
+          One library. Three framework adapters. Zero framework runtime on the main thread.
+          Multi-core utilization without the complexity of manual worker management.
+        </p>
+        <ul class="benefit-list">
+          <li>
+            <span class="icon">&#9889;</span>
+            <div><strong>Core Web Vitals improvement.</strong> <span>Moving framework execution off the main thread directly improves INP, FID, and TBT. Google rewards this in search rankings.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#127959;</span>
+            <div><strong>True micro-frontend isolation.</strong> <span>Each team ships a worker. CSS is encapsulated via shadow DOM. No shared globals. Independent deployment. React 18 and React 19 on the same page — zero conflicts.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128187;</span>
+            <div><strong>Remote rendering via WebSocket.</strong> <span>Run the app on a server, stream DOM updates to Smart TVs, kiosks, IoT devices, or thin clients. One codebase, any screen.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128176;</span>
+            <div><strong>Protect proprietary UI logic.</strong> <span>NDA demos, premium features, competitive algorithms — keep them in a worker or on a server, not in client bundles.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128200;</span>
+            <div><strong>634 tests. TypeScript. MIT license.</strong> <span>Production-ready with strict types, Biome linting, CI pipeline, Vite plugin, CLI scaffolding, and Chrome DevTools extension.</span></div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Developer -->
+      <div class="audience-panel" data-panel="dev">
+        <h3>Write normal code. It just runs in a Worker.</h3>
+        <p class="lead">
+          No new framework to learn. The virtual DOM API is comprehensive — your existing React, Vue,
+          or Svelte code works without modification. First-class DX with DevTools, error reporting, and hot reload.
+        </p>
+        <ul class="benefit-list">
+          <li>
+            <span class="icon">&#128230;</span>
+            <div><strong>Drop-in framework adapters.</strong> <span>&lt;AsyncDom&gt; component for React/Vue. use:asyncDom action for Svelte. useAsyncDom hooks/composables. Fallback, onReady, onError — all wired up.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128269;</span>
+            <div><strong>Built-in DevTools panel.</strong> <span>5-tab debug panel: virtual DOM tree with inspector, frame-budget flamechart, P50/P95/P99 latency, mutation log with time-travel replay, causality graph.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128268;</span>
+            <div><strong>Synchronous DOM reads.</strong> <span>getBoundingClientRect(), offsetWidth, getComputedStyle() return real values via SharedArrayBuffer. No async workarounds.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128295;</span>
+            <div><strong>Vite plugin with zero config.</strong> <span>COOP/COEP headers, binary transport in production, worker error overlay, debug defines — all automatic.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#9997;</span>
+            <div><strong>CLI scaffolding.</strong> <span><code>npx async-dom init my-app --template react-ts</code> — running in under a minute with vanilla, React, or Vue templates.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128679;</span>
+            <div><strong>Sandbox mode for third-party scripts.</strong> <span>Patch worker globals or use Proxy + eval sandbox. Third-party analytics, ads, and widgets "just work" inside the worker.</span></div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- SEO & Marketing -->
+      <div class="audience-panel" data-panel="seo">
+        <h3>Faster pages. Better rankings. Protected content.</h3>
+        <p class="lead">
+          Google uses Core Web Vitals as a ranking signal. async-dom moves heavy computation
+          off the main thread, directly improving the metrics that matter for SEO.
+        </p>
+        <ul class="benefit-list">
+          <li>
+            <span class="icon">&#128200;</span>
+            <div><strong>Better INP and TBT.</strong> <span>Interaction to Next Paint and Total Blocking Time improve when the main thread isn't running your framework. Google measures this.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128065;</span>
+            <div><strong>Real-time UX broadcasting.</strong> <span>WebSocket transport lets you observe exactly what users experience, live. Session replay at the mutation level, not pixel approximation.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128170;</span>
+            <div><strong>Content stays yours.</strong> <span>AI crawlers get an empty HTML shell. Your premium content, paywalled articles, and proprietary data don't end up in training datasets.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#129518;</span>
+            <div><strong>Invisible watermarking.</strong> <span>The worker controls rendering. Inject per-user, per-session watermarks that are invisible to readers but traceable if content leaks.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128106;</span>
+            <div><strong>Collaborative demos.</strong> <span>Multi-user events via WebSocket. Build interactive product demos where multiple users interact with the same live UI.</span></div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Legal -->
+      <div class="audience-panel" data-panel="legal">
+        <h3>Technical enforcement for legal rights</h3>
+        <p class="lead">
+          The NYT sued OpenAI. The IAB proposed the AI Accountability for Publishers Act.
+          But legal remedies are slow. async-dom gives your legal team a technical backstop.
+        </p>
+        <ul class="benefit-list">
+          <li>
+            <span class="icon">&#128220;</span>
+            <div><strong>Content never in source.</strong> <span>Structured content stays in the worker. The DOM receives procedural rendering instructions, not your data model. Scraping requires reverse-engineering a binary protocol.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128373;</span>
+            <div><strong>Traceable leaks.</strong> <span>Per-session rendering watermarks let you prove which session leaked content — useful evidence for DMCA and copyright claims.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128274;</span>
+            <div><strong>Access control at render time.</strong> <span>The worker can enforce licensing rules: time-limited viewing, user-specific rendering, geographic restrictions — without relying on server-side paywalls that AI scrapers circumvent.</span></div>
+          </li>
+          <li>
+            <span class="icon">&#128466;</span>
+            <div><strong>Copy-paste control.</strong> <span>Clipboard operations pass through the worker's abstraction layer. Intercept, modify, or log copy events without degrading the reading experience.</span></div>
+          </li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Code Preview ── -->
+<section class="section code-section" id="code">
+  <div class="container">
+    <span class="section-label">Get Started</span>
+    <h2 class="section-title">Three lines to move your UI off the main thread</h2>
+    <p class="section-subtitle">Works with any framework. No rewrites needed.</p>
+    <div class="code-tabs" role="tablist">
+      <button class="code-tab active" data-codetab="vanilla" role="tab">Vanilla</button>
+      <button class="code-tab" data-codetab="react" role="tab">React</button>
+      <button class="code-tab" data-codetab="vue" role="tab">Vue</button>
+      <button class="code-tab" data-codetab="svelte" role="tab">Svelte</button>
+    </div>
+    <div class="code-panels">
+      <div class="code-panel active" data-codepanel="vanilla">
+        <div class="code-block"><pre><span class="cm">// main.ts</span>
+<span class="kw">import</span> { createAsyncDom } <span class="kw">from</span> <span class="str">"async-dom"</span>;
+
+<span class="kw">const</span> dom = <span class="fn">createAsyncDom</span>({
+  <span class="attr">target</span>: document.<span class="fn">getElementById</span>(<span class="str">"app"</span>),
+  <span class="attr">worker</span>: <span class="kw">new</span> <span class="fn">Worker</span>(<span class="kw">new</span> <span class="fn">URL</span>(<span class="str">"./worker.ts"</span>, <span class="kw">import</span>.meta.url), { <span class="attr">type</span>: <span class="str">"module"</span> }),
+});
+dom.<span class="fn">start</span>();
+
+<span class="cm">// worker.ts</span>
+<span class="kw">import</span> { createWorkerDom } <span class="kw">from</span> <span class="str">"async-dom/worker"</span>;
+<span class="kw">const</span> { document } = <span class="fn">createWorkerDom</span>();
+
+<span class="kw">const</span> div = document.<span class="fn">createElement</span>(<span class="str">"div"</span>);
+div.textContent = <span class="str">"Hello from a Web Worker!"</span>;
+document.body.<span class="fn">appendChild</span>(div);</pre></div>
+      </div>
+      <div class="code-panel" data-codepanel="react">
+        <div class="code-block"><pre><span class="kw">import</span> { <span class="tag">AsyncDom</span> } <span class="kw">from</span> <span class="str">"async-dom/react"</span>;
+
+<span class="kw">function</span> <span class="fn">App</span>() {
+  <span class="kw">return</span> (
+    &lt;<span class="tag">AsyncDom</span>
+      <span class="attr">worker</span>=<span class="str">"./app.worker.ts"</span>
+      <span class="attr">debug</span>
+      <span class="attr">fallback</span>={&lt;<span class="tag">div</span>&gt;Loading...&lt;/<span class="tag">div</span>&gt;}
+      <span class="attr">onReady</span>={(instance) =&gt; console.<span class="fn">log</span>(<span class="str">"ready"</span>)}
+      <span class="attr">onError</span>={(err) =&gt; <span class="fn">reportError</span>(err)}
+    /&gt;
+  );
+}</pre></div>
+      </div>
+      <div class="code-panel" data-codepanel="vue">
+        <div class="code-block"><pre><span class="cm">&lt;!-- App.vue --&gt;</span>
+&lt;<span class="tag">template</span>&gt;
+  &lt;<span class="tag">AsyncDom</span> <span class="attr">worker</span>=<span class="str">"./app.worker.ts"</span> :<span class="attr">debug</span>=<span class="str">"true"</span> @<span class="attr">ready</span>=<span class="str">"onReady"</span>&gt;
+    &lt;<span class="kw">template</span> #<span class="attr">fallback</span>&gt;&lt;<span class="tag">div</span>&gt;Loading...&lt;/<span class="tag">div</span>&gt;&lt;/<span class="kw">template</span>&gt;
+  &lt;/<span class="tag">AsyncDom</span>&gt;
+&lt;/<span class="tag">template</span>&gt;
+
+&lt;<span class="tag">script</span> <span class="attr">setup</span>&gt;
+<span class="kw">import</span> { <span class="tag">AsyncDom</span> } <span class="kw">from</span> <span class="str">"async-dom/vue"</span>;
+&lt;/<span class="tag">script</span>&gt;</pre></div>
+      </div>
+      <div class="code-panel" data-codepanel="svelte">
+        <div class="code-block"><pre><span class="cm">&lt;!-- App.svelte --&gt;</span>
+&lt;<span class="tag">script</span>&gt;
+  <span class="kw">import</span> { asyncDom } <span class="kw">from</span> <span class="str">"async-dom/svelte"</span>;
+&lt;/<span class="tag">script</span>&gt;
+
+&lt;<span class="tag">div</span> <span class="kw">use</span>:<span class="fn">asyncDom</span>={{ <span class="attr">worker</span>: <span class="str">"./app.worker.ts"</span> }} /&gt;</pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Live Demos ── -->
+<section class="section" id="demos" style="background: var(--bg-surface);">
+  <div class="container">
+    <span class="section-label">See it in action</span>
+    <h2 class="section-title">Live demos running entirely in Web Workers</h2>
+    <p class="section-subtitle">
+      Every demo below runs its full application logic in a worker.
+      The main thread only applies DOM mutations. Open DevTools — there's zero framework code on the main thread.
+    </p>
+    <div class="demos-grid">
+
+      <a href="./framework-showcase/" class="demo-card showcase">
+        <h3>Framework Showcase: React + Vue + Svelte</h3>
+        <p>Three workers running simultaneously — Mandelbrot, Game of Life, and Particle simulation — each in its own shadow DOM. Zero framework runtime on the main thread.</p>
+        <div class="demo-tags">
+          <span class="demo-tag" style="background:rgba(97,218,251,0.1);color:var(--react);">React</span>
+          <span class="demo-tag" style="background:rgba(66,184,131,0.1);color:var(--vue);">Vue</span>
+          <span class="demo-tag" style="background:rgba(255,62,0,0.1);color:var(--svelte);">Svelte</span>
+          <span class="demo-tag">shadow DOM</span>
+          <span class="demo-tag">multi-app</span>
+        </div>
+      </a>
+
+      <a href="./vanilla/" class="demo-card">
+        <h3>7,000 Nodes Grid</h3>
+        <p>Interactive color grid with 7,000 DOM nodes. Click to score, hover to highlight. All at 60fps from a worker.</p>
+        <div class="demo-tags">
+          <span class="demo-tag">performance</span>
+          <span class="demo-tag">events</span>
+        </div>
+      </a>
+
+      <a href="./react-mandelbrot/" class="demo-card react">
+        <h3>React: Mandelbrot Explorer</h3>
+        <p>Interactive fractal renderer — 4,800 pixels computed in a worker. Click to zoom into infinite detail.</p>
+        <div class="demo-tags">
+          <span class="demo-tag">React</span>
+          <span class="demo-tag">heavy compute</span>
+        </div>
+      </a>
+
+      <a href="./vue-gameoflife/" class="demo-card vue">
+        <h3>Vue: Game of Life</h3>
+        <p>Conway's Game of Life on a 60x40 grid. 2,400 cell DOM updates per generation, all in a worker.</p>
+        <div class="demo-tags">
+          <span class="demo-tag">Vue</span>
+          <span class="demo-tag">simulation</span>
+        </div>
+      </a>
+
+      <a href="./svelte-particles/" class="demo-card svelte">
+        <h3>Svelte: Particle Life</h3>
+        <p>320 particles with attraction/repulsion rules. Emergent behaviors rendered on a 60x60 grid.</p>
+        <div class="demo-tags">
+          <span class="demo-tag">Svelte</span>
+          <span class="demo-tag">simulation</span>
+        </div>
+      </a>
+
+      <a href="./multi-app/" class="demo-card">
+        <h3>Multi-App Isolation</h3>
+        <p>Two worker apps in separate shadow roots with fully isolated CSS. Color picker + stopwatch side by side.</p>
+        <div class="demo-tags">
+          <span class="demo-tag">shadow DOM</span>
+          <span class="demo-tag">isolation</span>
+        </div>
+      </a>
+
+      <a href="./todo/" class="demo-card">
+        <h3>Todo List</h3>
+        <p>Input sync, keyboard events, dynamic add/remove, classList toggling. The classic demo, from a worker.</p>
+        <div class="demo-tags">
+          <span class="demo-tag">input sync</span>
+          <span class="demo-tag">dynamic DOM</span>
+        </div>
+      </a>
+
+      <a href="./counter/" class="demo-card">
+        <h3>Counter</h3>
+        <p>The simplest possible example. Two buttons, a number, click events. Under 20 lines of worker code.</p>
+        <div class="demo-tags">
+          <span class="demo-tag">beginner</span>
+        </div>
+      </a>
+
+      <a href="./audio-player/" class="demo-card">
+        <h3>Audio Player</h3>
+        <p>Play, pause, seek — all controlled from a worker. Media API bridging via callMethod mutations.</p>
+        <div class="demo-tags">
+          <span class="demo-tag">media API</span>
+          <span class="demo-tag">callMethod</span>
+        </div>
+      </a>
+
+      <a href="./vanilla/?debug" class="demo-card">
+        <h3>DevTools Panel</h3>
+        <p>The 7,000-node grid with the built-in 5-tab debug panel. Tree inspector, flamechart, mutation log, causality graph.</p>
+        <div class="demo-tags">
+          <span class="demo-tag">devtools</span>
+          <span class="demo-tag">debugging</span>
+        </div>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Comparison ── -->
+<section class="section" id="comparison">
+  <div class="container">
+    <span class="section-label">Comparison</span>
+    <h2 class="section-title">How async-dom compares</h2>
+    <p class="section-subtitle">
+      There are other projects in the worker-DOM space. Here's how they differ.
+    </p>
+    <div class="comparison-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="highlight-col">async-dom</th>
+            <th>Partytown</th>
+            <th>worker-dom (AMP)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Scope</td>
+            <td class="highlight-col">Full app rendering</td>
+            <td>Third-party scripts</td>
+            <td>AMP components</td>
+          </tr>
+          <tr>
+            <td>Framework support</td>
+            <td class="highlight-col">React, Vue, Svelte, vanilla</td>
+            <td>N/A</td>
+            <td>AMP only</td>
+          </tr>
+          <tr>
+            <td>DOM API coverage</td>
+            <td class="highlight-col">Comprehensive</td>
+            <td>Proxy forwarding</td>
+            <td>Subset</td>
+          </tr>
+          <tr>
+            <td>Sync DOM reads</td>
+            <td class="check">SharedArrayBuffer</td>
+            <td>Service Worker + Atomics</td>
+            <td class="cross">No</td>
+          </tr>
+          <tr>
+            <td>Frame budgeting</td>
+            <td class="check">Adaptive + priority</td>
+            <td class="cross">No</td>
+            <td class="cross">No</td>
+          </tr>
+          <tr>
+            <td>Binary wire protocol</td>
+            <td class="check">22 opcodes + string dedup</td>
+            <td class="cross">No</td>
+            <td>Transfer list</td>
+          </tr>
+          <tr>
+            <td>Multi-app isolation</td>
+            <td class="check">Shadow DOM</td>
+            <td class="cross">No</td>
+            <td class="cross">No</td>
+          </tr>
+          <tr>
+            <td>WebSocket transport</td>
+            <td class="check">Yes (remote rendering)</td>
+            <td class="cross">No</td>
+            <td class="cross">No</td>
+          </tr>
+          <tr>
+            <td>Content protection</td>
+            <td class="check">Structural</td>
+            <td class="cross">No</td>
+            <td class="cross">No</td>
+          </tr>
+          <tr>
+            <td>Built-in DevTools</td>
+            <td class="check">5-tab panel + Chrome ext</td>
+            <td class="cross">No</td>
+            <td class="cross">No</td>
+          </tr>
+          <tr>
+            <td>Bundle size (gzip)</td>
+            <td class="highlight-col">~21 KB total</td>
+            <td>~12 KB</td>
+            <td>~12 KB</td>
+          </tr>
+          <tr>
+            <td>Project status</td>
+            <td class="highlight-col" style="color: var(--green);">Active</td>
+            <td>Maintenance</td>
+            <td style="color: var(--text-dim);">Inactive</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA ── -->
+<section class="section cta-section">
+  <div class="container">
+    <span class="section-label">Get started</span>
+    <h2 class="section-title">Move your UI off the main thread today</h2>
+    <p class="section-subtitle">
+      MIT licensed. TypeScript strict. 634 tests. React, Vue, and Svelte adapters.
+      Vite plugin. CLI scaffolding. Chrome DevTools extension.
+    </p>
+    <div class="hero-actions" style="margin-top: 32px;">
+      <a href="https://github.com/lifeart/async-dom" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        View on GitHub
+      </a>
+      <a href="https://www.npmjs.com/package/async-dom" class="btn btn-secondary">npm install async-dom</a>
+    </div>
+    <div class="cta-links">
+      <a href="https://github.com/lifeart/async-dom/issues">Report an issue</a>
+      <a href="https://github.com/lifeart/async-dom/blob/master/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/lifeart/async-dom/blob/master/LICENSE">MIT License</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer class="footer">
+  <div class="footer-links">
+    <a href="https://github.com/lifeart/async-dom">GitHub</a>
+    <a href="https://www.npmjs.com/package/async-dom">npm</a>
+    <a href="https://github.com/lifeart/async-dom/blob/master/LICENSE">MIT License</a>
+  </div>
+  <p>Built by <a href="https://github.com/lifeart">Aleksandr Kanunnikov</a></p>
+</footer>
+
+<script>
+  // Audience tabs
+  document.querySelectorAll('.audience-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.tab;
+      document.querySelectorAll('.audience-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.audience-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelector(`[data-panel="${target}"]`).classList.add('active');
+    });
+  });
+
+  // Code tabs
+  document.querySelectorAll('.code-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.codetab;
+      document.querySelectorAll('.code-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.code-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelector(`[data-codepanel="${target}"]`).classList.add('active');
+    });
+  });
+
+  // Smooth scroll for nav links
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(a.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+</script>
+
 </body>
 </html>
