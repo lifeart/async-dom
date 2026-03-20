@@ -191,6 +191,20 @@ export class VirtualDocument {
 		// Create VirtualEvent for bubbling support
 		const virtualEvent = new VirtualEvent(evt.type as string, evt);
 
+		// Feature 15: tag mutations with the causal event
+		const eventType = (evt.type as string) ?? "unknown";
+		this.collector.setCausalEvent({
+			eventType,
+			listenerId,
+			timestamp: Date.now(),
+		});
+
+		// Feature 16: performance mark around event dispatch
+		const perfMarkName = `async-dom:event:${eventType}:${listenerId}`;
+		if (typeof performance !== "undefined" && performance.mark) {
+			performance.mark(`${perfMarkName}:start`);
+		}
+
 		// Sync input state from event to target element
 		const targetEl = virtualEvent.target;
 		if (targetEl && typeof targetEl === "object" && "_updateInputState" in targetEl) {
@@ -224,6 +238,7 @@ export class VirtualDocument {
 		const docListener = this._listenerMap.get(listenerId);
 		if (docListener) {
 			docListener(virtualEvent);
+			this._finishEventPerf(perfMarkName);
 			return;
 		}
 
@@ -243,6 +258,21 @@ export class VirtualDocument {
 					if (virtualEvent.propagationStopped) break;
 					current = current.parentNode;
 				}
+			}
+		}
+
+		// Feature 16: end performance measure
+		this._finishEventPerf(perfMarkName);
+	}
+
+	/** Feature 16: finish performance measurement for an event dispatch */
+	private _finishEventPerf(perfMarkName: string): void {
+		if (typeof performance !== "undefined" && performance.mark && performance.measure) {
+			performance.mark(`${perfMarkName}:end`);
+			try {
+				performance.measure(perfMarkName, `${perfMarkName}:start`, `${perfMarkName}:end`);
+			} catch {
+				// marks may not exist if cleared
 			}
 		}
 	}

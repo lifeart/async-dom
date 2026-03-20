@@ -24,6 +24,10 @@ export class MutationCollector {
 	private _coalescedLog: CoalescedLogEntry[] = [];
 	private _perTypeCoalesced = new Map<string, { added: number; coalesced: number }>();
 
+	/** Feature 15: Current causal event tag for this flush cycle */
+	private _causalEvent: { eventType: string; listenerId: string; timestamp: number } | null =
+		null;
+
 	getStats(): { added: number; coalesced: number; flushed: number } {
 		return { ...this._stats };
 	}
@@ -41,6 +45,18 @@ export class MutationCollector {
 	}
 
 	constructor(private appId: AppId) {}
+
+	/** Feature 15: Set the causal event for the current mutation cycle. */
+	setCausalEvent(
+		event: { eventType: string; listenerId: string; timestamp: number } | null,
+	): void {
+		this._causalEvent = event;
+	}
+
+	/** Feature 15: Get current causal event. */
+	getCausalEvent(): { eventType: string; listenerId: string; timestamp: number } | null {
+		return this._causalEvent;
+	}
 
 	enableCoalescing(enabled: boolean): void {
 		this._coalesceEnabled = enabled;
@@ -194,6 +210,12 @@ export class MutationCollector {
 			return;
 		}
 
+		// Feature 16: performance mark around coalesce/flush
+		const perfMarkName = `async-dom:flush:${this.appId}`;
+		if (typeof performance !== "undefined" && performance.mark) {
+			performance.mark(`${perfMarkName}:start`);
+		}
+
 		const rawLength = this.queue.length;
 		const batch = this._coalesceEnabled
 			? this.coalesce(this.queue.splice(0))
@@ -202,10 +224,15 @@ export class MutationCollector {
 		this._stats.coalesced += rawLength - batch.length;
 		this._stats.flushed += batch.length;
 
-		if (batch.length === 0) return;
+		if (batch.length === 0) {
+			// Clear causal event after flush
+			this._causalEvent = null;
+			return;
+		}
 		this.uidCounter++;
 
 		if (this.transport?.readyState !== "open") {
+			this._causalEvent = null;
 			return;
 		}
 
@@ -216,7 +243,23 @@ export class MutationCollector {
 			mutations: batch,
 		};
 
+		// Feature 15: attach causal event to the mutation message
+		if (this._causalEvent) {
+			message.causalEvent = this._causalEvent;
+			this._causalEvent = null;
+		}
+
 		this.transport.send(message);
+
+		// Feature 16: performance measure
+		if (typeof performance !== "undefined" && performance.mark && performance.measure) {
+			performance.mark(`${perfMarkName}:end`);
+			try {
+				performance.measure(perfMarkName, `${perfMarkName}:start`, `${perfMarkName}:end`);
+			} catch {
+				// marks may not exist if cleared
+			}
+		}
 	}
 
 	/** Force-flush all pending mutations immediately */

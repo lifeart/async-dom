@@ -128,6 +128,86 @@ export class DebugStats {
 	}
 }
 
+/**
+ * Mutation-to-event correlation index (Feature 19: "Why Was This Node Updated?").
+ *
+ * Indexes mutations by nodeId and links them to their batch and causal event,
+ * allowing reverse lookups: given a nodeId, find why it was updated.
+ */
+export class MutationEventCorrelation {
+	/** Map from nodeId -> list of { batchUid, action, timestamp, causalEvent } */
+	private nodeIndex = new Map<
+		number,
+		Array<{
+			batchUid: number | undefined;
+			action: string;
+			timestamp: number;
+			causalEvent: { eventType: string; listenerId: string; timestamp: number } | null;
+		}>
+	>();
+
+	private maxEntriesPerNode = 20;
+	private batchEventMap = new Map<
+		number,
+		{ eventType: string; listenerId: string; timestamp: number }
+	>();
+
+	/** Register a batch's causal event for later correlation. */
+	registerBatchEvent(
+		batchUid: number,
+		causalEvent: { eventType: string; listenerId: string; timestamp: number },
+	): void {
+		this.batchEventMap.set(batchUid, causalEvent);
+		// Limit size
+		if (this.batchEventMap.size > 500) {
+			const firstKey = this.batchEventMap.keys().next().value;
+			if (firstKey !== undefined) this.batchEventMap.delete(firstKey);
+		}
+	}
+
+	/** Index a mutation entry for a specific node. */
+	indexMutation(entry: MutationLogEntry): void {
+		const m = entry.mutation as Record<string, unknown>;
+		const nodeId = m.id as number | undefined;
+		if (nodeId == null) return;
+
+		const causalEvent = entry.batchUid != null ? this.batchEventMap.get(entry.batchUid) ?? null : null;
+
+		let list = this.nodeIndex.get(nodeId);
+		if (!list) {
+			list = [];
+			this.nodeIndex.set(nodeId, list);
+		}
+		list.push({
+			batchUid: entry.batchUid,
+			action: entry.action,
+			timestamp: entry.timestamp,
+			causalEvent,
+		});
+		if (list.length > this.maxEntriesPerNode) {
+			list.shift();
+		}
+	}
+
+	/** Look up the chain: mutation -> batch -> event for a given nodeId. */
+	getWhyUpdated(
+		nodeId: number,
+	): Array<{
+		batchUid: number | undefined;
+		action: string;
+		timestamp: number;
+		causalEvent: { eventType: string; listenerId: string; timestamp: number } | null;
+	}> {
+		return this.nodeIndex.get(nodeId) ?? [];
+	}
+
+	/** Clear all data. */
+	clear(): void {
+		this.nodeIndex.clear();
+		this.batchEventMap.clear();
+	}
+}
+
 export function resolveDebugHooks(options?: DebugOptions): {
 	onMutation: ((entry: MutationLogEntry) => void) | null;
 	onEvent: ((entry: EventLogEntry) => void) | null;

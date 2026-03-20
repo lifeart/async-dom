@@ -1,9 +1,13 @@
 import type {
 	EventLogEntry,
 	MutationLogEntry,
+	MutationEventCorrelation,
 	SyncReadLogEntry,
 	WarningLogEntry,
 } from "../core/debug.ts";
+import type { PerfEntryData } from "../core/protocol.ts";
+import type { CausalityTracker, CausalityGraph } from "./causality-graph.ts";
+import { type TreeSnapshot, type TreeDiffNode, cloneSnapshot, diffTrees, hasChanges } from "./tree-diff.ts";
 
 /**
  * The shape of __ASYNC_DOM_DEVTOOLS__ exposed on globalThis (main thread).
@@ -13,6 +17,8 @@ interface FrameLogEntry {
 	totalMs: number;
 	actionCount: number;
 	timingBreakdown: Map<string, number>;
+	/** Feature 18: per-app mutation counts and deferred counts per frame */
+	perApp?: Map<string, { mutations: number; deferred: number }>;
 }
 
 interface EventTraceEntry {
@@ -45,6 +51,12 @@ interface DevtoolsAPI {
 	refreshDebugData: () => void;
 	getAppData: (appId: string) => AppDebugData | undefined;
 	getAllAppsData: () => Record<string, AppDebugData>;
+	/** Feature 15: Causality graph tracker */
+	getCausalityTracker: () => CausalityTracker;
+	/** Feature 16: Worker CPU profiler entries */
+	getWorkerPerfEntries: () => Record<string, PerfEntryData[]>;
+	/** Feature 19: Mutation-to-event correlation */
+	getMutationCorrelation: () => MutationEventCorrelation;
 }
 
 interface AppDebugData {
@@ -777,6 +789,235 @@ const PANEL_CSS = `
 .log-entry.event-entry .log-action { color: #d7ba7d; }
 .log-entry.syncread-entry .log-action { color: #c586c0; }
 
+/* ---- Feature 15: Causality Graph tab ---- */
+
+.graph-container {
+  padding: 4px;
+}
+
+.graph-node {
+  display: flex;
+  align-items: flex-start;
+  margin: 2px 0;
+  padding: 3px 6px;
+  border-left: 2px solid #3c3c3c;
+  font-size: 11px;
+}
+.graph-node.event-node { border-left-color: #d7ba7d; }
+.graph-node.batch-node { border-left-color: #569cd6; }
+.graph-node.dom-node { border-left-color: #4ec9b0; }
+
+.graph-node-label {
+  color: #d4d4d4;
+  cursor: pointer;
+}
+.graph-node-label:hover { text-decoration: underline; }
+
+.graph-node-type {
+  font-weight: 600;
+  margin-right: 6px;
+  font-size: 9px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  width: 40px;
+}
+.graph-node-type.event { color: #d7ba7d; }
+.graph-node-type.batch { color: #569cd6; }
+.graph-node-type.node { color: #4ec9b0; }
+
+.graph-children {
+  padding-left: 16px;
+}
+
+.graph-empty {
+  color: #808080;
+  padding: 16px;
+  text-align: center;
+}
+
+/* ---- Feature 16: Worker CPU Profiler ---- */
+
+.worker-perf-section {
+  margin-top: 8px;
+}
+
+.worker-perf-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+  font-size: 10px;
+}
+
+.worker-perf-name {
+  color: #808080;
+  flex-shrink: 0;
+  width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worker-perf-duration {
+  color: #d4d4d4;
+  flex-shrink: 0;
+  width: 60px;
+  text-align: right;
+}
+
+.worker-perf-track {
+  flex: 1;
+  height: 10px;
+  background: #2d2d2d;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.worker-perf-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: #c586c0;
+}
+
+.worker-util {
+  font-size: 11px;
+  padding: 2px 0;
+}
+.worker-util-label { color: #808080; }
+.worker-util-value { color: #d4d4d4; font-weight: 600; }
+
+/* ---- Feature 17: Tree Diff ---- */
+
+.snapshot-bar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.snapshot-btn {
+  background: #3c3c3c;
+  border: 1px solid #555;
+  color: #d4d4d4;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  border-radius: 3px;
+}
+.snapshot-btn:hover { background: #505050; }
+.snapshot-btn:disabled { opacity: 0.4; cursor: default; }
+
+.snapshot-info {
+  color: #555;
+  font-size: 10px;
+}
+
+.diff-marker {
+  display: inline-block;
+  font-size: 9px;
+  padding: 0 3px;
+  border-radius: 2px;
+  margin-left: 4px;
+  font-weight: 600;
+}
+.diff-marker.added { background: #2ea04333; color: #4ec9b0; }
+.diff-marker.removed { background: #f4474733; color: #f44747; }
+.diff-marker.changed { background: #d7ba7d33; color: #d7ba7d; }
+
+.tree-line.diff-added { background: #2ea04315; }
+.tree-line.diff-removed { background: #f4474715; text-decoration: line-through; opacity: 0.7; }
+.tree-line.diff-changed { background: #d7ba7d15; }
+
+/* ---- Feature 18: Multi-App Interleaving ---- */
+
+.multiapp-frame {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 10px;
+}
+
+.multiapp-frame-label {
+  color: #808080;
+  flex-shrink: 0;
+  width: 50px;
+}
+
+.multiapp-stacked-bar {
+  flex: 1;
+  height: 14px;
+  display: flex;
+  border-radius: 2px;
+  overflow: hidden;
+  background: #2d2d2d;
+}
+
+.multiapp-segment {
+  height: 100%;
+  min-width: 1px;
+}
+
+.multiapp-info {
+  color: #808080;
+  flex-shrink: 0;
+  font-size: 10px;
+  white-space: nowrap;
+  width: 100px;
+  text-align: right;
+}
+
+.multiapp-legend {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 10px;
+  flex-wrap: wrap;
+}
+
+.multiapp-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.multiapp-legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ---- Feature 19: Why Updated? ---- */
+
+.why-updated-section {
+  margin-top: 4px;
+}
+
+.why-updated-title {
+  color: #c586c0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 0 2px;
+  border-bottom: 1px solid #2d2d2d;
+  margin-bottom: 2px;
+}
+
+.why-updated-chain {
+  padding: 2px 0;
+  font-size: 10px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.why-chain-mutation { color: #569cd6; }
+.why-chain-arrow { color: #555; margin: 0 3px; }
+.why-chain-batch { color: #d7ba7d; }
+.why-chain-event { color: #4ec9b0; }
+.why-chain-none { color: #555; font-style: italic; }
+
 /* Responsive / mobile-friendly */
 @media (max-width: 600px) {
   .panel { width: calc(100vw - 16px) !important; height: 50vh !important; left: 8px; right: 8px; bottom: 8px; }
@@ -913,7 +1154,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	const tabBar = document.createElement("div");
 	tabBar.className = "tab-bar";
 
-	const tabs = ["Tree", "Performance", "Log", "Warnings"] as const;
+	const tabs = ["Tree", "Performance", "Log", "Warnings", "Graph"] as const;
 	type TabName = (typeof tabs)[number];
 	const tabBtns: Record<string, HTMLButtonElement> = {};
 	const tabPanels: Record<string, HTMLDivElement> = {};
@@ -1032,6 +1273,13 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	tabPanels.Warnings = warnContent as HTMLDivElement;
 	panel.appendChild(warnContent);
 
+	// ---- Graph content (Feature 15: Causality Graph) ----
+	const graphContent = document.createElement("div");
+	graphContent.className = "tab-content";
+	graphContent.innerHTML = '<div class="graph-empty">No causality data yet. Interact with the app to generate event-mutation data.</div>';
+	tabPanels.Graph = graphContent as HTMLDivElement;
+	panel.appendChild(graphContent);
+
 	// Attach badge to Warnings tab button
 	tabBtns.Warnings.appendChild(warningBadge);
 
@@ -1048,6 +1296,12 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	let highlightUpdatesEnabled = false;
 	let selectedNodeForSidebar: TreeNode | null = null;
 	let expandedFrameId: number | null = null;
+
+	// Feature 17: Tree snapshots for diffing
+	let snapshot1: TreeSnapshot | null = null;
+	let snapshot2: TreeSnapshot | null = null;
+	let showDiff = false;
+	let currentDiff: TreeDiffNode | null = null;
 
 	// ---- Feature 1: Queue pressure health dot (polls even when collapsed) ----
 	function updateHealthDot(): void {
@@ -1142,6 +1396,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		else if (activeTab === "Performance") renderPerfTab();
 		else if (activeTab === "Log") renderLogTab();
 		else if (activeTab === "Warnings") renderWarningsTab();
+		else if (activeTab === "Graph") renderGraphTab();
 	}
 
 	// ---- Tree rendering (VIRTUAL DOM from worker) ----
@@ -1267,6 +1522,55 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			}
 		}
 
+		// Feature 19: "Why Was This Node Updated?" section
+		if (node.id != null) {
+			const nodeId = node.id;
+			const dt2 = getDevtools();
+			if (dt2?.getMutationCorrelation) {
+				const correlation = dt2.getMutationCorrelation();
+				const whyEntries = correlation.getWhyUpdated(nodeId);
+
+				const whyTitle = document.createElement("div");
+				whyTitle.className = "why-updated-title";
+				whyTitle.textContent = `Why Updated? (${whyEntries.length})`;
+				sidebar.appendChild(whyTitle);
+
+				if (whyEntries.length === 0) {
+					const emptyWhy = document.createElement("div");
+					emptyWhy.className = "sidebar-empty";
+					emptyWhy.textContent = "no correlation data";
+					sidebar.appendChild(emptyWhy);
+				} else {
+					const recentWhy = whyEntries.slice(-8);
+					for (const entry of recentWhy) {
+						const chain = document.createElement("div");
+						chain.className = "why-updated-chain";
+
+						// mutation action
+						let html = `<span class="why-chain-mutation">${escapeHtml(entry.action)}</span>`;
+
+						// batch
+						if (entry.batchUid != null) {
+							html += `<span class="why-chain-arrow">\u2192</span>`;
+							html += `<span class="why-chain-batch">Batch #${entry.batchUid}</span>`;
+						}
+
+						// causal event
+						if (entry.causalEvent) {
+							html += `<span class="why-chain-arrow">\u2192</span>`;
+							html += `<span class="why-chain-event">${escapeHtml(entry.causalEvent.eventType)}</span>`;
+						} else {
+							html += `<span class="why-chain-arrow">\u2192</span>`;
+							html += `<span class="why-chain-none">no event</span>`;
+						}
+
+						chain.innerHTML = html;
+						sidebar.appendChild(chain);
+					}
+				}
+			}
+		}
+
 		sidebar.classList.add("visible");
 	}
 
@@ -1305,6 +1609,59 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		const treeMain = document.createElement("div");
 		treeMain.className = "tree-main";
 
+		// Feature 17: Snapshot/Diff bar
+		const snapshotBar = document.createElement("div");
+		snapshotBar.className = "snapshot-bar";
+
+		const snapshotBtn = document.createElement("button");
+		snapshotBtn.className = "snapshot-btn";
+		snapshotBtn.textContent = snapshot1 ? (snapshot2 ? "Reset Snapshots" : "Snapshot B") : "Snapshot A";
+		snapshotBtn.addEventListener("click", () => {
+			if (snapshot1 && snapshot2) {
+				// Reset
+				snapshot1 = null;
+				snapshot2 = null;
+				showDiff = false;
+				currentDiff = null;
+			} else if (!snapshot1) {
+				snapshot1 = cloneSnapshot(tree as unknown as TreeSnapshot);
+			} else {
+				snapshot2 = cloneSnapshot(tree as unknown as TreeSnapshot);
+			}
+			renderTreeTab();
+		});
+		snapshotBar.appendChild(snapshotBtn);
+
+		if (snapshot1 && snapshot2) {
+			const diffBtn = document.createElement("button");
+			diffBtn.className = "snapshot-btn";
+			diffBtn.textContent = showDiff ? "Hide Diff" : "Show Diff";
+			diffBtn.addEventListener("click", () => {
+				showDiff = !showDiff;
+				if (showDiff) {
+					currentDiff = diffTrees(snapshot1, snapshot2);
+				} else {
+					currentDiff = null;
+				}
+				renderTreeTab();
+			});
+			snapshotBar.appendChild(diffBtn);
+		}
+
+		const snapshotInfo = document.createElement("span");
+		snapshotInfo.className = "snapshot-info";
+		if (snapshot1 && snapshot2) {
+			snapshotInfo.textContent = "2 snapshots captured";
+			if (showDiff && currentDiff) {
+				snapshotInfo.textContent += hasChanges(currentDiff) ? " (changes found)" : " (no changes)";
+			}
+		} else if (snapshot1) {
+			snapshotInfo.textContent = "1 snapshot captured";
+		}
+		snapshotBar.appendChild(snapshotInfo);
+
+		treeMain.appendChild(snapshotBar);
+
 		// Status line
 		const statusLine = document.createElement("div");
 		statusLine.className = "tree-refresh-bar";
@@ -1317,7 +1674,12 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		const sidebar = document.createElement("div") as HTMLDivElement;
 		sidebar.className = "node-sidebar";
 
-		buildTreeDOM(treeMain, tree, 0, true, dt, sidebar);
+		// Feature 17: if showing diff, render diff tree; otherwise normal tree
+		if (showDiff && currentDiff) {
+			buildDiffTreeDOM(treeMain, currentDiff, 0, true, dt, sidebar);
+		} else {
+			buildTreeDOM(treeMain, tree, 0, true, dt, sidebar);
+		}
 
 		layout.appendChild(treeMain);
 		layout.appendChild(sidebar);
@@ -1479,6 +1841,127 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		parent.appendChild(wrapper);
 	}
 
+	// ---- Feature 17: Diff tree rendering ----
+
+	function buildDiffTreeDOM(
+		parent: HTMLElement,
+		diff: TreeDiffNode,
+		depth: number,
+		expanded: boolean,
+		dt: DevtoolsAPI,
+		sidebar: HTMLDivElement,
+	): void {
+		const node = diff.node;
+		const wrapper = document.createElement("div");
+		wrapper.className = `tree-node${expanded ? " expanded" : ""}`;
+
+		const line = document.createElement("div");
+		line.className = "tree-line";
+		line.style.paddingLeft = `${depth * 14}px`;
+
+		// Apply diff styling
+		if (diff.diffType === "added") line.classList.add("diff-added");
+		else if (diff.diffType === "removed") line.classList.add("diff-removed");
+		else if (diff.diffType === "changed") line.classList.add("diff-changed");
+
+		const children = diff.children ?? [];
+		const hasChildren = children.length > 0;
+
+		if (node.type === "text") {
+			const toggle = document.createElement("span");
+			toggle.className = "tree-toggle";
+			line.appendChild(toggle);
+
+			const textSpan = document.createElement("span");
+			textSpan.className = "tree-text-node";
+			textSpan.textContent = `"${truncate((node.text ?? "").trim(), 50)}"`;
+			line.appendChild(textSpan);
+
+			appendDiffMarker(line, diff);
+			wrapper.appendChild(line);
+			parent.appendChild(wrapper);
+			return;
+		}
+
+		if (node.type === "comment") {
+			const toggle = document.createElement("span");
+			toggle.className = "tree-toggle";
+			line.appendChild(toggle);
+
+			const commentSpan = document.createElement("span");
+			commentSpan.className = "tree-comment";
+			commentSpan.textContent = `<!-- ${truncate(node.text ?? "", 40)} -->`;
+			line.appendChild(commentSpan);
+
+			appendDiffMarker(line, diff);
+			wrapper.appendChild(line);
+			parent.appendChild(wrapper);
+			return;
+		}
+
+		// Element node
+		const toggleEl = document.createElement("span");
+		toggleEl.className = "tree-toggle";
+		toggleEl.textContent = hasChildren ? (expanded ? "\u25BC" : "\u25B6") : " ";
+		line.appendChild(toggleEl);
+
+		const tag = (node.tag ?? "???").toLowerCase();
+		const tagSpan = document.createElement("span");
+		let html = `<span class="tree-tag">&lt;${escapeHtml(tag)}</span>`;
+		const attrs = node.attributes ?? {};
+		if (attrs.id) {
+			html += ` <span class="tree-attr-name">id</span>=<span class="tree-attr-value">"${escapeHtml(attrs.id)}"</span>`;
+		}
+		if (node.className) {
+			html += ` <span class="tree-attr-name">class</span>=<span class="tree-attr-value">"${escapeHtml(truncate(node.className, 30))}"</span>`;
+		}
+		html += `<span class="tree-tag">&gt;</span>`;
+		tagSpan.innerHTML = html;
+		line.appendChild(tagSpan);
+
+		if (node.id != null) {
+			const nidSpan = document.createElement("span");
+			nidSpan.className = "tree-nodeid";
+			nidSpan.textContent = `_${node.id}`;
+			line.appendChild(nidSpan);
+		}
+
+		appendDiffMarker(line, diff);
+
+		if (hasChildren) {
+			toggleEl.addEventListener("click", (e) => {
+				e.stopPropagation();
+				wrapper.classList.toggle("expanded");
+				toggleEl.textContent = wrapper.classList.contains("expanded") ? "\u25BC" : "\u25B6";
+			});
+		}
+
+		wrapper.appendChild(line);
+
+		if (hasChildren) {
+			const childrenDiv = document.createElement("div");
+			childrenDiv.className = "tree-children";
+			for (const child of children) {
+				buildDiffTreeDOM(childrenDiv, child, depth + 1, depth < 2, dt, sidebar);
+			}
+			wrapper.appendChild(childrenDiv);
+		}
+
+		parent.appendChild(wrapper);
+	}
+
+	function appendDiffMarker(line: HTMLElement, diff: TreeDiffNode): void {
+		if (diff.diffType === "unchanged") return;
+		const marker = document.createElement("span");
+		marker.className = `diff-marker ${diff.diffType}`;
+		if (diff.diffType === "added") marker.textContent = "+ADD";
+		else if (diff.diffType === "removed") marker.textContent = "-DEL";
+		else if (diff.diffType === "changed") {
+			marker.textContent = `~${(diff.changes ?? []).join(",")}`;
+		}
+		line.appendChild(marker);
+	}
+
 	// ---- Performance rendering ----
 
 	function renderPerfTab(): void {
@@ -1628,6 +2111,100 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			}
 		}
 
+		// Feature 16: Worker CPU Profiler entries
+		if (dt.getWorkerPerfEntries) {
+			const allPerfEntries = dt.getWorkerPerfEntries();
+			const appIds16 = Object.keys(allPerfEntries);
+			for (const appId16 of appIds16) {
+				const entries = allPerfEntries[appId16];
+				if (!entries || entries.length === 0) continue;
+
+				html += `<div class="perf-section-title">Worker CPU: ${escapeHtml(appId16)}</div>`;
+
+				// Compute utilization: total duration vs wall time
+				const totalDuration = entries.reduce((s, e) => s + e.duration, 0);
+				const maxDuration = Math.max(...entries.map((e) => e.duration));
+
+				// Group by name prefix (event vs flush)
+				const eventEntries = entries.filter((e) => e.name.includes(":event:"));
+				const flushEntries = entries.filter((e) => e.name.includes(":flush:"));
+				const eventTotal = eventEntries.reduce((s, e) => s + e.duration, 0);
+				const flushTotal = flushEntries.reduce((s, e) => s + e.duration, 0);
+
+				html += `<div class="worker-util"><span class="worker-util-label">Total worker time: </span><span class="worker-util-value">${totalDuration.toFixed(1)}ms</span></div>`;
+				html += `<div class="worker-util"><span class="worker-util-label">Event handlers: </span><span class="worker-util-value">${eventTotal.toFixed(1)}ms (${eventEntries.length} calls)</span></div>`;
+				html += `<div class="worker-util"><span class="worker-util-label">Flush/coalesce: </span><span class="worker-util-value">${flushTotal.toFixed(1)}ms (${flushEntries.length} calls)</span></div>`;
+
+				// Show top entries by duration
+				const topEntries = entries.slice().sort((a, b) => b.duration - a.duration).slice(0, 10);
+				for (const entry of topEntries) {
+					const pct = maxDuration > 0 ? Math.max((entry.duration / maxDuration) * 100, 2) : 0;
+					const shortName = entry.name.replace("async-dom:", "");
+					html += `<div class="worker-perf-bar">`;
+					html += `<span class="worker-perf-name" title="${escapeHtml(entry.name)}">${escapeHtml(shortName)}</span>`;
+					html += `<span class="worker-perf-track"><span class="worker-perf-fill" style="width:${pct.toFixed(1)}%"></span></span>`;
+					html += `<span class="worker-perf-duration">${entry.duration.toFixed(2)}ms</span>`;
+					html += `</div>`;
+				}
+			}
+		}
+
+		// Feature 18: Multi-App Message Interleaving Timeline
+		if (frameLog.length > 0) {
+			const framesWithPerApp = frameLog.filter((f) => f.perApp && f.perApp.size > 0);
+			if (framesWithPerApp.length > 0) {
+				html += '<div class="perf-section-title">Multi-App Interleaving</div>';
+
+				// Collect all app IDs for legend
+				const allAppIds18 = new Set<string>();
+				for (const frame of framesWithPerApp) {
+					if (frame.perApp) {
+						for (const key of frame.perApp.keys()) {
+							allAppIds18.add(key);
+						}
+					}
+				}
+				const appColors18 = new Map<string, string>();
+				const palette = ["#569cd6", "#4ec9b0", "#d7ba7d", "#c586c0", "#f44747", "#ce9178", "#6a9955"];
+				let colorIdx = 0;
+				for (const appKey of allAppIds18) {
+					appColors18.set(appKey, palette[colorIdx % palette.length]);
+					colorIdx++;
+				}
+
+				// Legend
+				html += '<div class="multiapp-legend">';
+				for (const [appKey, color] of appColors18) {
+					html += `<span class="multiapp-legend-item"><span class="multiapp-legend-dot" style="background:${color}"></span>${escapeHtml(appKey)}</span>`;
+				}
+				html += '</div>';
+
+				// Stacked bars per frame
+				for (const frame of framesWithPerApp.slice(-20)) {
+					const perApp = frame.perApp!;
+					let totalMuts = 0;
+					let totalDeferred = 0;
+					for (const [, data] of perApp) {
+						totalMuts += data.mutations;
+						totalDeferred += data.deferred;
+					}
+					if (totalMuts === 0) continue;
+
+					html += `<div class="multiapp-frame">`;
+					html += `<span class="multiapp-frame-label">#${frame.frameId}</span>`;
+					html += `<span class="multiapp-stacked-bar">`;
+					for (const [appKey, data] of perApp) {
+						const pct = (data.mutations / totalMuts) * 100;
+						const color = appColors18.get(appKey) ?? "#569cd6";
+						html += `<span class="multiapp-segment" style="width:${pct.toFixed(1)}%;background:${color}" title="${escapeHtml(appKey)}: ${data.mutations} muts, ${data.deferred} deferred"></span>`;
+					}
+					html += `</span>`;
+					html += `<span class="multiapp-info">${totalMuts} muts${totalDeferred > 0 ? ` (${totalDeferred} def)` : ""}</span>`;
+					html += `</div>`;
+				}
+			}
+		}
+
 		// Mutation Type Chart: horizontal bar chart from mutation log
 		if (mutationLog.length > 0) {
 			const typeCounts = new Map<string, number>();
@@ -1669,6 +2246,79 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 				expandedFrameId = expandedFrameId === fid ? null : fid;
 				renderPerfTab();
 			});
+		}
+	}
+
+	// ---- Feature 15: Graph tab rendering (Causality DAG) ----
+
+	function renderGraphTab(): void {
+		const dt = getDevtools();
+		if (!dt?.getCausalityTracker) {
+			graphContent.innerHTML = '<div class="graph-empty">Causality tracker not available.</div>';
+			return;
+		}
+
+		const tracker = dt.getCausalityTracker();
+		const graph = tracker.buildGraph();
+
+		if (graph.roots.length === 0) {
+			graphContent.innerHTML = '<div class="graph-empty">No causality data yet. Interact with the app to generate event-to-mutation data.</div>';
+			return;
+		}
+
+		graphContent.innerHTML = "";
+
+		const container = document.createElement("div");
+		container.className = "graph-container";
+
+		// Render each root and its subtree
+		for (const rootId of graph.roots) {
+			renderGraphNode(container, graph, rootId, 0);
+		}
+
+		graphContent.appendChild(container);
+	}
+
+	function renderGraphNode(
+		parent: HTMLElement,
+		graph: CausalityGraph,
+		nodeId: string,
+		depth: number,
+	): void {
+		const node = graph.nodes.get(nodeId);
+		if (!node) return;
+
+		const div = document.createElement("div");
+		div.style.paddingLeft = `${depth * 16}px`;
+
+		const line = document.createElement("div");
+		let cssClass = "graph-node";
+		if (node.type === "event") cssClass += " event-node";
+		else if (node.type === "batch") cssClass += " batch-node";
+		else cssClass += " dom-node";
+		line.className = cssClass;
+
+		const typeSpan = document.createElement("span");
+		typeSpan.className = `graph-node-type ${node.type}`;
+		typeSpan.textContent = node.type === "event" ? "EVT" : node.type === "batch" ? "BAT" : "NOD";
+		line.appendChild(typeSpan);
+
+		const labelSpan = document.createElement("span");
+		labelSpan.className = "graph-node-label";
+		labelSpan.textContent = node.label;
+		line.appendChild(labelSpan);
+
+		div.appendChild(line);
+		parent.appendChild(div);
+
+		// Render children
+		if (node.children.length > 0) {
+			const childrenDiv = document.createElement("div");
+			childrenDiv.className = "graph-children";
+			for (const childId of node.children) {
+				renderGraphNode(childrenDiv, graph, childId, depth + 1);
+			}
+			parent.appendChild(childrenDiv);
 		}
 	}
 
@@ -2112,10 +2762,11 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			}
 		}, 1000);
 
-		// Log + warnings: poll every 500ms
+		// Log + warnings + graph: poll every 500ms
 		logRenderTimer = setInterval(() => {
 			if (activeTab === "Log") renderLogTab();
 			if (activeTab === "Warnings") renderWarningsTab();
+			if (activeTab === "Graph") renderGraphTab();
 		}, 500);
 
 		// Render current tab immediately
