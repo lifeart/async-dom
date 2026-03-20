@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MutationLogEntry, WarningLogEntry } from "../../src/core/debug.ts";
-import { DebugStats, resolveDebugHooks, WarningCode } from "../../src/core/debug.ts";
+import { DebugStats, resolveDebugHooks, WarningCode, WarningDescriptions } from "../../src/core/debug.ts";
 import { createAppId, createNodeId, HTML_NODE_ID, type Message } from "../../src/core/protocol.ts";
 import { DomRenderer } from "../../src/main-thread/renderer.ts";
 import type { Transport } from "../../src/transport/base.ts";
@@ -132,6 +132,23 @@ describe("WarningCode", () => {
 		expect(WarningCode.LISTENER_NOT_FOUND).toBe("ASYNC_DOM_LISTENER_NOT_FOUND");
 		expect(WarningCode.EVENT_ATTACH_FAILED).toBe("ASYNC_DOM_EVENT_ATTACH_FAILED");
 		expect(WarningCode.TRANSPORT_NOT_OPEN).toBe("ASYNC_DOM_TRANSPORT_NOT_OPEN");
+	});
+});
+
+describe("WarningDescriptions", () => {
+	it("covers all WarningCode values", () => {
+		for (const code of Object.values(WarningCode)) {
+			expect(WarningDescriptions[code]).toBeDefined();
+			expect(WarningDescriptions[code].description).toBeTruthy();
+			expect(WarningDescriptions[code].suggestion).toBeTruthy();
+		}
+	});
+
+	it("has no extra entries", () => {
+		const validCodes = new Set(Object.values(WarningCode));
+		for (const key of Object.keys(WarningDescriptions)) {
+			expect(validCodes.has(key)).toBe(true);
+		}
 	});
 });
 

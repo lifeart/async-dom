@@ -4,6 +4,7 @@ import type {
 	SyncReadLogEntry,
 	WarningLogEntry,
 } from "../core/debug.ts";
+import { WarningDescriptions } from "../core/debug.ts";
 
 /**
  * The shape of __ASYNC_DOM_DEVTOOLS__ exposed on globalThis (main thread).
@@ -471,6 +472,23 @@ const PANEL_CSS = `
 }
 .warn-code.WORKER_ERROR, .warn-code.WORKER_UNHANDLED_REJECTION { color: #f44747; }
 .warn-empty { color: #808080; padding: 16px; text-align: center; }
+
+/* Grouped Warnings */
+.warn-group { margin: 4px 0; border: 1px solid #2d2d2d; border-radius: 3px; }
+.warn-group-header { display: flex; align-items: center; gap: 6px; padding: 4px 6px; background: #252526; cursor: pointer; font-size: 11px; user-select: none; }
+.warn-group-header:hover { background: #2a2d2e; }
+.warn-group-toggle { color: #808080; font-size: 9px; width: 12px; text-align: center; flex-shrink: 0; }
+.warn-group-code { font-weight: 600; }
+.warn-group-count { color: #808080; font-size: 10px; }
+.warn-group-entries { display: none; padding: 0 6px 4px 18px; }
+.warn-group.expanded .warn-group-entries { display: block; }
+.warn-group-doc { padding: 4px 6px; background: #1a1a1a; border-bottom: 1px solid #2d2d2d; font-size: 10px; }
+.warn-group-desc { color: #9cdcfe; }
+.warn-group-suggestion { color: #4ec9b0; margin-top: 2px; }
+.warn-suppress-btn { background: #3c3c3c; border: 1px solid #555; color: #808080; padding: 1px 6px; cursor: pointer; font-family: inherit; font-size: 10px; border-radius: 3px; margin-left: auto; }
+.warn-suppress-btn:hover { color: #d4d4d4; background: #505050; }
+.warn-suppressed-note { color: #555; font-size: 10px; padding: 4px; text-align: center; font-style: italic; }
+.warn-view-toggle { font-size: 10px; }
 
 /* ---- Frame flamechart ---- */
 
@@ -1017,6 +1035,17 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 	const warnToolbar = document.createElement("div");
 	warnToolbar.className = "log-toolbar";
+
+	const warnFilter = document.createElement("input");
+	warnFilter.className = "log-filter";
+	warnFilter.placeholder = "Filter warnings...";
+	warnFilter.type = "text";
+	warnToolbar.appendChild(warnFilter);
+
+	const warnViewToggle = document.createElement("button");
+	warnViewToggle.className = "log-btn warn-view-toggle";
+	warnViewToggle.textContent = "Chronological";
+	warnToolbar.appendChild(warnViewToggle);
 
 	const warnClearBtn = document.createElement("button");
 	warnClearBtn.className = "log-btn";
@@ -2006,6 +2035,57 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	// ---- Warnings rendering ----
 
 	let lastRenderedWarningLength = 0;
+	let warnViewMode: "grouped" | "chronological" = "grouped";
+	const suppressedCodes = new Set<string>();
+
+	warnViewToggle.addEventListener("click", () => {
+		warnViewMode = warnViewMode === "grouped" ? "chronological" : "grouped";
+		warnViewToggle.textContent = warnViewMode === "grouped" ? "Chronological" : "Grouped";
+		warnViewToggle.classList.toggle("active", warnViewMode === "chronological");
+		lastRenderedWarningLength = -1; // force re-render
+		renderWarningsTab();
+	});
+
+	warnFilter.addEventListener("input", () => {
+		lastRenderedWarningLength = -1; // force re-render
+		renderWarningsTab();
+	});
+
+	function buildWarnEntryDiv(entry: WarningLogEntry): HTMLDivElement {
+		const div = document.createElement("div");
+		div.className = "warn-entry";
+
+		const timeSpan = document.createElement("span");
+		timeSpan.className = "warn-time";
+		timeSpan.textContent = formatTime(entry.timestamp);
+		div.appendChild(timeSpan);
+
+		const codeSpan = document.createElement("span");
+		codeSpan.className = `warn-code ${entry.code}`;
+		codeSpan.textContent = entry.code;
+		div.appendChild(codeSpan);
+
+		const msgSpan = document.createElement("span");
+		msgSpan.className = "warn-msg";
+		const firstLine = entry.message.split("\n")[0];
+		const hasStack = entry.message.includes("\n");
+		msgSpan.textContent = firstLine;
+		div.appendChild(msgSpan);
+
+		if (hasStack) {
+			div.style.cursor = "pointer";
+			const stackPre = document.createElement("pre");
+			stackPre.className = "warn-stack";
+			stackPre.textContent = entry.message;
+			stackPre.style.display = "none";
+			div.appendChild(stackPre);
+			div.addEventListener("click", () => {
+				stackPre.style.display = stackPre.style.display === "none" ? "block" : "none";
+			});
+		}
+
+		return div;
+	}
 
 	function renderWarningsTab(): void {
 		if (warningLog.length === 0) {
@@ -2018,47 +2098,129 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 		if (warningLog.length === lastRenderedWarningLength) return;
 
+		const filterText = warnFilter.value.toLowerCase().trim();
 		const fragment = document.createDocumentFragment();
 
-		for (const entry of warningLog) {
-			const div = document.createElement("div");
-			div.className = "warn-entry";
+		// Filter warnings by text
+		const filtered = filterText
+			? warningLog.filter(
+					(e) =>
+						e.code.toLowerCase().includes(filterText) ||
+						e.message.toLowerCase().includes(filterText),
+				)
+			: warningLog;
 
-			const timeSpan = document.createElement("span");
-			timeSpan.className = "warn-time";
-			timeSpan.textContent = formatTime(entry.timestamp);
-			div.appendChild(timeSpan);
+		// Separate visible vs suppressed
+		const visible = filtered.filter((e) => !suppressedCodes.has(e.code));
+		const suppressedCount = filtered.length - visible.length;
 
-			const codeSpan = document.createElement("span");
-			codeSpan.className = `warn-code ${entry.code}`;
-			codeSpan.textContent = entry.code;
-			div.appendChild(codeSpan);
-
-			const msgSpan = document.createElement("span");
-			msgSpan.className = "warn-msg";
-			// Show first line as summary, full message expandable on click
-			const firstLine = entry.message.split("\n")[0];
-			const hasStack = entry.message.includes("\n");
-			msgSpan.textContent = firstLine;
-			div.appendChild(msgSpan);
-
-			if (hasStack) {
-				div.style.cursor = "pointer";
-				const stackPre = document.createElement("pre");
-				stackPre.className = "warn-stack";
-				stackPre.textContent = entry.message;
-				stackPre.style.display = "none";
-				div.appendChild(stackPre);
-				div.addEventListener("click", () => {
-					stackPre.style.display = stackPre.style.display === "none" ? "block" : "none";
-				});
+		if (warnViewMode === "chronological") {
+			// Flat chronological list (only non-suppressed)
+			for (const entry of visible) {
+				fragment.appendChild(buildWarnEntryDiv(entry));
+			}
+		} else {
+			// Grouped view
+			const groups = new Map<string, WarningLogEntry[]>();
+			for (const entry of visible) {
+				let arr = groups.get(entry.code);
+				if (!arr) {
+					arr = [];
+					groups.set(entry.code, arr);
+				}
+				arr.push(entry);
 			}
 
-			fragment.appendChild(div);
+			for (const [code, entries] of groups) {
+				const groupDiv = document.createElement("div");
+				groupDiv.className = "warn-group";
+
+				// Header
+				const header = document.createElement("div");
+				header.className = "warn-group-header";
+
+				const toggle = document.createElement("span");
+				toggle.className = "warn-group-toggle";
+				toggle.textContent = "\u25B6";
+				header.appendChild(toggle);
+
+				const codeSpan = document.createElement("span");
+				codeSpan.className = `warn-group-code warn-code ${code}`;
+				codeSpan.textContent = code;
+				header.appendChild(codeSpan);
+
+				const countSpan = document.createElement("span");
+				countSpan.className = "warn-group-count";
+				countSpan.textContent = `(${entries.length})`;
+				header.appendChild(countSpan);
+
+				const suppressBtn = document.createElement("button");
+				suppressBtn.className = "warn-suppress-btn";
+				suppressBtn.textContent = "Suppress";
+				suppressBtn.addEventListener("click", (e) => {
+					e.stopPropagation();
+					suppressedCodes.add(code);
+					lastRenderedWarningLength = -1; // force re-render
+					renderWarningsTab();
+				});
+				header.appendChild(suppressBtn);
+
+				header.addEventListener("click", () => {
+					groupDiv.classList.toggle("expanded");
+					toggle.textContent = groupDiv.classList.contains("expanded") ? "\u25BC" : "\u25B6";
+				});
+
+				groupDiv.appendChild(header);
+
+				// Inline documentation
+				const desc = WarningDescriptions[code as keyof typeof WarningDescriptions];
+				if (desc) {
+					const docDiv = document.createElement("div");
+					docDiv.className = "warn-group-doc";
+					const descP = document.createElement("div");
+					descP.className = "warn-group-desc";
+					descP.textContent = desc.description;
+					docDiv.appendChild(descP);
+					const sugP = document.createElement("div");
+					sugP.className = "warn-group-suggestion";
+					sugP.textContent = `Suggestion: ${desc.suggestion}`;
+					docDiv.appendChild(sugP);
+					groupDiv.appendChild(docDiv);
+				}
+
+				// Entries
+				const entriesDiv = document.createElement("div");
+				entriesDiv.className = "warn-group-entries";
+				for (const entry of entries) {
+					entriesDiv.appendChild(buildWarnEntryDiv(entry));
+				}
+				groupDiv.appendChild(entriesDiv);
+
+				fragment.appendChild(groupDiv);
+			}
 		}
 
 		warnList.innerHTML = "";
 		warnList.appendChild(fragment);
+
+		// Suppressed note
+		if (suppressedCount > 0) {
+			const note = document.createElement("div");
+			note.className = "warn-suppressed-note";
+			note.textContent = `${suppressedCount} suppressed warning${suppressedCount !== 1 ? "s" : ""} hidden`;
+			const unsuppressBtn = document.createElement("button");
+			unsuppressBtn.className = "warn-suppress-btn";
+			unsuppressBtn.textContent = "Show all";
+			unsuppressBtn.style.marginLeft = "8px";
+			unsuppressBtn.addEventListener("click", () => {
+				suppressedCodes.clear();
+				lastRenderedWarningLength = -1;
+				renderWarningsTab();
+			});
+			note.appendChild(unsuppressBtn);
+			warnList.appendChild(note);
+		}
+
 		warnList.scrollTop = warnList.scrollHeight;
 		lastRenderedWarningLength = warningLog.length;
 	}
