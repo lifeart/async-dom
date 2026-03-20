@@ -82,113 +82,6 @@ function sanitizeNode(node) {
 	}
 }
 //#endregion
-//#region src/debug/causality-graph.ts
-/**
-* Build a causality DAG from batch records.
-*/
-function buildCausalityGraph(batches) {
-	const nodes = /* @__PURE__ */ new Map();
-	const roots = [];
-	const eventMap = /* @__PURE__ */ new Map();
-	const orphanBatches = [];
-	for (const batch of batches) if (batch.causalEvent) {
-		const eventKey = `event:${batch.causalEvent.eventType}:${batch.causalEvent.listenerId}:${batch.causalEvent.timestamp}`;
-		if (!eventMap.has(eventKey)) eventMap.set(eventKey, []);
-		eventMap.get(eventKey).push(batch);
-	} else orphanBatches.push(batch);
-	for (const [eventKey, eventBatches] of eventMap) {
-		const evt = eventBatches[0].causalEvent;
-		const eventNode = {
-			type: "event",
-			id: eventKey,
-			label: `${evt.eventType} (${evt.listenerId})`,
-			children: []
-		};
-		for (const batch of eventBatches) {
-			const batchKey = `batch:${batch.batchUid}`;
-			const batchNode = {
-				type: "batch",
-				id: batchKey,
-				label: `Batch #${batch.batchUid} (${batch.mutationCount} muts)`,
-				children: []
-			};
-			for (const nodeId of batch.nodeIds) {
-				const nodeKey = `node:${nodeId}`;
-				if (!nodes.has(nodeKey)) nodes.set(nodeKey, {
-					type: "node",
-					id: nodeKey,
-					label: `#${nodeId}`,
-					children: []
-				});
-				batchNode.children.push(nodeKey);
-			}
-			nodes.set(batchKey, batchNode);
-			eventNode.children.push(batchKey);
-		}
-		nodes.set(eventKey, eventNode);
-		roots.push(eventKey);
-	}
-	for (const batch of orphanBatches) {
-		const batchKey = `batch:${batch.batchUid}`;
-		const batchNode = {
-			type: "batch",
-			id: batchKey,
-			label: `Batch #${batch.batchUid} (${batch.mutationCount} muts, no event)`,
-			children: []
-		};
-		for (const nodeId of batch.nodeIds) {
-			const nodeKey = `node:${nodeId}`;
-			if (!nodes.has(nodeKey)) nodes.set(nodeKey, {
-				type: "node",
-				id: nodeKey,
-				label: `#${nodeId}`,
-				children: []
-			});
-			batchNode.children.push(nodeKey);
-		}
-		nodes.set(batchKey, batchNode);
-		roots.push(batchKey);
-	}
-	return {
-		nodes,
-		roots
-	};
-}
-/**
-* Storage for causal batch records, maintained on the main thread.
-*/
-var CausalityTracker = class {
-	batches = [];
-	maxBatches = 100;
-	/** Record a batch with its causal event */
-	recordBatch(batchUid, nodeIds, mutationCount, causalEvent) {
-		this.batches.push({
-			batchUid,
-			causalEvent,
-			nodeIds: new Set(nodeIds),
-			mutationCount,
-			timestamp: Date.now()
-		});
-		if (this.batches.length > this.maxBatches) this.batches.shift();
-	}
-	/** Get all recorded batches */
-	getBatches() {
-		return this.batches.slice();
-	}
-	/** Build the DAG from recorded batches */
-	buildGraph() {
-		return buildCausalityGraph(this.batches);
-	}
-	/** Find batches that affected a given nodeId */
-	findBatchesForNode(nodeId) {
-		return this.batches.filter((b) => b.nodeIds.has(nodeId));
-	}
-	/** Clear all records */
-	clear() {
-		this.batches.length = 0;
-	}
-};
-//#endregion
 //#region src/core/node-cache.ts
 /**
 * Cache for mapping NodeIds to real DOM nodes on the main thread.
@@ -502,6 +395,220 @@ function prioritySort(a, b) {
 	return a.uid - b.uid;
 }
 //#endregion
+//#region src/debug/causality-graph.ts
+/**
+* Build a causality DAG from batch records.
+*/
+function buildCausalityGraph(batches) {
+	const nodes = /* @__PURE__ */ new Map();
+	const roots = [];
+	const eventMap = /* @__PURE__ */ new Map();
+	const orphanBatches = [];
+	for (const batch of batches) if (batch.causalEvent) {
+		const eventKey = `event:${batch.causalEvent.eventType}:${batch.causalEvent.listenerId}:${batch.causalEvent.timestamp}`;
+		if (!eventMap.has(eventKey)) eventMap.set(eventKey, []);
+		eventMap.get(eventKey)?.push(batch);
+	} else orphanBatches.push(batch);
+	for (const [eventKey, eventBatches] of eventMap) {
+		const evt = eventBatches[0].causalEvent;
+		const eventNode = {
+			type: "event",
+			id: eventKey,
+			label: `${evt.eventType} (${evt.listenerId})`,
+			children: []
+		};
+		for (const batch of eventBatches) {
+			const batchKey = `batch:${batch.batchUid}`;
+			const batchNode = {
+				type: "batch",
+				id: batchKey,
+				label: `Batch #${batch.batchUid} (${batch.mutationCount} muts)`,
+				children: []
+			};
+			for (const nodeId of batch.nodeIds) {
+				const nodeKey = `node:${nodeId}`;
+				if (!nodes.has(nodeKey)) nodes.set(nodeKey, {
+					type: "node",
+					id: nodeKey,
+					label: `#${nodeId}`,
+					children: []
+				});
+				batchNode.children.push(nodeKey);
+			}
+			nodes.set(batchKey, batchNode);
+			eventNode.children.push(batchKey);
+		}
+		nodes.set(eventKey, eventNode);
+		roots.push(eventKey);
+	}
+	for (const batch of orphanBatches) {
+		const batchKey = `batch:${batch.batchUid}`;
+		const batchNode = {
+			type: "batch",
+			id: batchKey,
+			label: `Batch #${batch.batchUid} (${batch.mutationCount} muts, no event)`,
+			children: []
+		};
+		for (const nodeId of batch.nodeIds) {
+			const nodeKey = `node:${nodeId}`;
+			if (!nodes.has(nodeKey)) nodes.set(nodeKey, {
+				type: "node",
+				id: nodeKey,
+				label: `#${nodeId}`,
+				children: []
+			});
+			batchNode.children.push(nodeKey);
+		}
+		nodes.set(batchKey, batchNode);
+		roots.push(batchKey);
+	}
+	return {
+		nodes,
+		roots
+	};
+}
+/**
+* Storage for causal batch records, maintained on the main thread.
+*/
+var CausalityTracker = class {
+	batches = [];
+	maxBatches = 100;
+	/** Record a batch with its causal event */
+	recordBatch(batchUid, nodeIds, mutationCount, causalEvent) {
+		this.batches.push({
+			batchUid,
+			causalEvent,
+			nodeIds: new Set(nodeIds),
+			mutationCount,
+			timestamp: Date.now()
+		});
+		if (this.batches.length > this.maxBatches) this.batches.shift();
+	}
+	/** Get all recorded batches */
+	getBatches() {
+		return this.batches.slice();
+	}
+	/** Build the DAG from recorded batches */
+	buildGraph() {
+		return buildCausalityGraph(this.batches);
+	}
+	/** Find batches that affected a given nodeId */
+	findBatchesForNode(nodeId) {
+		return this.batches.filter((b) => b.nodeIds.has(nodeId));
+	}
+	/** Clear all records */
+	clear() {
+		this.batches.length = 0;
+	}
+};
+//#endregion
+//#region src/debug/format-helpers.ts
+/**
+* Format a byte count into a human-readable string (B, KB, MB).
+*/
+function formatBytes(bytes) {
+	if (bytes === 0) return "0 B";
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+//#endregion
+//#region src/debug/replay.ts
+function createReplayState(entries) {
+	return {
+		entries: [...entries],
+		currentIndex: 0,
+		isPlaying: false
+	};
+}
+function replayStep(state) {
+	if (state.currentIndex >= state.entries.length) return null;
+	return state.entries[state.currentIndex++];
+}
+function replaySeek(state, index) {
+	state.currentIndex = Math.max(0, Math.min(index, state.entries.length));
+}
+function replayReset(state) {
+	state.currentIndex = 0;
+	state.isPlaying = false;
+}
+//#endregion
+//#region src/debug/session-export.ts
+function exportSession(data) {
+	const session = {
+		version: 1,
+		exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+		...data
+	};
+	return JSON.stringify(session, replacer, 2);
+}
+function replacer(_key, value) {
+	if (value instanceof Map) return Object.fromEntries(value);
+	return value;
+}
+function importSession(json) {
+	const raw = JSON.parse(json);
+	if (!raw || typeof raw !== "object") throw new Error("Invalid session: not an object");
+	if (raw.version !== 1) throw new Error(`Unsupported session version: ${raw.version}`);
+	if (!Array.isArray(raw.mutationLog)) throw new Error("Invalid session: mutationLog must be an array");
+	if (!Array.isArray(raw.warningLog)) throw new Error("Invalid session: warningLog must be an array");
+	if (!Array.isArray(raw.eventLog)) throw new Error("Invalid session: eventLog must be an array");
+	if (!Array.isArray(raw.syncReadLog)) throw new Error("Invalid session: syncReadLog must be an array");
+	const MAX_ENTRIES = 1e4;
+	if (raw.mutationLog.length > MAX_ENTRIES) raw.mutationLog = raw.mutationLog.slice(-MAX_ENTRIES);
+	if (raw.warningLog.length > MAX_ENTRIES) raw.warningLog = raw.warningLog.slice(-MAX_ENTRIES);
+	if (raw.eventLog.length > MAX_ENTRIES) raw.eventLog = raw.eventLog.slice(-MAX_ENTRIES);
+	if (raw.syncReadLog.length > MAX_ENTRIES) raw.syncReadLog = raw.syncReadLog.slice(-MAX_ENTRIES);
+	return raw;
+}
+function downloadJson(content, filename) {
+	const blob = new Blob([content], { type: "application/json" });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = filename;
+	a.click();
+	URL.revokeObjectURL(url);
+}
+//#endregion
+//#region src/debug/stats-helpers.ts
+/**
+* Shared helper functions for devtools statistics computation.
+* Extracted to a separate module for testability.
+*/
+/** Compute the value at a given percentile from a sorted array. */
+function percentile(sorted, p) {
+	if (sorted.length === 0) return 0;
+	const idx = Math.ceil(p / 100 * sorted.length) - 1;
+	return sorted[Math.max(0, idx)];
+}
+/** Compute P50, P95, P99 from an unsorted data array. */
+function computePercentiles(data) {
+	if (data.length === 0) return {
+		p50: 0,
+		p95: 0,
+		p99: 0
+	};
+	const sorted = [...data].sort((a, b) => a - b);
+	return {
+		p50: percentile(sorted, 50),
+		p95: percentile(sorted, 95),
+		p99: percentile(sorted, 99)
+	};
+}
+/** Color class for latency values: green/yellow/red. */
+function latencyColorClass(ms) {
+	if (ms > 16) return "red";
+	if (ms > 5) return "yellow";
+	return "green";
+}
+/** Color class for sync read latency values: green/yellow/red. */
+function syncReadColorClass(ms) {
+	if (ms > 50) return "red";
+	if (ms > 5) return "yellow";
+	return "green";
+}
+//#endregion
 //#region src/debug/tree-diff.ts
 /**
 * Deep-clone a tree snapshot for immutable storage.
@@ -600,113 +707,6 @@ function hasChanges(diff) {
 	if (diff.diffType !== "unchanged") return true;
 	if (diff.children) return diff.children.some(hasChanges);
 	return false;
-}
-//#endregion
-//#region src/debug/stats-helpers.ts
-/**
-* Shared helper functions for devtools statistics computation.
-* Extracted to a separate module for testability.
-*/
-/** Compute the value at a given percentile from a sorted array. */
-function percentile(sorted, p) {
-	if (sorted.length === 0) return 0;
-	const idx = Math.ceil(p / 100 * sorted.length) - 1;
-	return sorted[Math.max(0, idx)];
-}
-/** Compute P50, P95, P99 from an unsorted data array. */
-function computePercentiles(data) {
-	if (data.length === 0) return {
-		p50: 0,
-		p95: 0,
-		p99: 0
-	};
-	const sorted = [...data].sort((a, b) => a - b);
-	return {
-		p50: percentile(sorted, 50),
-		p95: percentile(sorted, 95),
-		p99: percentile(sorted, 99)
-	};
-}
-/** Color class for latency values: green/yellow/red. */
-function latencyColorClass(ms) {
-	if (ms > 16) return "red";
-	if (ms > 5) return "yellow";
-	return "green";
-}
-/** Color class for sync read latency values: green/yellow/red. */
-function syncReadColorClass(ms) {
-	if (ms > 50) return "red";
-	if (ms > 5) return "yellow";
-	return "green";
-}
-//#endregion
-//#region src/debug/format-helpers.ts
-/**
-* Format a byte count into a human-readable string (B, KB, MB).
-*/
-function formatBytes(bytes) {
-	if (bytes === 0) return "0 B";
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-//#endregion
-//#region src/debug/replay.ts
-function createReplayState(entries) {
-	return {
-		entries: [...entries],
-		currentIndex: 0,
-		isPlaying: false
-	};
-}
-function replayStep(state) {
-	if (state.currentIndex >= state.entries.length) return null;
-	return state.entries[state.currentIndex++];
-}
-function replaySeek(state, index) {
-	state.currentIndex = Math.max(0, Math.min(index, state.entries.length));
-}
-function replayReset(state) {
-	state.currentIndex = 0;
-	state.isPlaying = false;
-}
-//#endregion
-//#region src/debug/session-export.ts
-function exportSession(data) {
-	const session = {
-		version: 1,
-		exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
-		...data
-	};
-	return JSON.stringify(session, replacer, 2);
-}
-function replacer(_key, value) {
-	if (value instanceof Map) return Object.fromEntries(value);
-	return value;
-}
-function importSession(json) {
-	const raw = JSON.parse(json);
-	if (!raw || typeof raw !== "object") throw new Error("Invalid session: not an object");
-	if (raw.version !== 1) throw new Error(`Unsupported session version: ${raw.version}`);
-	if (!Array.isArray(raw.mutationLog)) throw new Error("Invalid session: mutationLog must be an array");
-	if (!Array.isArray(raw.warningLog)) throw new Error("Invalid session: warningLog must be an array");
-	if (!Array.isArray(raw.eventLog)) throw new Error("Invalid session: eventLog must be an array");
-	if (!Array.isArray(raw.syncReadLog)) throw new Error("Invalid session: syncReadLog must be an array");
-	const MAX_ENTRIES = 1e4;
-	if (raw.mutationLog.length > MAX_ENTRIES) raw.mutationLog = raw.mutationLog.slice(-MAX_ENTRIES);
-	if (raw.warningLog.length > MAX_ENTRIES) raw.warningLog = raw.warningLog.slice(-MAX_ENTRIES);
-	if (raw.eventLog.length > MAX_ENTRIES) raw.eventLog = raw.eventLog.slice(-MAX_ENTRIES);
-	if (raw.syncReadLog.length > MAX_ENTRIES) raw.syncReadLog = raw.syncReadLog.slice(-MAX_ENTRIES);
-	return raw;
-}
-function downloadJson(content, filename) {
-	const blob = new Blob([content], { type: "application/json" });
-	const url = URL.createObjectURL(blob);
-	const a = document.createElement("a");
-	a.href = url;
-	a.download = filename;
-	a.click();
-	URL.revokeObjectURL(url);
 }
 //#endregion
 //#region src/debug/devtools-panel.ts

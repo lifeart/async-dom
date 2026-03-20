@@ -2,7 +2,7 @@ import { _ as SerializedError } from "./base.js";
 import { n as DebugOptions } from "./debug.js";
 import { d as SchedulerConfig, r as AsyncDomInstance } from "./index.js";
 import * as vue0 from "vue";
-import { PropType, Ref, ShallowRef, SlotsType, VNode } from "vue";
+import { PropType, Ref, ShallowRef, SlotsType } from "vue";
 
 //#region src/vue/AsyncDom.d.ts
 /** Props for the {@link AsyncDom} Vue component. */
@@ -44,7 +44,7 @@ declare const AsyncDom: vue0.DefineComponent<vue0.ExtractPropTypes<{
     type: PropType<boolean | DebugOptions>;
     default: undefined;
   };
-}>, () => VNode<vue0.RendererNode, vue0.RendererElement, {
+}>, () => vue0.VNode<vue0.RendererNode, vue0.RendererElement, {
   [key: string]: any;
 }>, {}, {}, {}, vue0.ComponentOptionsMixin, vue0.ComponentOptionsMixin, {
   ready: (_instance: AsyncDomInstance) => true;

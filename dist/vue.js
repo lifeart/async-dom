@@ -110,9 +110,7 @@ const AsyncDom = defineComponent({
 			onError: (err) => emit("error", err)
 		});
 		return () => {
-			const children = [];
-			if (!instance.value && slots.fallback) children.push(...slots.fallback());
-			return h("div", { ref: containerRef }, children);
+			return h("div", null, [!instance.value && slots.fallback ? slots.fallback() : null, h("div", { ref: containerRef })]);
 		};
 	}
 });

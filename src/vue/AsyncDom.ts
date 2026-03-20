@@ -1,4 +1,4 @@
-import { defineComponent, h, type PropType, type SlotsType, type VNode } from "vue";
+import { defineComponent, h, type PropType, type SlotsType } from "vue";
 import type { DebugOptions, SchedulerConfig, SerializedError } from "../index.ts";
 import type { AsyncDomInstance } from "../main-thread/index.ts";
 import { useAsyncDom } from "./use-async-dom.ts";
@@ -68,14 +68,12 @@ export const AsyncDom = defineComponent({
 		});
 
 		return () => {
-			const children: VNode[] = [];
-
-			// Show fallback slot while instance is loading
-			if (!instance.value && slots.fallback) {
-				children.push(...slots.fallback());
-			}
-
-			return h("div", { ref: containerRef }, children);
+			// Fallback is rendered as a sibling before the container div to avoid
+			// Vue's VDOM diffing from clearing the worker-rendered content inside it.
+			return h("div", null, [
+				!instance.value && slots.fallback ? slots.fallback() : null,
+				h("div", { ref: containerRef }),
+			]);
 		};
 	},
 });
