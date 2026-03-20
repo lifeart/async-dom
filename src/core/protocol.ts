@@ -210,7 +210,8 @@ export type SystemMessage =
 	  }
 	| { type: "queryResult"; uid: number; result: unknown }
 	| { type: "debugQuery"; query: string }
-	| { type: "debugResult"; query: string; result: unknown };
+	| { type: "debugResult"; query: string; result: unknown }
+	| { type: "eventTimingResult"; listenerId: string; eventType: string; dispatchMs: number; mutationCount: number; transportMs: number };
 
 export type Message = MutationMessage | EventMessage | SystemMessage;
 

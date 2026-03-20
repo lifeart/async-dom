@@ -170,7 +170,24 @@ export function createWorkerDom(config?: WorkerDomConfig): WorkerDomResult {
 
 		if (isEventMessage(message)) {
 			const eventMsg = message as EventMessage;
+			const mutsBefore = doc.collector.totalAdded;
+			const dispatchStart = performance.now();
 			doc.dispatchEvent(eventMsg.listenerId, eventMsg.event);
+			const dispatchMs = performance.now() - dispatchStart;
+			const mutationCount = doc.collector.totalAdded - mutsBefore;
+
+			// Send dispatch timing back to main thread for the event tracer
+			const evt = eventMsg.event as unknown as Record<string, unknown>;
+			const transportMs =
+				evt.timeStamp != null ? dispatchStart - (evt.timeStamp as number) : undefined;
+			transport.send({
+				type: "eventTimingResult",
+				listenerId: eventMsg.listenerId,
+				eventType: (evt.type as string) ?? "",
+				dispatchMs,
+				mutationCount,
+				transportMs: transportMs ?? 0,
+			});
 		}
 	});
 

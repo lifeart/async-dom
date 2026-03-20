@@ -4,8 +4,13 @@ import type { Transport } from "../transport/base.ts";
 
 export interface EventTraceEntry {
 	eventType: string;
+	listenerId: string;
 	serializeMs: number;
 	timestamp: number;
+	sentAt: number;
+	transportMs?: number;
+	dispatchMs?: number;
+	mutationCount?: number;
 }
 
 const MAX_EVENT_TRACES = 100;
@@ -24,10 +29,20 @@ export class EventBridge {
 	private transport: Transport | null = null;
 	private appId: AppId;
 	private eventTraces: EventTraceEntry[] = [];
+	private _onTimingResult: ((trace: EventTraceEntry) => void) | null = null;
 
 	constructor(appId: AppId, nodeCache?: NodeCache) {
 		this.appId = appId;
 		this.nodeCache = nodeCache ?? new NodeCache();
+	}
+
+	/**
+	 * Set a callback that is invoked whenever a trace entry is fully
+	 * populated with worker timing data.  This allows callers (e.g. the
+	 * devtools debug hooks) to emit EventLogEntry objects.
+	 */
+	set onTimingResult(cb: ((trace: EventTraceEntry) => void) | null) {
+		this._onTimingResult = cb;
 	}
 
 	setTransport(transport: Transport): void {
@@ -79,10 +94,13 @@ export class EventBridge {
 				const serializeStart = performance.now();
 				const serialized = serializeEvent(domEvent);
 				const serializeMs = performance.now() - serializeStart;
+				const sentAt = Date.now();
 				this.eventTraces.push({
 					eventType: domEvent.type,
+					listenerId,
 					serializeMs,
 					timestamp: performance.now(),
+					sentAt,
 				});
 				if (this.eventTraces.length > MAX_EVENT_TRACES) {
 					this.eventTraces.shift();
@@ -117,6 +135,41 @@ export class EventBridge {
 
 	getEventTraces(): EventTraceEntry[] {
 		return this.eventTraces.slice();
+	}
+
+	/**
+	 * Update the most recent trace entry for a given listener with
+	 * dispatch and mutation count timing from the worker.
+	 * Transport time is computed on the main thread to avoid cross-origin
+	 * timing issues between main thread and worker `performance.now()`.
+	 */
+	updateTraceWithWorkerTiming(
+		listenerId: string,
+		dispatchMs: number,
+		mutationCount: number,
+	): void {
+		const receivedAt = Date.now();
+		// Find the most recent trace that matches by listenerId, walking backwards
+		for (let i = this.eventTraces.length - 1; i >= 0; i--) {
+			const trace = this.eventTraces[i];
+			if (trace.listenerId === listenerId && trace.transportMs === undefined) {
+				trace.transportMs = Math.max(0, receivedAt - trace.sentAt - dispatchMs);
+				trace.dispatchMs = dispatchMs;
+				trace.mutationCount = mutationCount;
+				this._onTimingResult?.(trace);
+				return;
+			}
+		}
+	}
+
+	getListenersForNode(nodeId: NodeId): Array<{ listenerId: string; eventName: string }> {
+		const result: Array<{ listenerId: string; eventName: string }> = [];
+		for (const [listenerId, meta] of this.listeners) {
+			if (meta.nodeId === nodeId) {
+				result.push({ listenerId, eventName: meta.eventName });
+			}
+		}
+		return result;
 	}
 
 	detachAll(): void {

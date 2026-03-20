@@ -24,6 +24,11 @@ export class MutationCollector {
 	private _coalescedLog: CoalescedLogEntry[] = [];
 	private _perTypeCoalesced = new Map<string, { added: number; coalesced: number }>();
 
+	/** Total mutations added (monotonically increasing counter for diff-based tracking). */
+	get totalAdded(): number {
+		return this._stats.added;
+	}
+
 	getStats(): { added: number; coalesced: number; flushed: number } {
 		return { ...this._stats };
 	}

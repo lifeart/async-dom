@@ -71,6 +71,34 @@ describe("protocol", () => {
 		});
 	});
 
+	describe("eventTimingResult is a valid SystemMessage", () => {
+		it("is recognized as a system message", () => {
+			const timingMsg: SystemMessage = {
+				type: "eventTimingResult",
+				listenerId: "l1",
+				eventType: "click",
+				dispatchMs: 2.5,
+				mutationCount: 3,
+				transportMs: 1.0,
+			};
+			expect(isSystemMessage(timingMsg)).toBe(true);
+			expect(isMutationMessage(timingMsg)).toBe(false);
+			expect(isEventMessage(timingMsg)).toBe(false);
+		});
+
+		it("can be assigned to Message type", () => {
+			const msg: Message = {
+				type: "eventTimingResult",
+				listenerId: "l1",
+				eventType: "click",
+				dispatchMs: 2.5,
+				mutationCount: 3,
+				transportMs: 1.0,
+			};
+			expect(msg.type).toBe("eventTimingResult");
+		});
+	});
+
 	describe("mutation types", () => {
 		it("supports all mutation actions as discriminated unions", () => {
 			const n1 = createNodeId();
