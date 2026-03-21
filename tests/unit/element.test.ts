@@ -249,18 +249,32 @@ describe("Element", () => {
 			expect(el.textContent).toBe("standalone");
 		});
 
-		it("innerHTML stores value independently of childNodes", () => {
+		it("innerHTML setter clears childNodes and emits mutation (raw HTML string is not parsed into virtual nodes)", () => {
 			const el = doc.createElement("div");
 			el.appendChild(doc.createElement("span"));
 			el.innerHTML = "<b>bold</b>";
-			expect(el.innerHTML).toBe("<b>bold</b>");
+			// innerHTML setter clears the virtual childNodes tree and sends the raw HTML
+			// to the real DOM via mutation; the virtual side has no children
 			expect(el.childNodes).toHaveLength(0);
+			// since there are no virtual children, getter returns ""
+			expect(el.innerHTML).toBe("");
 		});
 
-		it("outerHTML is not defined (not part of virtual API)", () => {
-			// VirtualElement does not implement outerHTML — confirm it's not there
+		it("innerHTML getter serializes virtual child nodes", () => {
 			const el = doc.createElement("div");
-			expect((el as unknown as Record<string, unknown>).outerHTML).toBeUndefined();
+			const span = doc.createElement("span");
+			span.appendChild(doc.createTextNode("hello"));
+			el.appendChild(span);
+			expect(el.innerHTML).toBe("<span>hello</span>");
+		});
+
+		it("outerHTML includes tag, attributes, and children", () => {
+			const el = doc.createElement("div");
+			el.setAttribute("id", "main");
+			const span = doc.createElement("span");
+			span.appendChild(doc.createTextNode("text"));
+			el.appendChild(span);
+			expect(el.outerHTML).toBe('<div id="main"><span>text</span></div>');
 		});
 	});
 
@@ -1081,6 +1095,121 @@ describe("Element", () => {
 	});
 
 	// ─── Regression tests ─────────────────────────────────────────────────────
+
+	// ─── innerHTML / outerHTML serialization ─────────────────────────────────
+
+	describe("innerHTML and outerHTML serialization", () => {
+		it("innerHTML returns empty string when no children", () => {
+			const el = doc.createElement("div");
+			expect(el.innerHTML).toBe("");
+		});
+
+		it("innerHTML after appendChild returns correct serialization", () => {
+			const el = doc.createElement("div");
+			el.appendChild(doc.createTextNode("hello"));
+			expect(el.innerHTML).toBe("hello");
+		});
+
+		it("innerHTML after textContent= returns escaped text content (no virtual children)", () => {
+			const el = doc.createElement("div");
+			el.textContent = "hello world";
+			// textContent= stores in _textContent and empties childNodes
+			// The innerHTML getter falls back to _textContent when childNodes is empty
+			expect(el.innerHTML).toBe("hello world");
+		});
+
+		it("innerHTML with nested elements serializes correctly", () => {
+			const el = doc.createElement("div");
+			const p = doc.createElement("p");
+			p.appendChild(doc.createTextNode("world"));
+			el.appendChild(p);
+			expect(el.innerHTML).toBe("<p>world</p>");
+		});
+
+		it("innerHTML with mixed text and element children", () => {
+			const el = doc.createElement("div");
+			el.appendChild(doc.createTextNode("before"));
+			const span = doc.createElement("span");
+			span.appendChild(doc.createTextNode("mid"));
+			el.appendChild(span);
+			el.appendChild(doc.createTextNode("after"));
+			expect(el.innerHTML).toBe("before<span>mid</span>after");
+		});
+
+		it("innerHTML escapes special characters in text nodes", () => {
+			const el = doc.createElement("div");
+			el.appendChild(doc.createTextNode("<script>alert('xss')</script> & more"));
+			expect(el.innerHTML).toBe("&lt;script&gt;alert('xss')&lt;/script&gt; &amp; more");
+		});
+
+		it("innerHTML includes comment nodes", () => {
+			const el = doc.createElement("div");
+			el.appendChild(doc.createComment("a comment"));
+			expect(el.innerHTML).toBe("<!--a comment-->");
+		});
+
+		it("outerHTML includes tag, attributes, and children", () => {
+			const el = doc.createElement("div");
+			el.setAttribute("class", "box");
+			el.appendChild(doc.createTextNode("hi"));
+			expect(el.outerHTML).toBe('<div class="box">hi</div>');
+		});
+
+		it("outerHTML handles void elements (br)", () => {
+			const br = doc.createElement("br");
+			expect(br.outerHTML).toBe("<br>");
+		});
+
+		it("outerHTML handles void elements (img with attributes)", () => {
+			const img = doc.createElement("img");
+			img.setAttribute("src", "cat.png");
+			img.setAttribute("alt", "a cat");
+			expect(img.outerHTML).toBe('<img src="cat.png" alt="a cat">');
+		});
+
+		it("outerHTML handles void elements (input)", () => {
+			const input = doc.createElement("input");
+			input.setAttribute("type", "text");
+			expect(input.outerHTML).toBe('<input type="text">');
+		});
+
+		it("outerHTML escapes attribute values", () => {
+			const el = doc.createElement("div");
+			el.setAttribute("data-val", 'say "hello" & goodbye');
+			expect(el.outerHTML).toBe('<div data-val="say &quot;hello&quot; &amp; goodbye"></div>');
+		});
+
+		it("innerHTML after appendChild then removeChild returns correct state", () => {
+			const el = doc.createElement("div");
+			const span = doc.createElement("span");
+			span.appendChild(doc.createTextNode("x"));
+			el.appendChild(span);
+			expect(el.innerHTML).toBe("<span>x</span>");
+			el.removeChild(span);
+			expect(el.innerHTML).toBe("");
+		});
+
+		it("round-trip: set textContent, then appendChild, read innerHTML", () => {
+			const el = doc.createElement("div");
+			el.textContent = "stale text";
+			// append a real virtual child — childNodes is now non-empty
+			const em = doc.createElement("em");
+			em.appendChild(doc.createTextNode("fresh"));
+			el.appendChild(em);
+			// Now childNodes.length > 0, so innerHTML serializes from the tree
+			expect(el.innerHTML).toBe("<em>fresh</em>");
+		});
+
+		it("deeply nested outerHTML serializes correctly", () => {
+			const outer = doc.createElement("div");
+			const mid = doc.createElement("p");
+			const inner = doc.createElement("strong");
+			inner.appendChild(doc.createTextNode("deep"));
+			mid.appendChild(inner);
+			outer.appendChild(mid);
+			expect(outer.outerHTML).toBe("<div><p><strong>deep</strong></p></div>");
+		});
+	});
 
 	describe("regression: innerHTML setter clears _textContent", () => {
 		it("setting innerHTML after textContent clears the old textContent value", () => {

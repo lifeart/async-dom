@@ -192,7 +192,8 @@ describe("VirtualDocument.toJSON", () => {
 		expect(divNode.type).toBe("element");
 		expect(divNode.tag).toBe("DIV");
 		expect(divNode.className).toBe("my-class");
-		expect(divNode.attributes).toEqual({ class: "test-class" });
+		// className setter syncs _attributes["class"], so the final value is "my-class"
+		expect(divNode.attributes).toEqual({ class: "my-class" });
 
 		const textChildren = divNode.children as unknown[];
 		expect(textChildren).toHaveLength(1);

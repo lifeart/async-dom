@@ -16,7 +16,32 @@ function kebabToCamel(str: string): string {
 	return str.replace(/-([a-z])/g, (_match, letter: string) => letter.toUpperCase());
 }
 
+function escapeHtml(s: string): string {
+	return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function escapeAttr(s: string): string {
+	return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 let listenerCounter = 0;
+
+const VOID_ELEMENTS = new Set([
+	"area",
+	"base",
+	"br",
+	"col",
+	"embed",
+	"hr",
+	"img",
+	"input",
+	"link",
+	"meta",
+	"param",
+	"source",
+	"track",
+	"wbr",
+]);
 
 /**
  * Virtual DOM element that records mutations via the MutationCollector
@@ -41,7 +66,6 @@ export class VirtualElement {
 
 	private _attributes = new Map<string, string>();
 	private _classes: string[] = [];
-	private _innerHTML = "";
 	private _textContent = "";
 	private _value = "";
 	private _checked = false;
@@ -193,6 +217,17 @@ export class VirtualElement {
 			this.collector.add(mutation);
 			return;
 		}
+		if (name === "class") {
+			this._classes = value ? value.split(/\s+/).filter(Boolean) : [];
+			this._attributes.set("class", value);
+			const mutation: DomMutation = {
+				action: "setClassName",
+				id: this._nodeId,
+				name: value,
+			};
+			this.collector.add(mutation);
+			return;
+		}
 		if (name === "style") {
 			this._parseAndSetStyles(value);
 			const mutation: DomMutation = {
@@ -224,6 +259,9 @@ export class VirtualElement {
 	}
 
 	removeAttribute(name: string): void {
+		if (name === "class") {
+			this._classes = [];
+		}
 		this._attributes.delete(name);
 		const mutation: DomMutation = {
 			action: "removeAttribute",
@@ -436,12 +474,21 @@ export class VirtualElement {
 	}
 
 	get innerHTML(): string {
-		return this._innerHTML;
+		if (this.childNodes.length === 0) {
+			return this._textContent ? escapeHtml(this._textContent) : "";
+		}
+		return this.childNodes
+			.map((child) => {
+				if (child.nodeType === 3) return escapeHtml((child as VirtualTextNode).nodeValue);
+				if (child.nodeType === 8) return `<!--${(child as VirtualCommentNode).nodeValue.replace(/--/g, "")}-->`;
+				if (child instanceof VirtualElement) return child.outerHTML;
+				return "";
+			})
+			.join("");
 	}
 
 	set innerHTML(value: string) {
 		this._textContent = "";
-		this._innerHTML = value;
 		// Clear children — cleanup document registrations first
 		for (const child of this.childNodes) {
 			if (child instanceof VirtualElement) {
@@ -458,6 +505,26 @@ export class VirtualElement {
 			html: value,
 		};
 		this.collector.add(mutation);
+	}
+
+	get outerHTML(): string {
+		const tag = this.tagName.toLowerCase();
+		let attrs = "";
+		for (const [key, value] of this._attributes) {
+			attrs += ` ${key}="${escapeAttr(value)}"`;
+		}
+		// Serialize class attribute from _classes if not already in _attributes
+		if (this._classes.length > 0 && !this._attributes.has("class")) {
+			attrs += ` class="${escapeAttr(this._classes.join(" "))}"`;
+		}
+		// Serialize style attribute from the style proxy's cssText
+		const cssText = (this.style as Record<string, unknown>).cssText as string;
+		if (cssText) {
+			attrs += ` style="${escapeAttr(cssText)}"`;
+		}
+		const inner = this.innerHTML;
+		if (VOID_ELEMENTS.has(tag)) return `<${tag}${attrs}>`;
+		return `<${tag}${attrs}>${inner}</${tag}>`;
 	}
 
 	// --- Input Properties ---
@@ -581,7 +648,14 @@ export class VirtualElement {
 	}
 
 	set className(value: string) {
-		this._classes = value ? value.split(" ").filter(Boolean) : [];
+		this._classes = value ? value.split(/\s+/).filter(Boolean) : [];
+		// Keep _attributes["class"] in sync so getAttribute("class") and outerHTML
+		// always reflect the current class list via a single source of truth.
+		if (this._classes.length > 0) {
+			this._attributes.set("class", this._classes.join(" "));
+		} else {
+			this._attributes.delete("class");
+		}
 		const mutation: DomMutation = {
 			action: "setClassName",
 			id: this._nodeId,

@@ -291,6 +291,15 @@ asyncDom.start();
 - Mutation log size and maximum client count are configurable.
 - Backpressure is managed independently per client.
 
+**Limitations & Known Gaps**
+
+- **No conflict resolution** — Events from concurrent clients are processed in arrival order (FIFO). No last-writer-wins or ownership model is implemented.
+- **Replay safety** — Late-joining clients receive a full mutation log replay. Non-idempotent mutations (`addEventListener`, `callMethod`, `insertAdjacentHTML`) may cause duplicate side effects during replay.
+- **No log compaction** — The mutation log grows linearly up to `maxEntries`. Snapshot-based compaction is not yet implemented.
+- **Single-process** — The streaming server runs in a single Node.js process. For high concurrency, external load balancing is needed.
+- **No built-in authentication** — `handleConnection` does not validate connections. Authentication must be handled at the WebSocket server level before passing the socket.
+- **No per-client backpressure** — A slow client can temporarily degrade broadcast throughput for other clients.
+
 `createServerApp` remains available for single-client (one app per connection) use cases.
 
 ---
@@ -520,6 +529,37 @@ npm run dev    # run all examples locally
 | DevTools | Built-in 5-tab panel | No | No |
 | Bundle (gzip) | ~11 KB + ~10 KB | ~12 KB | ~12 KB |
 | Status | Active | Maintenance | Inactive |
+
+---
+
+## DOM API Compatibility
+
+Layout reads require a SharedArrayBuffer sync channel. Without it, they return zero values. All other APIs work without special setup.
+
+| Category | APIs | Status |
+| -------- | ---- | ------ |
+| Tree manipulation | appendChild, removeChild, insertBefore, append, prepend, replaceWith, before, after, replaceChildren | Full |
+| Attributes | get/set/has/removeAttribute, NS variants, attributes iterable | Full |
+| Properties | id, className, textContent, innerHTML, value, checked, disabled, selectedIndex, type | Full |
+| ClassList | add, remove, toggle, contains, replace, length | Full |
+| Style | style proxy (camelCase + kebab-case), cssText | Full |
+| Dataset | Proxy-based data-* attribute access | Full |
+| Events | addEventListener, removeEventListener, dispatchEvent, on* handlers, once option | Full |
+| Queries | querySelector/All, getElementById, getElementsByTagName/ClassName, matches, closest, contains | Full |
+| Layout reads | clientWidth/Height, scrollWidth/Height, offsetWidth/Height/Top/Left, getBoundingClientRect | Sync |
+| Scroll | scrollTop, scrollLeft (get/set), scrollIntoView | Full |
+| Media | play, pause, load, currentTime, duration, paused, ended, readyState | Full |
+| Methods | focus, blur, click, select, showModal, close | Full |
+| Clone | cloneNode (shallow + deep) | Full |
+| Document | createElement, createTextNode, createComment, createDocumentFragment, createEvent, createRange, createTreeWalker | Full |
+| Navigation | parentNode/Element, first/lastChild, next/previousSibling, first/lastElementChild, children, childElementCount, ownerDocument, isConnected, getRootNode | Full |
+| insertAdjacentHTML | insertAdjacentHTML | Full |
+| normalize | normalize() | Stub |
+| Shadow DOM | attachShadow, shadowRoot | -- |
+| outerHTML | outerHTML getter (read-only) | Full |
+| Animations | animate, getAnimations | -- |
+| Fullscreen | requestFullscreen | -- |
+| Pointer capture | setPointerCapture, releasePointerCapture | -- |
 
 ---
 

@@ -1,2 +1,0 @@
-import { a as VirtualCommentNode, c as createNodePlatform, i as MutationCollector, l as createWorkerPlatform, n as ScopedStorage, o as VirtualElement, r as VirtualDocument, s as VirtualTextNode, t as createWorkerDom, u as detectPlatform } from "./worker-thread.js";
-export { MutationCollector, ScopedStorage, VirtualCommentNode, VirtualDocument, VirtualElement, VirtualTextNode, createNodePlatform, createWorkerDom, createWorkerPlatform, detectPlatform };
