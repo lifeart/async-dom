@@ -481,10 +481,10 @@ Add `?debug` to the URL or set `debug: { exposeDevtools: true }`:
 | Tab | What it shows |
 | --- | ------------- |
 | **Tree** | Virtual DOM tree with node inspector — attributes, styles, event listeners, mutation history, "why updated?" trail. Snapshot & diff. |
-| **Performance** | Frame budget flamechart, worker-to-main latency (P50/P95/P99), dropped frames, mutation type chart, coalescing breakdown, sync read heatmap. |
-| **Log** | Live mutation stream, color-coded diffs, event round-trip tracer. |
+| **Performance** | Frame budget flamechart, worker-to-main latency (P50/P95/P99), dropped frames, mutation type chart, coalescing breakdown, sync read heatmap, worker CPU profiler. |
+| **Log** | Live mutation stream, color-coded diffs, event round-trip tracer, time-travel replay with scrubber. |
 | **Warnings** | Grouped by code with docs and fixes. Suppressible. |
-| **Graph** | Causality DAG (planned): events → mutation batches → affected DOM nodes. |
+| **Graph** | Causality DAG: events → mutation batches → affected DOM nodes. |
 
 Console API available via `__ASYNC_DOM_DEVTOOLS__` for programmatic inspection.
 
