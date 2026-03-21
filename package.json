@@ -68,6 +68,7 @@
     "format": "biome format --write .",
     "build:demo": "vite build",
     "ci": "npm run lint && npm run typecheck && npm run typecheck:worker && npm run test && npm run build",
+    "test:e2e": "playwright test",
     "prepublishOnly": "npm run ci"
   },
   "repository": {
@@ -90,6 +91,7 @@
   "homepage": "https://github.com/lifeart/async-dom#readme",
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
+    "@playwright/test": "^1.58.2",
     "@testing-library/react": "^16.0.0",
     "@types/node": "^25.5.0",
     "@types/react": "^19.0.0",
