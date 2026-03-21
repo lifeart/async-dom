@@ -162,6 +162,40 @@ export function captureWarning(entry: WarningLogEntry): void {
 	onWarningBadgeUpdate?.();
 }
 
+/**
+ * Reset module-level capture state. Used by destroy() and tests.
+ */
+export function resetDevtoolsState(): void {
+	mutationLog.length = 0;
+	warningLog.length = 0;
+	eventLog.length = 0;
+	syncReadLog.length = 0;
+	warningBadgeCount = 0;
+	logPaused = false;
+	isReplaying = false;
+}
+
+/**
+ * Set the logPaused flag. Exposed for testing.
+ */
+export function setLogPaused(value: boolean): void {
+	logPaused = value;
+}
+
+/**
+ * Set the isReplaying flag. Exposed for testing.
+ */
+export function setIsReplaying(value: boolean): void {
+	isReplaying = value;
+}
+
+/**
+ * Get current values of module-level flags. Exposed for testing.
+ */
+export function getDevtoolsFlags(): { logPaused: boolean; isReplaying: boolean } {
+	return { logPaused, isReplaying };
+}
+
 // ---- CSS ----
 
 const PANEL_CSS = `
@@ -1507,6 +1541,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	const MAX_HISTORY = 30;
 	let highlightUpdatesEnabled = false;
 	let selectedNodeForSidebar: TreeNode | null = null;
+	/** Tracks which node IDs are expanded in the tree view. Empty means "first render". */
+	const expandedNodeIds = new Set<number>();
+	/** Whether the tree has been rendered at least once (to distinguish first render). */
+	let hasRenderedTree = false;
 	let expandedFrameId: number | null = null;
 
 	// Feature 3: Latency history tracking
@@ -1515,6 +1553,11 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	let lastQueuePushFrameId = -1;
 	let lastLatencyPushFrameId = -1;
 	const MAX_LATENCY_HISTORY = 60;
+
+	// Track pending setTimeout IDs so destroy() can cancel them
+	let treeRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
+	let perfRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
+	let manualRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	// Replay state (Feature 8)
 	let replayState: ReplayState | null = null;
@@ -1873,7 +1916,8 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		if (!dt) return;
 		dt.refreshDebugData();
 		// Render after a short delay to let the response arrive
-		setTimeout(() => {
+		manualRefreshTimeout = setTimeout(() => {
+			manualRefreshTimeout = null;
 			updateAppBar();
 			renderActiveTab();
 		}, 250);
@@ -1891,6 +1935,8 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		showDiff = false;
 		currentDiff = null;
 		selectedNodeForSidebar = null;
+		expandedNodeIds.clear();
+		hasRenderedTree = false;
 
 		// Log tab: reset coalesced view and log render position
 		showCoalesced = false;
@@ -2359,10 +2405,33 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		treeContent.innerHTML = "";
 		treeContent.appendChild(layout);
 
+		// Mark that the tree has been rendered at least once so subsequent
+		// rebuilds use expandedNodeIds instead of the depth-based default.
+		hasRenderedTree = true;
+
+		// Refresh selectedNodeForSidebar to point at the new tree's node
+		// so the sidebar shows up-to-date metadata after a rebuild.
+		if (selectedNodeForSidebar && selectedNodeForSidebar.id != null) {
+			const freshNode = findTreeNodeById(tree, selectedNodeForSidebar.id);
+			if (freshNode) {
+				selectedNodeForSidebar = freshNode;
+			}
+		}
+
 		// If we had a selected node, try to render sidebar for it
 		if (selectedNodeForSidebar) {
 			renderNodeSidebar(sidebar, selectedNodeForSidebar);
 		}
+	}
+
+	/** Recursively find a TreeNode by its numeric id. */
+	function findTreeNodeById(root: TreeNode, targetId: number): TreeNode | null {
+		if (root.id === targetId) return root;
+		for (const child of root.children ?? []) {
+			const found = findTreeNodeById(child, targetId);
+			if (found) return found;
+		}
+		return null;
 	}
 
 	function buildTreeDOM(
@@ -2434,9 +2503,23 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		const children = node.children ?? [];
 		const hasChildren = children.length > 0;
 
+		// Determine expanded state from expandedNodeIds (or default on first render)
+		let isExpanded: boolean;
+		if (node.id != null && hasRenderedTree) {
+			isExpanded = expandedNodeIds.has(node.id);
+		} else {
+			// First render or node without id: use the depth-based default
+			isExpanded = expanded;
+			if (node.id != null && isExpanded) {
+				expandedNodeIds.add(node.id);
+			}
+		}
+		// Update wrapper class to reflect computed expanded state
+		wrapper.className = `tree-node${isExpanded ? " expanded" : ""}`;
+
 		const toggleEl = document.createElement("span");
 		toggleEl.className = "tree-toggle";
-		toggleEl.textContent = hasChildren ? (expanded ? "\u25BC" : "\u25B6") : " ";
+		toggleEl.textContent = hasChildren ? (isExpanded ? "\u25BC" : "\u25B6") : " ";
 		line.appendChild(toggleEl);
 
 		// Build tag string: <tag .className #id>
@@ -2477,7 +2560,16 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		line.addEventListener("click", (e: MouseEvent) => {
 			if (hasChildren && e.target === toggleEl) {
 				wrapper.classList.toggle("expanded");
-				toggleEl.textContent = wrapper.classList.contains("expanded") ? "\u25BC" : "\u25B6";
+				const nowExpanded = wrapper.classList.contains("expanded");
+				toggleEl.textContent = nowExpanded ? "\u25BC" : "\u25B6";
+				// Track expand/collapse state so it survives tree rebuilds
+				if (node.id != null) {
+					if (nowExpanded) {
+						expandedNodeIds.add(node.id);
+					} else {
+						expandedNodeIds.delete(node.id);
+					}
+				}
 				return;
 			}
 			// Select for sidebar inspection
@@ -2572,9 +2664,21 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		}
 
 		// Element node
+		// Determine expanded state from expandedNodeIds (or default on first render)
+		let isExpanded: boolean;
+		if (node.id != null && hasRenderedTree) {
+			isExpanded = expandedNodeIds.has(node.id);
+		} else {
+			isExpanded = expanded;
+			if (node.id != null && isExpanded) {
+				expandedNodeIds.add(node.id);
+			}
+		}
+		wrapper.className = `tree-node${isExpanded ? " expanded" : ""}`;
+
 		const toggleEl = document.createElement("span");
 		toggleEl.className = "tree-toggle";
-		toggleEl.textContent = hasChildren ? (expanded ? "\u25BC" : "\u25B6") : " ";
+		toggleEl.textContent = hasChildren ? (isExpanded ? "\u25BC" : "\u25B6") : " ";
 		line.appendChild(toggleEl);
 
 		const tag = (node.tag ?? "???").toLowerCase();
@@ -2604,7 +2708,15 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			toggleEl.addEventListener("click", (e) => {
 				e.stopPropagation();
 				wrapper.classList.toggle("expanded");
-				toggleEl.textContent = wrapper.classList.contains("expanded") ? "\u25BC" : "\u25B6";
+				const nowExpanded = wrapper.classList.contains("expanded");
+				toggleEl.textContent = nowExpanded ? "\u25BC" : "\u25B6";
+				if (node.id != null) {
+					if (nowExpanded) {
+						expandedNodeIds.add(node.id);
+					} else {
+						expandedNodeIds.delete(node.id);
+					}
+				}
 			});
 		}
 
@@ -3848,7 +3960,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			if (activeTab === "Tree") {
 				const dt = getDevtools();
 				if (dt) dt.refreshDebugData();
-				setTimeout(renderTreeTab, 250);
+				treeRefreshTimeout = setTimeout(() => {
+					treeRefreshTimeout = null;
+					renderTreeTab();
+				}, 250);
 			}
 		}, 2000);
 
@@ -3857,7 +3972,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			if (activeTab === "Performance") {
 				const dt = getDevtools();
 				if (dt) dt.refreshDebugData();
-				setTimeout(renderPerfTab, 250);
+				perfRefreshTimeout = setTimeout(() => {
+					perfRefreshTimeout = null;
+					renderPerfTab();
+				}, 250);
 			}
 		}, 1000);
 
@@ -3894,6 +4012,19 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 				clearInterval(replayTimer);
 				replayTimer = null;
 			}
+			// Cancel pending setTimeout callbacks
+			if (treeRefreshTimeout) {
+				clearTimeout(treeRefreshTimeout);
+				treeRefreshTimeout = null;
+			}
+			if (perfRefreshTimeout) {
+				clearTimeout(perfRefreshTimeout);
+				perfRefreshTimeout = null;
+			}
+			if (manualRefreshTimeout) {
+				clearTimeout(manualRefreshTimeout);
+				manualRefreshTimeout = null;
+			}
 			clearInterval(healthDotTimer);
 			onWarningBadgeUpdate = null;
 			// Reset module-level state for clean re-creation (e.g., HMR)
@@ -3902,6 +4033,8 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			eventLog.length = 0;
 			syncReadLog.length = 0;
 			warningBadgeCount = 0;
+			logPaused = false;
+			isReplaying = false;
 			host.remove();
 		},
 	};
