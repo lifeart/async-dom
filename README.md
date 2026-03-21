@@ -7,7 +7,7 @@
 
 **Your application runs in a Web Worker. The DOM is just a projection.**
 
-async-dom moves your entire UI framework — React, Vue, Svelte, or vanilla JS — into a Web Worker. The main thread receives only serialized mutation instructions through a message-passing channel and applies them with a frame-budgeted scheduler targeting 60 fps.
+async-dom provides a virtual `document` inside a Web Worker with the full DOM API. Your worker code uses standard DOM operations (`createElement`, `addEventListener`, `textContent`). The main thread receives serialized mutations and applies them at 60 fps. Framework adapters let you embed worker-rendered content inside React, Vue, or Svelte host apps.
 
 This architecture doesn't just improve performance. It fundamentally changes what is accessible to scrapers, bots, browser extensions, and anyone inspecting your page.
 
@@ -118,6 +118,12 @@ document.body.appendChild(input);
 
 That's it. Your app now runs entirely in a worker.
 
+### Further Reading
+
+- [Getting Started Guide](./docs/getting-started.md) — Mental model, styling, forms, testing, deployment
+- [Migration Guide](./docs/migration-guide.md) — Adopting async-dom in existing apps
+- [Security Guide](./docs/security-guide.md) — CSP, Trusted Types, COOP/COEP
+
 ---
 
 ## Framework Adapters
@@ -164,6 +170,8 @@ import { AsyncDom } from "@lifeart/async-dom/vue";
 
 <div use:asyncDom={{ worker: "./app.worker.ts" }} />
 ```
+
+> **Important:** Framework adapters are main-thread mount points. They create a container element and spin up a Web Worker. The worker code uses async-dom's virtual DOM API (standard DOM operations), not the framework's component model. See the [Getting Started Guide](./docs/getting-started.md) for details.
 
 ---
 
@@ -329,6 +337,8 @@ dom.addApp({
 | `@lifeart/async-dom/svelte`    | Svelte `asyncDom` action                     |
 | `@lifeart/async-dom/vite-plugin` | Vite plugin (COOP/COEP headers, binary transport, error overlay) |
 | `@lifeart/async-dom/server`   | Server-side runner (`createServerApp`, `createStreamingServer`, `BroadcastTransport`, `MutationLog`, `WebSocketServerTransport`) |
+
+For detailed API documentation, see the JSDoc comments on all exported types and functions. Key types: `AsyncDomConfig`, `AsyncDomInstance`, `WorkerDomConfig`, `WorkerDomResult`.
 
 ---
 
@@ -581,6 +591,15 @@ Templates: `vanilla-ts`, `react-ts`, `vue-ts`
 | Firefox | 79+ | Full support |
 | Safari | 15.2+ | Requires COOP/COEP for sync reads |
 | Edge | 80+ | Full support (Chromium) |
+
+---
+
+## When Not to Use async-dom
+
+- **SEO-dependent pages** — Worker-rendered content is not visible to search engine crawlers
+- **Simple apps** — The worker overhead (initialization, message serialization, event round-trips) may exceed the benefit for lightweight UIs
+- **Apps requiring sub-millisecond input response** — Event round-trips add 2-20ms of latency compared to same-thread handlers
+- **Heavy third-party library integration** — Libraries that assume direct DOM access (D3, jQuery, analytics SDKs) will not work in the worker
 
 ---
 
