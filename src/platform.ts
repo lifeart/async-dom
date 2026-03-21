@@ -1,3 +1,14 @@
+/* eslint-disable no-var */
+declare var process:
+	| {
+			version: string;
+			// biome-ignore lint/suspicious/noExplicitAny: Node.js process event signatures
+			on(event: string, listener: (...args: any[]) => void): void;
+			// biome-ignore lint/suspicious/noExplicitAny: Node.js process event signatures
+			removeListener(event: string, listener: (...args: any[]) => void): void;
+	  }
+	| undefined;
+
 /**
  * PlatformHost abstraction for running async-dom in different environments
  * (Web Worker, Node.js, etc.).
@@ -123,6 +134,7 @@ export function createNodePlatform(): PlatformHost {
 		},
 		installErrorHandlers(onError, onUnhandledRejection) {
 			if (typeof process === "undefined") return () => {};
+			const proc = process;
 
 			const onUncaught = (err: Error) => {
 				onError(err.message, err, undefined, undefined, undefined);
@@ -131,23 +143,24 @@ export function createNodePlatform(): PlatformHost {
 				onUnhandledRejection(reason);
 			};
 
-			process.on("uncaughtException", onUncaught);
-			process.on("unhandledRejection", onRejection);
+			proc.on("uncaughtException", onUncaught);
+			proc.on("unhandledRejection", onRejection);
 
 			return () => {
-				process.removeListener("uncaughtException", onUncaught);
-				process.removeListener("unhandledRejection", onRejection);
+				proc.removeListener("uncaughtException", onUncaught);
+				proc.removeListener("unhandledRejection", onRejection);
 			};
 		},
 		onBeforeUnload(callback) {
 			if (typeof process === "undefined") return () => {};
+			const proc = process;
 
 			const handler = () => {
 				callback();
 			};
-			process.on("beforeExit", handler);
+			proc.on("beforeExit", handler);
 			return () => {
-				process.removeListener("beforeExit", handler);
+				proc.removeListener("beforeExit", handler);
 			};
 		},
 	};
