@@ -1,6 +1,6 @@
 {
   "name": "@lifeart/async-dom",
-  "version": "2.0.0-alpha.2",
+  "version": "2.0.0-alpha.3",
   "description": "Asynchronous DOM rendering — offload UI to Web Workers with frame-budgeted scheduling",
   "type": "module",
   "exports": {
