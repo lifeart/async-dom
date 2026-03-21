@@ -590,7 +590,7 @@ Templates: `vanilla-ts`, `react-ts`, `vue-ts`
 npm install          # install dependencies
 npm run dev          # dev server with examples
 npm run build        # build ESM + CJS + declarations
-npm test             # 1,296 tests across 65 files
+npm test             # 1,310 tests across 65 files
 npm run typecheck    # type-check
 npm run lint         # lint (Biome)
 ```
