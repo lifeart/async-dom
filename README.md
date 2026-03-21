@@ -70,7 +70,7 @@ Traditional web apps expose everything: business logic in bundled JS, data struc
 | -------- | ------------------- |
 | **Parallel editing** | Broadcast a single app instance to multiple viewers via WebSocket. Event forwarding from clients is supported but does not include conflict resolution (events are processed in arrival order). |
 | **Marketing & UX analytics** | WebSocket transport broadcasts UI state to multiple observers. Watch exactly what users experience, live. |
-| **Time-travel debugging** | Record DOM mutation sequences for debugging and analysis. Replay and snapshot comparison are planned features. |
+| **Time-travel debugging** | Record and replay DOM mutation sequences. Scrub through rendering history with a time-travel scrubber. Compare tree snapshots with visual diff. |
 | **Rendering regression tests** | If mutation batches are identical, the UI is identical. Deterministic rendering without pixel comparison. |
 
 ---
@@ -590,7 +590,7 @@ Templates: `vanilla-ts`, `react-ts`, `vue-ts`
 npm install          # install dependencies
 npm run dev          # dev server with examples
 npm run build        # build ESM + CJS + declarations
-npm test             # 1,310 tests across 65 files
+npm test             # 1,310 tests across 67 files
 npm run typecheck    # type-check
 npm run lint         # lint (Biome)
 ```
