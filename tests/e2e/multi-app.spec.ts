@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test.describe("Multi-App with Shadow DOM", () => {
 	test.beforeEach(async ({ page }) => {

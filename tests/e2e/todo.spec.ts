@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test.describe("Todo App", () => {
 	test.beforeEach(async ({ page }) => {
@@ -12,9 +12,7 @@ test.describe("Todo App", () => {
 		await expect(items).toHaveCount(2);
 
 		await expect(items.nth(0).locator("span")).toHaveText("Try async-dom");
-		await expect(items.nth(1).locator("span")).toHaveText(
-			"Build something cool",
-		);
+		await expect(items.nth(1).locator("span")).toHaveText("Build something cool");
 	});
 
 	test("shows correct remaining count", async ({ page }) => {
@@ -95,9 +93,7 @@ test.describe("Todo App", () => {
 		await removeBtn.click();
 
 		await expect(items).toHaveCount(1);
-		await expect(items.first().locator("span")).toHaveText(
-			"Build something cool",
-		);
+		await expect(items.first().locator("span")).toHaveText("Build something cool");
 
 		const count = page.locator("#app .count");
 		await expect(count).toHaveText("1 item remaining");

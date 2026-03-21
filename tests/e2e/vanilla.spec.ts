@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test.describe("Vanilla Grid Demo", () => {
 	test("renders grid nodes within 10 seconds", async ({ page }) => {

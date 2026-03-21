@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test.describe("HTTP Headers and HTML Shell", () => {
 	test("serves empty HTML shell before JS runs", async ({ request }) => {
