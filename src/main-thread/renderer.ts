@@ -135,6 +135,11 @@ export interface RendererRoot {
  * Applies DOM mutations to the real DOM.
  * Stateless except for the node cache mapping NodeIds to DOM nodes.
  */
+export interface ContentVisibilityConfig {
+	enabled: boolean;
+	intrinsicSize: string;
+}
+
 export class DomRenderer {
 	private nodeCache: NodeCache;
 	private permissions: RendererPermissions;
@@ -144,6 +149,7 @@ export class DomRenderer {
 	private _onWarning: ((entry: WarningLogEntry) => void) | null = null;
 	private _onMutation: ((entry: MutationLogEntry) => void) | null = null;
 	private highlightEnabled = false;
+	private _contentVisibility: ContentVisibilityConfig | null = null;
 
 	setDebugHooks(hooks: {
 		onWarning?: ((e: WarningLogEntry) => void) | null;
@@ -155,6 +161,10 @@ export class DomRenderer {
 
 	enableHighlightUpdates(enabled: boolean): void {
 		this.highlightEnabled = enabled;
+	}
+
+	setContentVisibility(config: ContentVisibilityConfig | null): void {
+		this._contentVisibility = config;
 	}
 
 	private highlightNode(id: NodeId): void {
@@ -360,6 +370,7 @@ export class DomRenderer {
 			return;
 		}
 		(parent as Element).appendChild(child);
+		this._applyContentVisibility(parent, child);
 	}
 
 	private removeNode(id: NodeId): void {
@@ -530,6 +541,35 @@ export class DomRenderer {
 		if (typeof fn === "function") {
 			(fn as (...a: unknown[]) => unknown).apply(node, args);
 		}
+	}
+
+	/** Inline element tags that should not receive content-visibility. */
+	private static readonly INLINE_TAGS = new Set([
+		"SPAN", "A", "STRONG", "EM", "B", "I", "U", "S", "SMALL", "BIG",
+		"SUB", "SUP", "ABBR", "CITE", "CODE", "KBD", "SAMP", "VAR",
+		"MARK", "Q", "TIME", "LABEL", "BR", "WBR", "IMG",
+	]);
+
+	/**
+	 * Apply content-visibility: auto to top-level children of the mount point.
+	 * Only applies to block-level HTMLElements that don't already have it set.
+	 */
+	private _applyContentVisibility(parent: Node, child: Node): void {
+		if (!this._contentVisibility) return;
+		// Only apply to direct children of the mount point (root.body)
+		const mountPoint = this.root.body;
+		if (parent !== (mountPoint as unknown as Node)) return;
+		// Only apply to HTMLElements (not text nodes, comments, or SVG)
+		if (!(child instanceof HTMLElement)) return;
+		// Skip inline elements
+		if (DomRenderer.INLINE_TAGS.has(child.tagName)) return;
+		// Don't override if already set
+		if (child.style.contentVisibility) return;
+		// Don't apply inside shadow DOM (shadowRoot host check)
+		if (parent instanceof ShadowRoot) return;
+
+		child.style.contentVisibility = "auto";
+		child.style.containIntrinsicSize = this._contentVisibility.intrinsicSize;
 	}
 
 	/**

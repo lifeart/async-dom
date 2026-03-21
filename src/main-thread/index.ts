@@ -21,7 +21,7 @@ import {
 	createDevtoolsPanel,
 } from "../debug/devtools-panel.ts";
 import { EventBridge } from "./event-bridge.ts";
-import { DomRenderer, type RendererRoot } from "./renderer.ts";
+import { DomRenderer, type ContentVisibilityConfig, type RendererRoot } from "./renderer.ts";
 import { ThreadManager } from "./thread-manager.ts";
 
 // Allowlist of safe window properties accessible via sync channel.
@@ -66,6 +66,8 @@ export interface AsyncDomConfig {
 	worker?: Worker;
 	scheduler?: SchedulerConfig;
 	debug?: DebugOptions;
+	/** Enable content-visibility: auto on top-level container elements for off-screen rendering optimization. */
+	contentVisibility?: boolean | { intrinsicSize?: string };
 }
 
 export interface AppConfig {
@@ -112,6 +114,17 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 	const syncHosts = new Map<AppId, SyncChannelHost>();
 	const debugHooks = resolveDebugHooks(config.debug);
 	const debugStats = new DebugStats();
+
+	// Resolve content-visibility config
+	const contentVisibilityConfig: ContentVisibilityConfig | null = config.contentVisibility
+		? {
+				enabled: true,
+				intrinsicSize:
+					typeof config.contentVisibility === "object" && config.contentVisibility.intrinsicSize
+						? config.contentVisibility.intrinsicSize
+						: "auto 500px",
+			}
+		: null;
 
 	// Feature 15: Causality tracker for building event -> batch -> node DAG
 	const causalityTracker = new CausalityTracker();
@@ -459,6 +472,10 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		}
 
 		const appRenderer = new DomRenderer(appNodeCache, undefined, rendererRoot);
+
+		if (contentVisibilityConfig) {
+			appRenderer.setContentVisibility(contentVisibilityConfig);
+		}
 
 		if (debugHooks.onWarning || debugHooks.onMutation) {
 			appRenderer.setDebugHooks({
@@ -899,6 +916,6 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 
 export { FrameScheduler, type SchedulerConfig } from "../core/scheduler.ts";
 export { EventBridge } from "./event-bridge.ts";
-export { DomRenderer, type RendererPermissions, type RendererRoot } from "./renderer.ts";
+export { DomRenderer, type ContentVisibilityConfig, type RendererPermissions, type RendererRoot } from "./renderer.ts";
 export type { RemoteConfig, WebSocketConfig, WorkerConfig } from "./thread-manager.ts";
 export { ThreadManager } from "./thread-manager.ts";
