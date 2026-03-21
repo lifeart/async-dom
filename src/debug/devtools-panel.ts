@@ -1604,18 +1604,21 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			replayTimer = null;
 		}
 		const dt = getDevtools();
-		if (replayState) {
-			replayState.isPlaying = false;
-			// Restore DOM to latest state by re-applying the full mutation log
-			const appId = selectedAppId ?? dt?.apps()[0];
-			if (dt?.clearAndReapply && appId) {
-				dt.clearAndReapply(mutationLog, mutationLog.length, appId);
+		try {
+			if (replayState) {
+				replayState.isPlaying = false;
+				// Restore DOM to latest state by re-applying the full mutation log
+				const appId = selectedAppId ?? dt?.apps()[0];
+				if (dt?.clearAndReapply && appId) {
+					dt.clearAndReapply(mutationLog, mutationLog.length, appId);
+				}
+				replayState = null;
 			}
-			replayState = null;
+			isReplaying = false;
+		} finally {
+			// Resume the scheduler so live mutations flow again — even if replay restoration throws
+			dt?.scheduler.start();
 		}
-		isReplaying = false;
-		// Resume the scheduler so live mutations flow again
-		dt?.scheduler.start();
 		replayBar.style.display = "none";
 		logReplayBtn.classList.remove("active");
 		renderLogTab();
@@ -1625,7 +1628,13 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		const dt = getDevtools();
 		if (!dt?.replayMutation) return;
 		const appId = selectedAppId ?? dt.apps()[0];
-		if (appId) dt.replayMutation(entry.mutation, appId);
+		if (appId) {
+			try {
+				dt.replayMutation(entry.mutation, appId);
+			} catch (e) {
+				console.error("[async-dom devtools] replayMutation failed", e);
+			}
+		}
 	}
 
 	function clearAndReapplyUpTo(index: number): void {
@@ -1633,7 +1642,11 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		const dt = getDevtools();
 		if (!dt?.clearAndReapply) return;
 		const appId = selectedAppId ?? dt.apps()[0];
-		dt.clearAndReapply(replayState.entries, index, appId);
+		try {
+			dt.clearAndReapply(replayState.entries, index, appId);
+		} catch (e) {
+			console.error("[async-dom devtools] clearAndReapply failed", e);
+		}
 	}
 
 	function replayStepForwardOne(): void {

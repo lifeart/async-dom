@@ -867,7 +867,7 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 						root.body.textContent = "";
 						root.head.textContent = "";
 					}
-					renderer.clearNodeCache();
+					renderer.resetNodeCache();
 					const end = Math.min(upToIndex, mutations.length);
 					for (let i = 0; i < end; i++) {
 						renderer.apply(mutations[i].mutation, mutations[i].batchUid);

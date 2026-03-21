@@ -353,7 +353,7 @@ export class DomRenderer {
 	 * Used during replay to allow re-creation of dynamic nodes while keeping the
 	 * root structure intact.
 	 */
-	clearNodeCache(): void {
+	resetNodeCache(): void {
 		this.nodeCache.clear();
 		// Re-seed structural nodes so replay createNode mutations work correctly
 		this.nodeCache.set(BODY_NODE_ID, this.root.body as unknown as Node);
@@ -654,9 +654,6 @@ export class DomRenderer {
 		if (DomRenderer.INLINE_TAGS.has(child.tagName)) return;
 		// Don't override if already set
 		if (child.style.contentVisibility) return;
-		// Don't apply inside shadow DOM (shadowRoot host check)
-		if (parent instanceof ShadowRoot) return;
-
 		child.style.contentVisibility = "auto";
 		child.style.containIntrinsicSize = this._contentVisibility.intrinsicSize;
 	}
