@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Message } from "../../src/core/protocol.ts";
-import type { Transport, TransportReadyState } from "../../src/transport/base.ts";
 import { createServerApp } from "../../src/server/runner.ts";
+import type { Transport, TransportReadyState } from "../../src/transport/base.ts";
 import type { WorkerDomResult } from "../../src/worker-thread/index.ts";
 
 function createMockTransport(): Transport & { sent: Message[] } {
@@ -49,9 +49,9 @@ describe("createServerApp", () => {
 			});
 
 			expect(capturedDom).not.toBeNull();
-			expect(capturedDom!.document).toBeDefined();
-			expect(capturedDom!.window).toBeDefined();
-			expect(typeof capturedDom!.destroy).toBe("function");
+			expect(capturedDom?.document).toBeDefined();
+			expect(capturedDom?.window).toBeDefined();
+			expect(typeof capturedDom?.destroy).toBe("function");
 
 			app.destroy();
 		});
@@ -104,8 +104,8 @@ describe("createServerApp", () => {
 				},
 			});
 
-			expect(domResult!.document.body.tagName).toBe("BODY");
-			expect(domResult!.document.head.tagName).toBe("HEAD");
+			expect(domResult?.document.body.tagName).toBe("BODY");
+			expect(domResult?.document.head.tagName).toBe("HEAD");
 
 			app.destroy();
 		});
@@ -147,7 +147,7 @@ describe("createServerApp", () => {
 			transport.sent.length = 0;
 
 			// Perform a DOM operation after destroy — it should not produce any messages
-			capturedDom!.document.createElement("div");
+			capturedDom?.document.createElement("div");
 
 			expect(transport.sent).toHaveLength(0);
 			expect(capturedDom).not.toBeNull();
@@ -218,10 +218,7 @@ describe("createServerApp", () => {
 
 			await app.ready;
 
-			expect(consoleSpy).toHaveBeenCalledWith(
-				"[async-dom] Server app module error:",
-				asyncError,
-			);
+			expect(consoleSpy).toHaveBeenCalledWith("[async-dom] Server app module error:", asyncError);
 
 			app.destroy();
 			consoleSpy.mockRestore();

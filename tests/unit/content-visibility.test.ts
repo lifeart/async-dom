@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { BODY_NODE_ID, createNodeId, type NodeId } from "../../src/core/protocol.ts";
 import { NodeCache } from "../../src/core/node-cache.ts";
+import { BODY_NODE_ID, createNodeId } from "../../src/core/protocol.ts";
 import { DomRenderer } from "../../src/main-thread/renderer.ts";
 
 describe("content-visibility integration", () => {

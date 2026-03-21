@@ -480,7 +480,8 @@ export class VirtualElement {
 		return this.childNodes
 			.map((child) => {
 				if (child.nodeType === 3) return escapeHtml((child as VirtualTextNode).nodeValue);
-				if (child.nodeType === 8) return `<!--${(child as VirtualCommentNode).nodeValue.replace(/--/g, "")}-->`;
+				if (child.nodeType === 8)
+					return `<!--${(child as VirtualCommentNode).nodeValue.replace(/--/g, "")}-->`;
 				if (child instanceof VirtualElement) return child.outerHTML;
 				return "";
 			})

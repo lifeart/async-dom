@@ -3,7 +3,7 @@ import { WarningCode } from "../core/debug.ts";
 import { sanitizeHTML } from "../core/html-sanitizer.ts";
 import { NodeCache } from "../core/node-cache.ts";
 import type { DomMutation, InsertPosition, NodeId } from "../core/protocol.ts";
-import { BODY_NODE_ID, HEAD_NODE_ID, HTML_NODE_ID, DOCUMENT_NODE_ID } from "../core/protocol.ts";
+import { BODY_NODE_ID, DOCUMENT_NODE_ID, HEAD_NODE_ID, HTML_NODE_ID } from "../core/protocol.ts";
 
 const DANGEROUS_ATTR_NAMES = new Set(["srcdoc", "formaction"]);
 const DANGEROUS_URI_ATTR_NAMES = new Set(["href", "src", "data", "action", "xlink:href"]);
@@ -560,9 +560,31 @@ export class DomRenderer {
 
 	/** Inline element tags that should not receive content-visibility. */
 	private static readonly INLINE_TAGS = new Set([
-		"SPAN", "A", "STRONG", "EM", "B", "I", "U", "S", "SMALL", "BIG",
-		"SUB", "SUP", "ABBR", "CITE", "CODE", "KBD", "SAMP", "VAR",
-		"MARK", "Q", "TIME", "LABEL", "BR", "WBR", "IMG",
+		"SPAN",
+		"A",
+		"STRONG",
+		"EM",
+		"B",
+		"I",
+		"U",
+		"S",
+		"SMALL",
+		"BIG",
+		"SUB",
+		"SUP",
+		"ABBR",
+		"CITE",
+		"CODE",
+		"KBD",
+		"SAMP",
+		"VAR",
+		"MARK",
+		"Q",
+		"TIME",
+		"LABEL",
+		"BR",
+		"WBR",
+		"IMG",
 	]);
 
 	/**

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Message, MutationMessage } from "../../src/core/protocol.ts";
 import { createAppId, createClientId } from "../../src/core/protocol.ts";
-import type { Transport, TransportReadyState } from "../../src/transport/base.ts";
 import { BroadcastTransport } from "../../src/server/broadcast-transport.ts";
+import type { Transport, TransportReadyState } from "../../src/transport/base.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -251,9 +251,7 @@ describe("BroadcastTransport", () => {
 
 			const disconnectEvents = received.filter((m) => m.type === "clientDisconnect");
 			expect(disconnectEvents).toHaveLength(1);
-			expect(
-				(disconnectEvents[0] as { type: string; clientId: string }).clientId,
-			).toBe(clientId);
+			expect((disconnectEvents[0] as { type: string; clientId: string }).clientId).toBe(clientId);
 		});
 
 		it("is a no-op for unknown clientIds", () => {

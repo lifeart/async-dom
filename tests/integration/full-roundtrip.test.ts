@@ -13,9 +13,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
 	BODY_NODE_ID,
+	createAppId,
 	HEAD_NODE_ID,
 	HTML_NODE_ID,
-	createAppId,
 	type Message,
 	type MutationMessage,
 } from "../../src/core/protocol.ts";

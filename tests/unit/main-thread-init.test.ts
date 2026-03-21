@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createAppId, createNodeId, type AppId, type Message, type MutationMessage } from "../../src/core/protocol.ts";
-import { createAsyncDom, type AsyncDomConfig, type AppConfig, type RemoteAppConfig } from "../../src/main-thread/index.ts";
+import {
+	type AppId,
+	createAppId,
+	createNodeId,
+	type Message,
+	type MutationMessage,
+} from "../../src/core/protocol.ts";
+import { type AsyncDomConfig, createAsyncDom } from "../../src/main-thread/index.ts";
 import type { Transport } from "../../src/transport/base.ts";
 
 // ---------------------------------------------------------------------------
@@ -27,11 +33,21 @@ function createMockWorker() {
 	return mock as unknown as Worker & { emit(msg: Message): void };
 }
 
-function createMockTransport(): Transport & { sent: Message[]; simulateMessage(msg: Message): void; simulateError(err: Error): void; simulateClose(): void } {
+function createMockTransport(): Transport & {
+	sent: Message[];
+	simulateMessage(msg: Message): void;
+	simulateError(err: Error): void;
+	simulateClose(): void;
+} {
 	const sent: Message[] = [];
 	// Support multiple handlers just like WorkerTransport does
 	const messageHandlers: Array<(msg: Message) => void> = [];
-	const transport: Transport & { sent: Message[]; simulateMessage(msg: Message): void; simulateError(err: Error): void; simulateClose(): void } = {
+	const transport: Transport & {
+		sent: Message[];
+		simulateMessage(msg: Message): void;
+		simulateError(err: Error): void;
+		simulateClose(): void;
+	} = {
 		sent,
 		send(msg: Message) {
 			sent.push(msg);
@@ -75,7 +91,11 @@ describe("createAsyncDom()", () => {
 
 	afterEach(() => {
 		for (const inst of instances) {
-			try { inst.destroy(); } catch { /* already destroyed */ }
+			try {
+				inst.destroy();
+			} catch {
+				/* already destroyed */
+			}
 		}
 		instances = [];
 		vi.restoreAllMocks();
@@ -106,7 +126,10 @@ describe("createAsyncDom()", () => {
 		it("start() and stop() do not throw", () => {
 			const target = makeMountPoint();
 			const inst = make({ target });
-			expect(() => { inst.start(); inst.stop(); }).not.toThrow();
+			expect(() => {
+				inst.start();
+				inst.stop();
+			}).not.toThrow();
 		});
 
 		it("destroy() can be called without any apps", () => {
@@ -398,7 +421,6 @@ describe("createAsyncDom()", () => {
 			// without requiring RAF. No error = message was properly routed.
 			expect(() => inst.destroy()).not.toThrow();
 		});
-
 	});
 
 	// -------------------------------------------------------------------------

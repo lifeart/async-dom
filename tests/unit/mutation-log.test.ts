@@ -137,8 +137,17 @@ describe("MutationLog", () => {
 		it("round-trips a non-empty mutations array unchanged", () => {
 			const log = new MutationLog();
 			const mutations: DomMutation[] = [
-				{ action: "createNode", id: 11 as import("../../src/core/protocol.ts").NodeId, tag: "DIV", textContent: "" },
-				{ action: "appendChild", id: 1 as import("../../src/core/protocol.ts").NodeId, childId: 11 as import("../../src/core/protocol.ts").NodeId },
+				{
+					action: "createNode",
+					id: 11 as import("../../src/core/protocol.ts").NodeId,
+					tag: "DIV",
+					textContent: "",
+				},
+				{
+					action: "appendChild",
+					id: 1 as import("../../src/core/protocol.ts").NodeId,
+					childId: 11 as import("../../src/core/protocol.ts").NodeId,
+				},
 			];
 			const msg = makeMutation(7, mutations);
 			log.append(msg);

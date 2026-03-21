@@ -38,7 +38,9 @@ describe("CLI templates", () => {
 		it("imports createWorkerDom in worker", () => {
 			const files = getTemplate("vanilla-ts", "my-app");
 			const worker = files.find((f) => f.path === "src/app.worker.ts")!;
-			expect(worker.content).toContain('import { createWorkerDom } from "@lifeart/async-dom/worker"');
+			expect(worker.content).toContain(
+				'import { createWorkerDom } from "@lifeart/async-dom/worker"',
+			);
 		});
 
 		it("vite config uses asyncDomPlugin", () => {

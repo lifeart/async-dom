@@ -21,7 +21,7 @@ import {
 	createDevtoolsPanel,
 } from "../debug/devtools-panel.ts";
 import { EventBridge } from "./event-bridge.ts";
-import { DomRenderer, type ContentVisibilityConfig, type RendererRoot } from "./renderer.ts";
+import { type ContentVisibilityConfig, DomRenderer, type RendererRoot } from "./renderer.ts";
 import { ThreadManager } from "./thread-manager.ts";
 
 // Allowlist of safe window properties accessible via sync channel.
@@ -947,6 +947,11 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 
 export { FrameScheduler, type SchedulerConfig } from "../core/scheduler.ts";
 export { EventBridge } from "./event-bridge.ts";
-export { DomRenderer, type ContentVisibilityConfig, type RendererPermissions, type RendererRoot } from "./renderer.ts";
+export {
+	type ContentVisibilityConfig,
+	DomRenderer,
+	type RendererPermissions,
+	type RendererRoot,
+} from "./renderer.ts";
 export type { RemoteConfig, WebSocketConfig, WorkerConfig } from "./thread-manager.ts";
 export { ThreadManager } from "./thread-manager.ts";

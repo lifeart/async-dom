@@ -88,7 +88,9 @@ export class BroadcastTransport implements Transport {
 		if (this._readyState === "closed") return;
 
 		if (this.config.maxClients !== undefined && this.clients.size >= this.config.maxClients) {
-			console.error(`[async-dom] Max clients (${this.config.maxClients}) reached, rejecting ${clientId}`);
+			console.error(
+				`[async-dom] Max clients (${this.config.maxClients}) reached, rejecting ${clientId}`,
+			);
 			transport.close();
 			return;
 		}

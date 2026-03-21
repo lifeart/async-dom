@@ -814,13 +814,21 @@ describe("VirtualDocument.toJSON", () => {
 		const p = doc.createElement("p");
 		p.setAttribute("data-test", "yes");
 		doc.body.appendChild(p);
-		const json = doc.toJSON() as { children: Array<{ tag: string; children: Array<{ tag: string; children: Array<{ tag: string; attributes?: Record<string, string> }> }> }> };
+		const json = doc.toJSON() as {
+			children: Array<{
+				tag: string;
+				children: Array<{
+					tag: string;
+					children: Array<{ tag: string; attributes?: Record<string, string> }>;
+				}>;
+			}>;
+		};
 		// Structure: HTML > [HEAD, BODY > [P]]
 		const body = json.children.find((c) => c.tag === "BODY");
 		expect(body).toBeTruthy();
-		const pEl = body!.children.find((c) => c.tag === "P");
+		const pEl = body?.children.find((c) => c.tag === "P");
 		expect(pEl).toBeTruthy();
-		expect(pEl!.attributes?.["data-test"]).toBe("yes");
+		expect(pEl?.attributes?.["data-test"]).toBe("yes");
 	});
 
 	it("serializes text nodes as type 'text'", () => {
@@ -856,9 +864,7 @@ describe("VirtualDocument.destroy", () => {
 		doc.destroy();
 
 		expect(doc.getElementById("tracked")).toBeNull();
-		expect(
-			(doc as unknown as { _listenerMap: Map<string, unknown> })._listenerMap.size,
-		).toBe(0);
+		expect((doc as unknown as { _listenerMap: Map<string, unknown> })._listenerMap.size).toBe(0);
 		expect(
 			(doc as unknown as { _nodeIdToElement: Map<unknown, unknown> })._nodeIdToElement.size,
 		).toBe(0);

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { createApiBridge, type BridgeConfig } from "../../src/core/api-bridge.ts";
-import { QueryType } from "../../src/core/sync-channel.ts";
+import { type BridgeConfig, createApiBridge } from "../../src/core/api-bridge.ts";
 import type { NodeId } from "../../src/core/protocol.ts";
+import { QueryType } from "../../src/core/sync-channel.ts";
 
 function nid(n: number): NodeId {
 	return n as NodeId;
@@ -118,10 +118,7 @@ describe("createApiBridge", () => {
 
 			(bridge.getFrequencyData as () => void)();
 
-			expect(syncChannel.request).toHaveBeenCalledWith(
-				QueryType.NodeProperty,
-				expect.any(String),
-			);
+			expect(syncChannel.request).toHaveBeenCalledWith(QueryType.NodeProperty, expect.any(String));
 		});
 
 		it("encodes nodeId, property name and args in the request payload", () => {

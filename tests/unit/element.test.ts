@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createAppId } from "../../src/core/protocol.ts";
 import { VirtualDocument } from "../../src/worker-thread/document.ts";
-import { VirtualElement, VirtualTextNode } from "../../src/worker-thread/element.ts";
+import type { VirtualElement, VirtualTextNode } from "../../src/worker-thread/element.ts";
 
 describe("Element", () => {
 	let doc: VirtualDocument;
@@ -851,7 +851,6 @@ describe("Element", () => {
 				y: 0,
 			});
 		});
-
 	});
 
 	// ─── contains() ──────────────────────────────────────────────────────────
@@ -985,7 +984,8 @@ describe("Element", () => {
 			const el = doc.createElement("div");
 			const cb = () => {};
 			el.addEventListener("click", cb);
-			const listeners = (el as unknown as { _eventListeners: Map<string, unknown> })._eventListeners;
+			const listeners = (el as unknown as { _eventListeners: Map<string, unknown> })
+				._eventListeners;
 			const stored = [...listeners.values()];
 			expect(stored).toContain(cb);
 		});
@@ -995,7 +995,8 @@ describe("Element", () => {
 			const cb = () => {};
 			el.addEventListener("click", cb);
 			el.removeEventListener("click", cb);
-			const listeners = (el as unknown as { _eventListeners: Map<string, unknown> })._eventListeners;
+			const listeners = (el as unknown as { _eventListeners: Map<string, unknown> })
+				._eventListeners;
 			expect(listeners.size).toBe(0);
 		});
 
@@ -1025,7 +1026,9 @@ describe("Element", () => {
 			let count = 0;
 			el.addEventListener("click", () => count++, { once: true });
 
-			const listenerId = [...(el as unknown as { _eventListeners: Map<string, unknown> })._eventListeners.keys()][0];
+			const listenerId = [
+				...(el as unknown as { _eventListeners: Map<string, unknown> })._eventListeners.keys(),
+			][0];
 			doc.dispatchEvent(listenerId, { type: "click", target: el._nodeId, bubbles: false });
 			doc.dispatchEvent(listenerId, { type: "click", target: el._nodeId, bubbles: false });
 			expect(count).toBe(1);
@@ -1034,7 +1037,8 @@ describe("Element", () => {
 		it("empty event name is ignored", () => {
 			const el = doc.createElement("div");
 			expect(() => el.addEventListener("", () => {})).not.toThrow();
-			const listeners = (el as unknown as { _eventListeners: Map<string, unknown> })._eventListeners;
+			const listeners = (el as unknown as { _eventListeners: Map<string, unknown> })
+				._eventListeners;
 			expect(listeners.size).toBe(0);
 		});
 
@@ -1259,8 +1263,12 @@ describe("Element", () => {
 			const el = doc.createElement("div");
 			let clickFired = false;
 			let mouseoverFired = false;
-			const clickHandler = () => { clickFired = true; };
-			const mouseoverHandler = () => { mouseoverFired = true; };
+			const clickHandler = () => {
+				clickFired = true;
+			};
+			const mouseoverHandler = () => {
+				mouseoverFired = true;
+			};
 
 			el.addEventListener("click", clickHandler);
 			el.addEventListener("mouseover", mouseoverHandler);
@@ -1278,7 +1286,9 @@ describe("Element", () => {
 		it("removing 'click' does not remove same fn registered for 'mouseover'", () => {
 			const el = doc.createElement("div");
 			let count = 0;
-			const handler = () => { count++; };
+			const handler = () => {
+				count++;
+			};
 
 			el.addEventListener("click", handler);
 			el.addEventListener("mouseover", handler);

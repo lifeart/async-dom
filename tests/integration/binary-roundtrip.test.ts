@@ -7,14 +7,11 @@
  * originals.
  */
 import { describe, expect, it } from "vitest";
-import {
-	BinaryMutationDecoder,
-	BinaryMutationEncoder,
-} from "../../src/core/binary-codec.ts";
+import { BinaryMutationDecoder, BinaryMutationEncoder } from "../../src/core/binary-codec.ts";
 import type { DomMutation, NodeId } from "../../src/core/protocol.ts";
+import { createAppId } from "../../src/core/protocol.ts";
 import { StringStore } from "../../src/core/string-store.ts";
 import { VirtualDocument } from "../../src/worker-thread/document.ts";
-import { createAppId } from "../../src/core/protocol.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -64,9 +61,17 @@ describe("Binary codec round-trip", () => {
 		});
 
 		it("createComment survives round-trip", () => {
-			const original: DomMutation = { action: "createComment", id: id(12), textContent: "<!-- comment -->" };
+			const original: DomMutation = {
+				action: "createComment",
+				id: id(12),
+				textContent: "<!-- comment -->",
+			};
 			const [decoded] = roundTrip([original]);
-			expect(decoded).toMatchObject({ action: "createComment", id: id(12), textContent: "<!-- comment -->" });
+			expect(decoded).toMatchObject({
+				action: "createComment",
+				id: id(12),
+				textContent: "<!-- comment -->",
+			});
 		});
 
 		it("appendChild survives round-trip", () => {
@@ -95,7 +100,12 @@ describe("Binary codec round-trip", () => {
 				refId: id(10),
 			};
 			const [decoded] = roundTrip([original]);
-			expect(decoded).toMatchObject({ action: "insertBefore", id: id(1), newId: id(15), refId: id(10) });
+			expect(decoded).toMatchObject({
+				action: "insertBefore",
+				id: id(1),
+				newId: id(15),
+				refId: id(10),
+			});
 		});
 
 		it("insertBefore with null refId survives round-trip", () => {
@@ -106,7 +116,12 @@ describe("Binary codec round-trip", () => {
 				refId: null,
 			};
 			const [decoded] = roundTrip([original]);
-			expect(decoded).toMatchObject({ action: "insertBefore", id: id(1), newId: id(15), refId: null });
+			expect(decoded).toMatchObject({
+				action: "insertBefore",
+				id: id(1),
+				newId: id(15),
+				refId: null,
+			});
 		});
 
 		it("setAttribute survives round-trip", () => {
@@ -391,7 +406,11 @@ describe("Binary codec round-trip", () => {
 			expect(decoded[0]).toMatchObject({ action: "createNode", tag: "DIV" });
 			expect(decoded[1]).toMatchObject({ action: "createNode", tag: "SPAN" });
 			expect(decoded[2]).toMatchObject({ action: "appendChild", id: id(10), childId: id(11) });
-			expect(decoded[3]).toMatchObject({ action: "setAttribute", name: "class", value: "highlight" });
+			expect(decoded[3]).toMatchObject({
+				action: "setAttribute",
+				name: "class",
+				value: "highlight",
+			});
 			expect(decoded[4]).toMatchObject({ action: "setTextContent", textContent: "hello" });
 		});
 
@@ -411,14 +430,20 @@ describe("Binary codec round-trip", () => {
 			const decoder = new BinaryMutationDecoder(strings);
 			const decoded = decoder.decode(buffer);
 
-			expect(decoded[0]).toMatchObject({ action: "addEventListener", name: "click", listenerId: "l1" });
-			expect(decoded[1]).toMatchObject({ action: "addEventListener", name: "click", listenerId: "l2" });
+			expect(decoded[0]).toMatchObject({
+				action: "addEventListener",
+				name: "click",
+				listenerId: "l1",
+			});
+			expect(decoded[1]).toMatchObject({
+				action: "addEventListener",
+				name: "click",
+				listenerId: "l2",
+			});
 			expect(decoded[2]).toMatchObject({ action: "removeEventListener", listenerId: "l1" });
 
 			// "click" should appear only once in the string store
-			expect(strings.size).toBe(
-				["click", "l1", "l2"].length,
-			);
+			expect(strings.size).toBe(["click", "l1", "l2"].length);
 		});
 
 		it("encoder can be reset and reused for a second batch", () => {

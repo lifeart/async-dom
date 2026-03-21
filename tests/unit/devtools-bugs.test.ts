@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { MutationLogEntry, EventLogEntry, SyncReadLogEntry } from "../../src/core/debug.ts";
+import type { EventLogEntry, MutationLogEntry, SyncReadLogEntry } from "../../src/core/debug.ts";
 import {
-	captureMutation,
 	captureEvent,
+	captureMutation,
 	captureSyncRead,
-	resetDevtoolsState,
-	setLogPaused,
-	setIsReplaying,
 	getDevtoolsFlags,
+	resetDevtoolsState,
+	setIsReplaying,
+	setLogPaused,
 } from "../../src/debug/devtools-panel.ts";
 
 // Minimal stubs for log entries

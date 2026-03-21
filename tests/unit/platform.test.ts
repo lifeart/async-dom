@@ -40,16 +40,16 @@ describe("createWorkerPlatform", () => {
 	let originalNavigator: Navigator;
 	let originalOnerror: typeof self.onerror;
 	let originalOnUnhandledRejection: typeof self.onunhandledrejection;
-	let originalAddEventListener: typeof self.addEventListener;
-	let originalRemoveEventListener: typeof self.removeEventListener;
+	let _originalAddEventListener: typeof self.addEventListener;
+	let _originalRemoveEventListener: typeof self.removeEventListener;
 
 	beforeEach(() => {
 		// jsdom provides `self` — snapshot what we'll be touching
 		originalNavigator = self.navigator;
 		originalOnerror = self.onerror;
 		originalOnUnhandledRejection = self.onunhandledrejection;
-		originalAddEventListener = self.addEventListener.bind(self);
-		originalRemoveEventListener = self.removeEventListener.bind(self);
+		_originalAddEventListener = self.addEventListener.bind(self);
+		_originalRemoveEventListener = self.removeEventListener.bind(self);
 	});
 
 	afterEach(() => {
@@ -94,10 +94,7 @@ describe("createWorkerPlatform", () => {
 			const prevOnerror = self.onerror;
 			const prevOnRejection = self.onunhandledrejection;
 
-			const cleanup = platform.installErrorHandlers(
-				vi.fn(),
-				vi.fn(),
-			);
+			const cleanup = platform.installErrorHandlers(vi.fn(), vi.fn());
 
 			expect(self.onerror).not.toBe(prevOnerror);
 			expect(self.onunhandledrejection).not.toBe(prevOnRejection);
@@ -184,7 +181,7 @@ describe("createWorkerPlatform", () => {
 
 			const reason = new Error("unhandled promise");
 			const fakeEvent = { reason } as PromiseRejectionEvent;
-			self.onunhandledrejection!(fakeEvent);
+			self.onunhandledrejection?.(fakeEvent);
 
 			expect(onUnhandledRejection).toHaveBeenCalledOnce();
 			expect(onUnhandledRejection).toHaveBeenCalledWith(reason);
@@ -343,13 +340,7 @@ describe("createNodePlatform", () => {
 			process.emit("uncaughtException", err, "uncaughtException");
 
 			expect(onError).toHaveBeenCalledOnce();
-			expect(onError).toHaveBeenCalledWith(
-				err.message,
-				err,
-				undefined,
-				undefined,
-				undefined,
-			);
+			expect(onError).toHaveBeenCalledWith(err.message, err, undefined, undefined, undefined);
 
 			cleanup();
 		});
@@ -389,22 +380,18 @@ describe("createNodePlatform", () => {
 			const registeredListeners: Array<(...args: unknown[]) => void> = [];
 			const removedListeners: Array<(...args: unknown[]) => void> = [];
 
-			const onSpy = vi
-				.spyOn(process, "on")
-				.mockImplementation((event, listener) => {
-					if (event === "uncaughtException") {
-						registeredListeners.push(listener as (...args: unknown[]) => void);
-					}
-					return process;
-				});
-			const offSpy = vi
-				.spyOn(process, "removeListener")
-				.mockImplementation((event, listener) => {
-					if (event === "uncaughtException") {
-						removedListeners.push(listener as (...args: unknown[]) => void);
-					}
-					return process;
-				});
+			const onSpy = vi.spyOn(process, "on").mockImplementation((event, listener) => {
+				if (event === "uncaughtException") {
+					registeredListeners.push(listener as (...args: unknown[]) => void);
+				}
+				return process;
+			});
+			const offSpy = vi.spyOn(process, "removeListener").mockImplementation((event, listener) => {
+				if (event === "uncaughtException") {
+					removedListeners.push(listener as (...args: unknown[]) => void);
+				}
+				return process;
+			});
 
 			const platform = createNodePlatform();
 			const onError = vi.fn();

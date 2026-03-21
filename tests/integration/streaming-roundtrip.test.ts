@@ -8,8 +8,8 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import type { Message } from "../../src/core/protocol.ts";
-import type { WebSocketLike } from "../../src/transport/ws-server-transport.ts";
 import { createStreamingServer } from "../../src/server/streaming-server.ts";
+import type { WebSocketLike } from "../../src/transport/ws-server-transport.ts";
 
 // ---------------------------------------------------------------------------
 // MockWebSocket — minimal WebSocketLike for tests (same pattern as unit tests)
@@ -191,9 +191,7 @@ describe("Streaming server full round-trip", () => {
 		// A should not get the new mutation (disconnected before it)
 		// The A socket got snapshotComplete + possibly initial mutations before disconnect
 		// but none of the new ones
-		expect(
-			afterDisconnectMsgsA.filter(() => true).length,
-		).toBe(0);
+		expect(afterDisconnectMsgsA.filter(() => true).length).toBe(0);
 
 		server.destroy();
 	});

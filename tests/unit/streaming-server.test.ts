@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Message, MutationMessage } from "../../src/core/protocol.ts";
 import { createAppId, createClientId } from "../../src/core/protocol.ts";
-import type { WebSocketLike } from "../../src/transport/ws-server-transport.ts";
 import { createStreamingServer } from "../../src/server/streaming-server.ts";
+import type { WebSocketLike } from "../../src/transport/ws-server-transport.ts";
 
 // ---------------------------------------------------------------------------
 // MockWebSocket — minimal WebSocketLike for tests
@@ -43,7 +43,7 @@ class MockWebSocket implements WebSocketLike {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeMutation(uid: number): MutationMessage {
+function _makeMutation(uid: number): MutationMessage {
 	return {
 		type: "mutation",
 		appId: createAppId("test-app"),
@@ -140,9 +140,7 @@ describe("createStreamingServer", () => {
 
 			server.handleConnection(socket);
 
-			const snapshots = socket.parsedMessages.filter(
-				(m) => m.type === "snapshotComplete",
-			);
+			const snapshots = socket.parsedMessages.filter((m) => m.type === "snapshotComplete");
 			expect(snapshots).toHaveLength(1);
 
 			server.destroy();
@@ -365,9 +363,7 @@ describe("createStreamingServer", () => {
 		it("disconnectClient with an unknown ID does not throw", () => {
 			const server = createStreamingServer({ createApp: () => {} });
 
-			expect(() =>
-				server.disconnectClient(createClientId("no-such-client")),
-			).not.toThrow();
+			expect(() => server.disconnectClient(createClientId("no-such-client"))).not.toThrow();
 
 			server.destroy();
 		});
@@ -415,7 +411,11 @@ describe("createStreamingServer", () => {
 			// an additional onMessage handler to capture forwarded events before
 			// they are processed by createWorkerDom's internal handler.
 			const dom = server.getDom();
-			const broadcastTransport = (dom.document.collector as unknown as { transport: import("../../src/transport/base.ts").Transport }).transport;
+			const broadcastTransport = (
+				dom.document.collector as unknown as {
+					transport: import("../../src/transport/base.ts").Transport;
+				}
+			).transport;
 			broadcastTransport.onMessage((msg) => {
 				if (msg.type === "event") {
 					forwardedClientIds.push((msg as { clientId?: string }).clientId);
