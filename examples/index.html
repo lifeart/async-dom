@@ -497,7 +497,7 @@
     v2.0 alpha — React, Vue, Svelte adapters
   </div>
   <h1>Run React, Vue & Svelte in <em>Web Workers</em></h1>
-  <p style="font-size:1.3rem;color:var(--text);font-weight:500;margin-bottom:8px;letter-spacing:-0.01em;">Your DOM is just a projection.</p>
+  <p style="font-size:1.3rem;color:var(--text);font-weight:500;margin-bottom:8px;letter-spacing:-0.01em;">Your framework runs off the main thread. Your content stays off the page source.</p>
   <p class="hero-sub">
     Move your entire UI framework into a Web Worker. The main thread receives only
     serialized mutations. Content is structurally invisible to scrapers, bots, and AI crawlers.
@@ -520,24 +520,20 @@
 <!-- ── Stats ── -->
 <div class="stats-bar">
   <div class="stat">
+    <div class="stat-value stat-hero">0 KB</div>
+    <div class="stat-label">Framework runtime on main thread</div>
+  </div>
+  <div class="stat">
     <div class="stat-value">60 fps</div>
-    <div class="stat-label">Frame-budgeted rendering</div>
+    <div class="stat-label">Frame-budgeted target</div>
   </div>
   <div class="stat">
     <div class="stat-value">~21 KB</div>
-    <div class="stat-label">Main + Worker (gzip)</div>
+    <div class="stat-label">Core runtime (gzip)</div>
   </div>
   <div class="stat">
-    <div class="stat-value">634</div>
-    <div class="stat-label">Tests passing</div>
-  </div>
-  <div class="stat">
-    <div class="stat-value">3</div>
+    <div class="stat-value">React · Vue · Svelte</div>
     <div class="stat-label">Framework adapters</div>
-  </div>
-  <div class="stat">
-    <div class="stat-value stat-hero">0 KB</div>
-    <div class="stat-label">Framework on main thread</div>
   </div>
 </div>
 
@@ -589,7 +585,7 @@
         <p>
           Source code in bundles. Data structures in the DOM. Auth tokens accessible to XSS.
           Business logic readable by anyone with DevTools. Browser extensions with full access.
-          <span class="stat-highlight">There's no architectural boundary.</span>
+          <span class="stat-highlight">Traditional architecture offers no isolation boundary.</span>
         </p>
       </div>
     </div>
@@ -624,7 +620,7 @@
       <div class="how-step">
         <div class="how-number">4</div>
         <h3>Applied at 60 fps</h3>
-        <p>A frame-budgeted scheduler on the main thread applies mutations with priority sorting and viewport culling. Never drops below 60fps.</p>
+        <p>A frame-budgeted scheduler on the main thread applies mutations with priority sorting and viewport culling. Targets 60 fps with graceful degradation under heavy load.</p>
       </div>
     </div>
     <div class="arch-diagram">
@@ -819,15 +815,15 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
         <ul class="benefit-list">
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span>
-            <div><strong>XSS containment.</strong> <span>Malicious scripts on the main thread cannot reach worker internal state. All data passes through postMessage — a natural serialization boundary.</span></div>
+            <div><strong>XSS containment.</strong> <span>Main-thread scripts cannot access worker-scoped variables or closures. All data passes through postMessage — a natural serialization boundary. Note: XSS on the main thread can still read the rendered DOM.</span></div>
           </li>
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>
-            <div><strong>Token isolation.</strong> <span>Auth tokens, session state, and API keys stored in the worker are inaccessible to compromised main-thread scripts or browser extensions.</span></div>
+            <div><strong>Token isolation.</strong> <span>Auth tokens and session state stored as worker-scoped variables are inaccessible to main-thread XSS. Note: tokens in HTTP request headers remain visible to browser DevTools and extensions with appropriate permissions.</span></div>
           </li>
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></span>
-            <div><strong>Anti-scraping by architecture.</strong> <span>Empty HTML payload. Procedural DOM structure. Dynamic class names. Honeypot injection. Behavioral gating. Not a cat-and-mouse game — a structural barrier.</span></div>
+            <div><strong>Anti-scraping by architecture.</strong> <span>Empty HTML payload. Procedural DOM construction. Architecture supports per-session DOM variation. Raises the cost of scraping from HTTP parsing to full browser automation — an architectural property, not a bolted-on defense.</span></div>
           </li>
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
@@ -835,7 +831,7 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
           </li>
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/></svg></span>
-            <div><strong>Bot detection at the app layer.</strong> <span>The worker controls rendering. Detect non-human patterns (no mouse events, impossibly fast navigation) and alter output in real-time.</span></div>
+            <div><strong>Bot detection at the app layer.</strong> <span>The worker controls what it renders and when, enabling application-level bot detection patterns. This is an application-level capability, not a built-in feature.</span></div>
           </li>
         </ul>
       </div>
@@ -850,7 +846,7 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
         <ul class="benefit-list">
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
-            <div><strong>Core Web Vitals improvement.</strong> <span>Moving framework execution off the main thread directly improves INP, FID, and TBT. Google rewards this in search rankings.</span></div>
+            <div><strong>Core Web Vitals improvement.</strong> <span>Moving framework execution off the main thread can improve INP and TBT when JavaScript computation is the bottleneck. Event round-trips add 2-20ms of latency compared to same-thread handlers.</span></div>
           </li>
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
@@ -866,7 +862,7 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
           </li>
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg></span>
-            <div><strong>634 tests. TypeScript. MIT license.</strong> <span>Production-ready with strict types, Biome linting, CI pipeline, Vite plugin, CLI scaffolding, and Chrome DevTools extension.</span></div>
+            <div><strong>1,289 tests. TypeScript. MIT license.</strong> <span>Production-ready with strict types, Biome linting, CI pipeline, Vite plugin, CLI scaffolding, and Chrome DevTools extension.</span></div>
           </li>
         </ul>
       </div>
@@ -881,7 +877,7 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
         <ul class="benefit-list">
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg></span>
-            <div><strong>Drop-in framework adapters.</strong> <span>&lt;AsyncDom&gt; component for React/Vue. use:asyncDom action for Svelte. useAsyncDom hooks/composables. Fallback, onReady, onError — all wired up.</span></div>
+            <div><strong>Framework adapters for React, Vue &amp; Svelte.</strong> <span>&lt;AsyncDom&gt; component for React/Vue. use:asyncDom action for Svelte. useAsyncDom hooks/composables. Fallback, onReady, onError — all wired up. Some APIs that directly access the browser DOM require adaptation.</span></div>
           </li>
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span>
@@ -924,11 +920,11 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
           </li>
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><rect x="9" y="11" width="6" height="5" rx="1"/><path d="M10 11V9a2 2 0 014 0v2"/></svg></span>
-            <div><strong>Content stays yours.</strong> <span>AI crawlers get an empty HTML shell. Your premium content, paywalled articles, and proprietary data don't end up in training datasets.</span></div>
+            <div><strong>Content stays yours.</strong> <span>AI crawlers that rely on HTTP responses get an empty shell. Headless browser-based crawlers must execute the full worker pipeline, raising extraction cost and complexity.</span></div>
           </li>
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a2 2 0 100-4 2 2 0 000 4z"/><path d="M19.5 10a2 2 0 100-4 2 2 0 000 4z"/><path d="M4.5 10a2 2 0 100-4 2 2 0 000 4z"/><path d="M12 22c4-4 4-8 0-12M19.5 10c0 4-3 7-5.5 10M4.5 10c0 4 3 7 5.5 10"/></svg></span>
-            <div><strong>Invisible watermarking.</strong> <span>The worker controls rendering. Inject per-user, per-session watermarks that are invisible to readers but traceable if content leaks.</span></div>
+            <div><strong>Server-controlled rendering.</strong> <span>The worker controls what content is rendered and when. Per-session content variation and server-side rendering gates are architectural capabilities the framework supports.</span></div>
           </li>
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg></span>
@@ -947,15 +943,15 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
         <ul class="benefit-list">
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
-            <div><strong>Content never in source.</strong> <span>Structured content stays in the worker. The DOM receives procedural rendering instructions, not your data model. Scraping requires reverse-engineering a binary protocol.</span></div>
+            <div><strong>Content never in source.</strong> <span>Content is not present in the initial HTML payload or JavaScript bundles. Extraction requires executing the page in a browser environment and reading from the live DOM, raising the cost of automated extraction.</span></div>
           </li>
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/><path d="M2 2l20 20"/></svg></span>
-            <div><strong>Traceable leaks.</strong> <span>Per-session rendering watermarks let you prove which session leaked content — useful evidence for DMCA and copyright claims.</span></div>
+            <div><strong>Per-session content variation.</strong> <span>The architecture supports per-session rendering variation, enabling content fingerprinting patterns at the application layer. This is a capability the architecture facilitates, not a built-in feature.</span></div>
           </li>
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span>
-            <div><strong>Access control at render time.</strong> <span>The worker can enforce licensing rules: time-limited viewing, user-specific rendering, geographic restrictions — without relying on server-side paywalls that AI scrapers circumvent.</span></div>
+            <div><strong>Access control at render time.</strong> <span>The worker can enforce application-level rendering rules: time-limited viewing, user-specific content, geographic variation — complementing server-side access controls.</span></div>
           </li>
           <li>
             <span class="icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M12 11v6M9 14h6"/></svg></span>
@@ -1120,7 +1116,7 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
           </tr>
           <tr>
             <td>DOM API coverage</td>
-            <td class="highlight-col">Comprehensive</td>
+            <td class="highlight-col">Broad</td>
             <td>Proxy forwarding</td>
             <td>Subset</td>
           </tr>
@@ -1196,9 +1192,9 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
         </div>
         <h3>Copyright & DRM enforcement</h3>
         <p>
-          The NYT sued OpenAI. The <span class="stat-highlight">$236 billion DRM market</span> proves demand.
+          The NYT sued OpenAI. Content creators need technical enforcement, not just legal remedies.
           async-dom keeps content in the worker — the DOM receives rendering instructions, not your data model.
-          Per-session watermarking traces leaks.
+          The architecture supports per-session content variation for fingerprinting.
         </p>
       </div>
       <div class="problem-card">
@@ -1280,6 +1276,22 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
           Migrate section by section. Each worker app is isolated — it doesn't affect the rest of your page.
         </p>
       </details>
+      <details>
+        <summary>Does this work with Next.js, Nuxt, or SvelteKit?</summary>
+        <p>async-dom replaces the rendering layer, not the routing or data-fetching layer. It is not a drop-in for meta-frameworks. Use it for standalone apps, dashboards, embedded components, or protected content applications where SSR-based routing is not required.</p>
+      </details>
+      <details>
+        <summary>Is content accessible to screen readers?</summary>
+        <p>Yes. async-dom applies mutations to the real DOM. The rendered output is identical to what a traditional app produces. ARIA attributes, semantic HTML, roles, and all accessibility features work as expected.</p>
+      </details>
+      <details>
+        <summary>Who is using this in production?</summary>
+        <p>async-dom is in active development. We welcome early adopters building dashboards, internal tools, protected content applications, and interactive demos. If you ship with async-dom, we'd love to hear about it.</p>
+      </details>
+      <details>
+        <summary>What is the input latency overhead?</summary>
+        <p>Event round-trips (main thread → worker → main thread) add 2-20ms of latency compared to same-thread handlers, depending on mutation complexity and postMessage serialization. For most interactive UIs this is imperceptible. For sub-millisecond interactions (e.g., drag-and-drop, canvas drawing), consider keeping that logic on the main thread.</p>
+      </details>
     </div>
   </div>
 </section>
@@ -1296,7 +1308,7 @@ document.body.<span class="fn">appendChild</span>(div);</pre></div>
       </button>
     </div>
     <p class="section-subtitle" style="margin: 0 auto 24px; text-align: center;">
-      MIT licensed. TypeScript strict. 634 tests. React, Vue, Svelte adapters. Vite plugin. Chrome DevTools extension.
+      MIT licensed. TypeScript strict. 1,289 tests. React, Vue, Svelte adapters. Vite plugin. Chrome DevTools extension.
     </p>
     <div class="hero-actions" style="margin-top: 24px;">
       <a href="https://github.com/lifeart/async-dom" class="btn btn-primary">

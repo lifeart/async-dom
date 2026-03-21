@@ -7,7 +7,7 @@
 
 **Your application runs in a Web Worker. The DOM is just a projection.**
 
-async-dom moves your entire UI framework — React, Vue, Svelte, or vanilla JS — into a Web Worker. The main thread receives only serialized mutation instructions through a message-passing channel and applies them with a frame-budgeted scheduler at 60 fps.
+async-dom moves your entire UI framework — React, Vue, Svelte, or vanilla JS — into a Web Worker. The main thread receives only serialized mutation instructions through a message-passing channel and applies them with a frame-budgeted scheduler targeting 60 fps.
 
 This architecture doesn't just improve performance. It fundamentally changes what is accessible to scrapers, bots, browser extensions, and anyone inspecting your page.
 
@@ -39,20 +39,20 @@ Traditional web apps expose everything: business logic in bundled JS, data struc
 
 | Use Case | How async-dom helps |
 | -------- | ------------------- |
-| **AI scraping prevention** | Content never exists in initial HTML. `curl` and simple scrapers get an empty shell. Headless browsers see only rendered pixels, not structured data. |
-| **Copyright & DRM** | Business logic and data stay in the worker. The DOM is a procedural artifact — not a template that maps 1:1 to source content. Per-session watermarking at the render layer makes leaked content traceable. |
+| **AI scraping prevention** | Content never exists in initial HTML. `curl` and simple scrapers get an empty shell. Headless browsers must wait for worker initialization and mutation application, raising the cost and complexity of automated extraction. |
+| **Copyright & DRM** | Business logic and data stay in the worker. The DOM is a procedural artifact — not a template that maps 1:1 to source content. The architecture enables per-session content variation and server-controlled rendering for content protection scenarios. |
 | **NDA UI demos** | Share interactive prototypes where the client cannot copy JS logic — it runs server-side via WebSocket transport or inside an opaque worker. |
-| **Exam & education anti-cheat** | Students interact with the UI but cannot access APIs, source code, or application state — the logic runs outside their reach. |
-| **Dynamic obfuscation** | Class names, element IDs, and DOM structure can change on every page load, breaking CSS-selector-based scrapers without affecting the user experience. |
+| **Exam & education anti-cheat** | Application state and logic run in a worker or on a server via WebSocket, making them inaccessible from browser DevTools or in-page scripts. This supplements (but does not replace) purpose-built proctoring solutions. |
+| **Dynamic obfuscation** | The architecture supports per-session variation of non-semantic identifiers (class names, element IDs), increasing maintenance cost for selector-based scrapers. This is an advanced pattern with tradeoffs for CSS tooling and testing. |
 
 ### Performance & Architecture
 
 | Use Case | How async-dom helps |
 | -------- | ------------------- |
-| **Main thread liberation** | Your entire framework (React, Vue, Svelte) runs off the main thread. No framework runtime competes with user input or browser rendering. |
+| **Main thread liberation** | Your entire framework (React, Vue, Svelte) runs off the main thread. Framework runtime does not compete with user input or browser rendering on the main thread. Event round-trips add latency compared to same-thread handlers. |
 | **Heavy computation** | Sorting, filtering, data processing, fractal rendering — all happen in the worker without dropping frames. |
 | **Multi-core utilization** | Modern devices have 4-8+ cores. Traditional web apps use one. async-dom lets you use the rest. |
-| **SmartTV & low-power devices** | Run computation on a backend, stream DOM updates via WebSocket to constrained hardware for smooth 60fps UI. |
+| **SmartTV & low-power devices** | Run computation on a backend, stream DOM updates via WebSocket to devices with modern browser support. Frame rate depends on network latency and jitter. |
 | **IoT streaming** | Execute the app on a server, stream rendered output to any connected device — TVs, kiosks, embedded displays. |
 
 ### Multi-Framework & Isolation
@@ -68,9 +68,9 @@ Traditional web apps expose everything: business logic in bundled JS, data struc
 
 | Use Case | How async-dom helps |
 | -------- | ------------------- |
-| **Parallel editing** | Capture events from multiple users via WebSocket and apply them to a single app instance — real-time collaborative UI. |
+| **Parallel editing** | Broadcast a single app instance to multiple viewers via WebSocket. Event forwarding from clients is supported but does not include conflict resolution (events are processed in arrival order). |
 | **Marketing & UX analytics** | WebSocket transport broadcasts UI state to multiple observers. Watch exactly what users experience, live. |
-| **Time-travel debugging** | Record and replay DOM mutation sequences. Scrub through rendering history. Compare tree snapshots. |
+| **Time-travel debugging** | Record DOM mutation sequences for debugging and analysis. Replay and snapshot comparison are planned features. |
 | **Rendering regression tests** | If mutation batches are identical, the UI is identical. Deterministic rendering without pixel comparison. |
 
 ---
@@ -122,7 +122,7 @@ That's it. Your app now runs entirely in a worker.
 
 ## Framework Adapters
 
-async-dom ships first-class adapters for React, Vue, and Svelte.
+async-dom ships adapters for React, Vue, and Svelte. Your framework code runs in the worker with async-dom's virtual DOM API.
 
 ### React
 
@@ -362,7 +362,7 @@ Worker Thread                  Main Thread
 
 1. **Worker** — Your framework runs here. Virtual `document` and `window` provide the full DOM API. Mutations are batched and coalesced automatically.
 2. **Transport** — Mutations are serialized (structured clone, binary codec, or WebSocket) and sent to the main thread.
-3. **Scheduler** — The main thread applies mutations within a per-frame budget. Priority sorting, viewport culling, and adaptive batch sizing keep paint at 60 fps.
+3. **Scheduler** — The main thread applies mutations within a per-frame budget. Priority sorting, viewport culling, and adaptive batch sizing targets 60 fps.
 4. **Events** — User interactions on the main thread are serialized and dispatched to worker event handlers.
 5. **Sync Reads** — `getBoundingClientRect()`, `offsetWidth`, `getComputedStyle()` block in the worker via `SharedArrayBuffer` + `Atomics` and return real values from the main thread.
 
@@ -376,7 +376,7 @@ async-dom provides multiple layers of protection:
 
 - **No direct DOM access** — XSS payloads in the page cannot reach worker internal state.
 - **Serialized communication only** — all data passes through `postMessage`, a natural sanitization boundary.
-- **Separate execution context** — workers are isolated at the browser engine level. No `shadowRoot` workaround, no extension bypass.
+- **Separate execution context** — workers are isolated at the browser engine level. Main-thread scripts cannot access worker internal state. Note: browser extensions with appropriate permissions can still read the rendered DOM.
 - **Token protection** — auth tokens and session state in the worker are inaccessible to malicious main-thread scripts.
 
 ### Content Sanitization (Active)
@@ -387,13 +387,13 @@ async-dom provides multiple layers of protection:
 
 ### Anti-Scraping (Structural)
 
-Unlike `robots.txt` (voluntary), CDN-level blocks (circumventable), or CAPTCHAs (UX-degrading), worker-based rendering is a **structural defense**:
+Unlike `robots.txt` (voluntary), CDN-level blocks (circumventable), or CAPTCHAs (UX-degrading), worker-based rendering is an **architectural property** that raises the cost of content extraction:
 
 - Empty HTML payload — no content for `curl`, `wget`, or simple GET requests.
 - Procedural DOM — the rendered tree is an artifact of the mutation protocol, not a semantic template.
-- Dynamic structure — class names, nesting, and attributes can randomize per session.
-- Honeypot injection — the worker can insert invisible trap elements that bots follow but humans never see.
-- Behavioral gating — the worker controls what renders and when, enabling real-time bot detection at the application layer.
+- Dynamic structure — the architecture supports per-session variation of class names and DOM structure, raising the maintenance burden for selector-based scrapers.
+- Honeypot injection — the worker can be programmed to insert invisible trap elements that automated tools follow but humans never see.
+- Behavioral gating — the worker controls what renders and when, enabling application-level bot detection logic.
 
 ---
 
@@ -481,10 +481,10 @@ Add `?debug` to the URL or set `debug: { exposeDevtools: true }`:
 | Tab | What it shows |
 | --- | ------------- |
 | **Tree** | Virtual DOM tree with node inspector — attributes, styles, event listeners, mutation history, "why updated?" trail. Snapshot & diff. |
-| **Performance** | Frame budget flamechart, worker-to-main latency (P50/P95/P99), dropped frames, mutation type chart, coalescing breakdown, sync read heatmap, worker CPU profiler. |
-| **Log** | Live mutation stream, color-coded diffs, event round-trip tracer, time-travel replay with scrubber. |
+| **Performance** | Frame budget flamechart, worker-to-main latency (P50/P95/P99), dropped frames, mutation type chart, coalescing breakdown, sync read heatmap. |
+| **Log** | Live mutation stream, color-coded diffs, event round-trip tracer. |
 | **Warnings** | Grouped by code with docs and fixes. Suppressible. |
-| **Graph** | Causality DAG: events --> mutation batches --> affected DOM nodes. |
+| **Graph** | Causality DAG (planned): events → mutation batches → affected DOM nodes. |
 
 Console API available via `__ASYNC_DOM_DEVTOOLS__` for programmatic inspection.
 
@@ -515,11 +515,11 @@ npm run dev    # run all examples locally
 
 ## Comparison
 
-| Feature | async-dom | [Partytown](https://partytown.builder.io/) | [@ampproject/worker-dom](https://github.com/nicejob/nicejob) |
+| Feature | async-dom | [Partytown](https://partytown.builder.io/) | @ampproject/worker-dom |
 | ------- | --------- | ------------------------------------------- | ------------------------------------------------------------ |
 | Scope | Full app rendering | Third-party scripts only | AMP components only |
 | Frameworks | React, Vue, Svelte, vanilla | N/A | AMP only |
-| DOM API | Comprehensive | Proxy forwarding | Subset |
+| DOM API coverage | Broad (see compatibility table) | Proxy forwarding | Subset |
 | Sync reads | SharedArrayBuffer | Service Worker + Atomics | No |
 | Frame budgeting | Adaptive with priority | No | No |
 | Binary protocol | 22 opcodes + string dedup | No | Transfer list |
@@ -527,7 +527,7 @@ npm run dev    # run all examples locally
 | WebSocket transport | Yes (remote rendering) | No | No |
 | Content protection | Structural (worker isolation) | No | No |
 | DevTools | Built-in 5-tab panel | No | No |
-| Bundle (gzip) | ~11 KB + ~10 KB | ~12 KB | ~12 KB |
+| Bundle (gzip) | ~21 KB (core, gzip) | ~12 KB | ~12 KB |
 | Status | Active | Maintenance | Inactive |
 
 ---
@@ -590,7 +590,7 @@ Templates: `vanilla-ts`, `react-ts`, `vue-ts`
 npm install          # install dependencies
 npm run dev          # dev server with examples
 npm run build        # build ESM + CJS + declarations
-npm test             # 634 tests across 46 files
+npm test             # 1,289 tests across 65 files
 npm run typecheck    # type-check
 npm run lint         # lint (Biome)
 ```
