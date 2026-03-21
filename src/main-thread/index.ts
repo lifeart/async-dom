@@ -163,9 +163,13 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		appRenderer: DomRenderer,
 		query: { queryType: QueryType; data: string },
 	): unknown {
+		const startTime = performance.now();
+		let resultStatus: "success" | "timeout" | "error" = "success";
+		let parsedNodeId: string = "";
 		try {
 			const parsed = JSON.parse(query.data);
 			const nodeId = parsed.nodeId;
+			parsedNodeId = String(nodeId ?? "");
 			const property = parsed.property;
 
 			switch (query.queryType) {
@@ -301,7 +305,20 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 					return null;
 			}
 		} catch {
+			resultStatus = "error";
 			return null;
+		} finally {
+			debugStats.syncReadRequests++;
+			if (debugHooks.onSyncRead) {
+				const latencyMs = performance.now() - startTime;
+				debugHooks.onSyncRead({
+					queryType: query.queryType,
+					nodeId: parsedNodeId,
+					latencyMs,
+					result: resultStatus,
+					timestamp: performance.now(),
+				});
+			}
 		}
 	}
 
@@ -420,6 +437,33 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			debugData.set(appId, data);
 		}
 	});
+
+	// Wire mutation/warning/event/syncRead capture for the devtools panel
+	// BEFORE adding the first app, so that addAppInternal sees non-null hooks
+	if (config.debug?.exposeDevtools) {
+		const origOnMutation = debugHooks.onMutation;
+		const origOnWarning = debugHooks.onWarning;
+		const origOnEvent = debugHooks.onEvent;
+		const origOnSyncRead = debugHooks.onSyncRead;
+		debugHooks.onMutation = (entry) => {
+			origOnMutation?.(entry);
+			captureMutation(entry);
+			// Feature 19: index mutation for "Why Updated?" lookups
+			mutationCorrelation.indexMutation(entry);
+		};
+		debugHooks.onWarning = (entry) => {
+			origOnWarning?.(entry);
+			captureWarning(entry);
+		};
+		debugHooks.onEvent = (entry) => {
+			origOnEvent?.(entry);
+			captureEvent(entry);
+		};
+		debugHooks.onSyncRead = (entry) => {
+			origOnSyncRead?.(entry);
+			captureSyncRead(entry);
+		};
+	}
 
 	// If a worker was provided in config, add it as the first app
 	if (config.worker) {
@@ -789,32 +833,6 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 		if (typeof document !== "undefined") {
 			devtoolsPanelHandle = createDevtoolsPanel();
 		}
-	}
-
-	// Wire mutation/warning/event/syncRead capture for the devtools panel
-	if (config.debug?.exposeDevtools) {
-		const origOnMutation = debugHooks.onMutation;
-		const origOnWarning = debugHooks.onWarning;
-		const origOnEvent = debugHooks.onEvent;
-		const origOnSyncRead = debugHooks.onSyncRead;
-		debugHooks.onMutation = (entry) => {
-			origOnMutation?.(entry);
-			captureMutation(entry);
-			// Feature 19: index mutation for "Why Updated?" lookups
-			mutationCorrelation.indexMutation(entry);
-		};
-		debugHooks.onWarning = (entry) => {
-			origOnWarning?.(entry);
-			captureWarning(entry);
-		};
-		debugHooks.onEvent = (entry) => {
-			origOnEvent?.(entry);
-			captureEvent(entry);
-		};
-		debugHooks.onSyncRead = (entry) => {
-			origOnSyncRead?.(entry);
-			captureSyncRead(entry);
-		};
 	}
 
 	console.debug("[async-dom] Initialized", {
