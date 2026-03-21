@@ -331,7 +331,7 @@ link.setAttribute("href", "/styles/main.css");
 document.head.appendChild(link);
 ```
 
-Note: external stylesheets must be served with appropriate CORS headers if COEP is enabled (see section 10).
+Note: external stylesheets must be served with appropriate CORS headers if COEP is enabled (see section 11).
 
 ### Tailwind CSS
 
@@ -454,6 +454,70 @@ The `postMessage` round-trip for events typically takes 1-3ms. This is fast enou
 
 By default, passive events (`scroll`, `touchstart`, `touchmove`, `wheel`) are registered with `{ passive: true }`. If you need `preventDefault` on these events, configure it on the main thread via the `configureEvent` API. For click events on `<a>` elements, `preventDefault` is called automatically to prevent navigation.
 
+### File Inputs and Drag-and-Drop
+
+`File` objects cannot be serialized via `postMessage` structured clone, and the `DataTransfer` API is main-thread only. This means file inputs and drag-and-drop require main-thread handling with manual data forwarding to the worker.
+
+**File inputs:** Handle the `change` event on the main thread, read the file contents, and send the data to the worker via a custom message:
+
+```typescript
+// main.ts — after creating the worker
+worker.addEventListener("message", (e) => {
+  // ... normal async-dom message handling
+});
+
+// Listen for file input changes on the real DOM
+document.addEventListener("change", (e) => {
+  const input = e.target as HTMLInputElement;
+  if (input.type === "file" && input.files?.length) {
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      worker.postMessage({
+        type: "file-data",
+        name: file.name,
+        size: file.size,
+        mimeType: file.type,
+        data: reader.result, // ArrayBuffer
+      }, [reader.result as ArrayBuffer]); // Transfer, not copy
+    };
+    reader.readAsArrayBuffer(file);
+  }
+});
+```
+
+```typescript
+// worker.ts — receive the file data
+self.addEventListener("message", (e) => {
+  if (e.data?.type === "file-data") {
+    const { name, size, data } = e.data;
+    statusEl.textContent = `Received ${name} (${size} bytes)`;
+    // Process the ArrayBuffer as needed
+  }
+});
+```
+
+**Drag and drop:** Handle `dragover` and `drop` on the main thread, extract the relevant data, and forward it to the worker:
+
+```typescript
+// main.ts
+const target = document.getElementById("app")!;
+target.addEventListener("dragover", (e) => e.preventDefault());
+target.addEventListener("drop", (e) => {
+  e.preventDefault();
+  const files = e.dataTransfer?.files;
+  if (files?.length) {
+    // Read and forward each file as shown above
+  }
+  const text = e.dataTransfer?.getData("text/plain");
+  if (text) {
+    worker.postMessage({ type: "drop-text", text });
+  }
+});
+```
+
+The worker creates the file input element via the virtual DOM as usual. The main thread intercepts the actual file selection or drop, reads the data, and sends it through a custom message channel.
+
 ---
 
 ## 7. Data Fetching
@@ -505,7 +569,76 @@ This applies to images, fonts, scripts, and API endpoints. If a third-party API 
 
 ---
 
-## 8. Debugging
+## 8. State Management Patterns
+
+Worker state is plain JavaScript -- variables, objects, `Map`s, arrays. There are no special state primitives or stores. Framework-specific state libraries (Redux, Zustand, Jotai, Pinia) run on the main thread and cannot be imported in the worker.
+
+### Worker-Side State
+
+The simplest pattern: keep state in the worker and render directly to the virtual DOM.
+
+```typescript
+// worker.ts
+const { document } = createWorkerDom();
+
+// State is just variables
+let count = 0;
+const todos = new Map<number, { text: string; done: boolean }>();
+
+function render() {
+  countEl.textContent = `Count: ${count}`;
+  // Re-render todo list, update classList, etc.
+}
+
+button.addEventListener("click", () => {
+  count++;
+  render();
+});
+```
+
+This works well for self-contained worker apps. The worker owns both state and rendering.
+
+### Main-Thread State to Worker
+
+When the main thread owns state (e.g., from a React/Vue parent component), send updates to the worker via `postMessage`:
+
+```typescript
+// main.ts
+const worker = new Worker(new URL("./app.worker.ts", import.meta.url), {
+  type: "module",
+});
+
+// Send state changes to the worker
+function updateWorkerState(state: { user: string; theme: string }) {
+  worker.postMessage({ type: "state-update", payload: state });
+}
+```
+
+```typescript
+// worker.ts
+let currentUser = "";
+let currentTheme = "light";
+
+self.addEventListener("message", (e) => {
+  if (e.data?.type === "state-update") {
+    const { user, theme } = e.data.payload;
+    currentUser = user;
+    currentTheme = theme;
+    render();
+  }
+});
+```
+
+### Guidelines
+
+- **Keep state close to where it is used.** If only the worker reads and writes it, keep it in the worker.
+- **Avoid mirroring state.** Do not keep the same state in both the main thread and the worker -- pick one owner.
+- **Serialize conservatively.** `postMessage` uses structured clone. Send only the data the worker needs, not entire application state trees.
+- **Use Transferable objects for large data.** `ArrayBuffer`, `OffscreenCanvas`, and `MessagePort` can be transferred (zero-copy) instead of cloned.
+
+---
+
+## 9. Debugging
 
 ### Chrome DevTools
 
@@ -576,7 +709,7 @@ __ASYNC_DOM_DEVTOOLS__.findNode("my-id")  // Find a virtual node by ID
 
 ---
 
-## 9. Testing
+## 10. Testing
 
 ### Unit Testing: VirtualDocument Directly
 
@@ -652,7 +785,23 @@ expect(node?.textContent).toBe("hello");
 
 ### E2E Testing: Playwright
 
-For end-to-end tests, use Playwright and wait for worker-rendered DOM elements:
+For end-to-end tests, use Playwright and wait for worker-rendered DOM elements. Workers introduce async initialization -- the worker must start, build the virtual DOM, and send mutations before elements appear in the real DOM. Always use `waitForSelector` before interacting with worker-rendered content.
+
+```typescript
+// tests/e2e/counter.spec.ts
+import { test, expect } from '@playwright/test';
+
+test('counter increments on click', async ({ page }) => {
+  await page.goto('/counter/');
+  // Wait for worker to initialize
+  await page.waitForSelector('button');
+
+  await page.click('button:has-text("+")');
+  await expect(page.locator('.count')).toHaveText('1');
+});
+```
+
+A simpler variant when the page has a single button:
 
 ```typescript
 import { test, expect } from "@playwright/test";
@@ -669,11 +818,11 @@ test("counter increments on click", async ({ page }) => {
 });
 ```
 
-Worker-rendered DOM is real DOM once applied, so standard Playwright selectors work. The only consideration is that initial render requires the worker to start, create mutations, and have them applied -- so use `waitForSelector` rather than assuming elements exist immediately.
+Worker-rendered DOM is real DOM once applied, so standard Playwright selectors work. The key difference from testing a traditional SPA is the async initialization: without `waitForSelector`, tests may run before the worker has finished rendering, causing flaky failures.
 
 ---
 
-## 10. Deployment
+## 11. Deployment
 
 ### Required Headers
 
@@ -760,7 +909,7 @@ The Vite plugin configures `worker: { format: "es" }` so worker scripts are bund
 
 ---
 
-## 11. When NOT to Use async-dom
+## 12. When NOT to Use async-dom
 
 async-dom adds architectural complexity. It is not the right tool for every project.
 
