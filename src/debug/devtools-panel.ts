@@ -63,6 +63,8 @@ interface DevtoolsAPI {
 		};
 		frameLog: () => FrameLogEntry[];
 		flush: () => void;
+		stop: () => void;
+		start: () => void;
 	};
 	debugStats: () => Record<string, number>;
 	getEventTraces: () => EventTraceEntry[];
@@ -87,6 +89,7 @@ interface DevtoolsAPI {
 	clearAndReapply: (
 		mutations: Array<{ mutation: import("../core/protocol.ts").DomMutation; batchUid?: number }>,
 		upToIndex: number,
+		appId?: string,
 	) => void;
 	/** Feature 15: Causality graph tracker */
 	getCausalityTracker: () => CausalityTracker;
@@ -127,9 +130,10 @@ const syncReadLog: SyncReadLogEntry[] = [];
 let warningBadgeCount = 0;
 let onWarningBadgeUpdate: (() => void) | null = null;
 let logPaused = false;
+let isReplaying = false;
 
 export function captureMutation(entry: MutationLogEntry): void {
-	if (logPaused) return;
+	if (logPaused || isReplaying) return;
 	mutationLog.push(entry);
 	if (mutationLog.length > MAX_LOG_ENTRIES) mutationLog.shift();
 }
@@ -147,6 +151,11 @@ export function captureSyncRead(entry: SyncReadLogEntry): void {
 }
 
 export function captureWarning(entry: WarningLogEntry): void {
+	if (logPaused) {
+		warningBadgeCount++;
+		onWarningBadgeUpdate?.();
+		return;
+	}
 	warningLog.push(entry);
 	if (warningLog.length > MAX_WARNING_ENTRIES) warningLog.shift();
 	warningBadgeCount++;
@@ -1502,6 +1511,9 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 	// Feature 3: Latency history tracking
 	const latencyHistory: number[] = [];
+	// Guards to prevent duplicate sparkline data on manual refresh
+	let lastQueuePushFrameId = -1;
+	let lastLatencyPushFrameId = -1;
 	const MAX_LATENCY_HISTORY = 60;
 
 	// Replay state (Feature 8)
@@ -1532,6 +1544,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 	function enterReplayMode(): void {
 		if (importedSession) return; // no replay in imported mode
+		const dt = getDevtools();
+		// Pause the scheduler so live mutations don't interfere with replay
+		dt?.scheduler.stop();
+		isReplaying = true;
 		replayState = createReplayState(mutationLog);
 		replayBar.style.display = "flex";
 		logReplayBtn.classList.add("active");
@@ -1544,10 +1560,19 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			clearInterval(replayTimer);
 			replayTimer = null;
 		}
+		const dt = getDevtools();
 		if (replayState) {
 			replayState.isPlaying = false;
+			// Restore DOM to latest state by re-applying the full mutation log
+			const appId = selectedAppId ?? dt?.apps()[0];
+			if (dt?.clearAndReapply && appId) {
+				dt.clearAndReapply(mutationLog, mutationLog.length, appId);
+			}
 			replayState = null;
 		}
+		isReplaying = false;
+		// Resume the scheduler so live mutations flow again
+		dt?.scheduler.start();
 		replayBar.style.display = "none";
 		logReplayBtn.classList.remove("active");
 		renderLogTab();
@@ -1556,7 +1581,7 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	function applyReplayMutation(entry: MutationLogEntry): void {
 		const dt = getDevtools();
 		if (!dt?.replayMutation) return;
-		const appId = dt.apps()[0];
+		const appId = selectedAppId ?? dt.apps()[0];
 		if (appId) dt.replayMutation(entry.mutation, appId);
 	}
 
@@ -1564,7 +1589,8 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		if (!replayState) return;
 		const dt = getDevtools();
 		if (!dt?.clearAndReapply) return;
-		dt.clearAndReapply(replayState.entries, index);
+		const appId = selectedAppId ?? dt.apps()[0];
+		dt.clearAndReapply(replayState.entries, index, appId);
 	}
 
 	function replayStepForwardOne(): void {
@@ -1745,6 +1771,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 	function enterImportMode(session: DebugSession): void {
 		importedSession = session;
+		// Pause live capture so incoming mutations don't overwrite the ring buffer
+		logPaused = true;
+		logPauseBtn.textContent = "Resume";
+		logPauseBtn.classList.add("active");
 		// Exit replay if active
 		if (replayState) exitReplayMode();
 
@@ -1775,6 +1805,11 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		importedSession = null;
 		importIndicator.style.display = "none";
 		importIndicator.textContent = "";
+
+		// Resume live capture
+		logPaused = false;
+		logPauseBtn.textContent = "Pause";
+		logPauseBtn.classList.remove("active");
 
 		// Re-enable controls
 		setImportControlsDisabled(false);
@@ -1817,6 +1852,15 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	function collapse(): void {
 		panel.classList.add("collapsed");
 		stopPolling();
+		// Stop replay playback to prevent invisible DOM mutations while collapsed
+		if (replayTimer) {
+			clearInterval(replayTimer);
+			replayTimer = null;
+		}
+		if (replayState?.isPlaying) {
+			replayState.isPlaying = false;
+			updateReplayUI();
+		}
 	}
 
 	toggleTab.addEventListener("click", expand);
@@ -1851,6 +1895,9 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		// Log tab: reset coalesced view and log render position
 		showCoalesced = false;
 		lastRenderedLogLength = 0;
+		lastRenderedFilterText = "";
+		lastRenderedEventLogLength = 0;
+		lastRenderedSyncReadLogLength = 0;
 
 		// Replay: exit replay mode if active
 		if (replayState) {
@@ -1879,7 +1926,11 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		appBar.appendChild(label);
 
 		if (selectedAppId === null || !apps.includes(selectedAppId)) {
+			const previousAppId = selectedAppId;
 			selectedAppId = apps[0];
+			if (previousAppId !== null && previousAppId !== selectedAppId) {
+				resetPerAppState();
+			}
 		}
 
 		for (const id of apps) {
@@ -2612,9 +2663,12 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 		const stats = dt.scheduler.stats();
 		const pending = stats.pending;
 
-		// Track queue depth history
-		queueHistory.push(pending);
-		if (queueHistory.length > MAX_HISTORY) queueHistory.shift();
+		// Track queue depth history (guard against duplicate pushes on manual refresh)
+		if (stats.frameId !== lastQueuePushFrameId) {
+			queueHistory.push(pending);
+			if (queueHistory.length > MAX_HISTORY) queueHistory.shift();
+			lastQueuePushFrameId = stats.frameId;
+		}
 
 		let html = "";
 
@@ -2643,9 +2697,10 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 
 		// Worker-to-main cross-thread latency (real, from Date.now() diff)
 		const workerLatencyMs = stats.workerToMainLatencyMs;
-		if (workerLatencyMs > 0) {
+		if (workerLatencyMs > 0 && stats.frameId !== lastLatencyPushFrameId) {
 			latencyHistory.push(workerLatencyMs);
 			if (latencyHistory.length > MAX_LATENCY_HISTORY) latencyHistory.shift();
+			lastLatencyPushFrameId = stats.frameId;
 		}
 		const workerLatencyClass = latencyColorClass(workerLatencyMs);
 		html += `<div class="perf-row"><span class="perf-label">Worker\u2192Main</span><span class="perf-value ${workerLatencyClass}">${workerLatencyMs > 0 ? `${workerLatencyMs.toFixed(1)}ms` : "N/A"}</span></div>`;
@@ -3089,6 +3144,9 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	// ---- Log rendering ----
 
 	let lastRenderedLogLength = 0;
+	let lastRenderedFilterText = "";
+	let lastRenderedEventLogLength = 0;
+	let lastRenderedSyncReadLogLength = 0;
 	let showCoalesced = false;
 
 	logPauseBtn.addEventListener("click", () => {
@@ -3177,11 +3235,27 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 					: "No mutations captured yet.";
 				logList.innerHTML = `<div class="log-empty">${msg}</div>`;
 				lastRenderedLogLength = 0;
+				lastRenderedFilterText = "";
+				lastRenderedEventLogLength = 0;
+				lastRenderedSyncReadLogLength = 0;
 			}
 			return;
 		}
 
 		const filterText = logFilter.value.toLowerCase().trim();
+
+		// Skip full rebuild if nothing has changed since last render
+		const needsFullRebuild =
+			replayState !== null ||
+			filterText !== lastRenderedFilterText ||
+			displayMutations.length !== lastRenderedLogLength ||
+			activeEventLog.length !== lastRenderedEventLogLength ||
+			activeSyncReadLog.length !== lastRenderedSyncReadLogLength;
+
+		if (!needsFullRebuild) {
+			return;
+		}
+
 		const fragment = document.createDocumentFragment();
 
 		// Group mutations by batchUid
@@ -3526,6 +3600,9 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 			logList.scrollTop = logList.scrollHeight;
 		}
 		lastRenderedLogLength = displayMutations.length;
+		lastRenderedFilterText = filterText;
+		lastRenderedEventLogLength = activeEventLog.length;
+		lastRenderedSyncReadLogLength = activeSyncReadLog.length;
 	}
 
 	logFilter.addEventListener("input", renderLogTab);
@@ -3533,6 +3610,9 @@ export function createDevtoolsPanel(): { destroy: () => void } {
 	logClearBtn.addEventListener("click", () => {
 		mutationLog.length = 0;
 		lastRenderedLogLength = 0;
+		lastRenderedFilterText = "";
+		lastRenderedEventLogLength = 0;
+		lastRenderedSyncReadLogLength = 0;
 		logList.innerHTML = '<div class="log-empty">No mutations captured yet.</div>';
 		logCountSpan.textContent = "0";
 	});

@@ -3,6 +3,7 @@ import { WarningCode } from "../core/debug.ts";
 import { sanitizeHTML } from "../core/html-sanitizer.ts";
 import { NodeCache } from "../core/node-cache.ts";
 import type { DomMutation, InsertPosition, NodeId } from "../core/protocol.ts";
+import { BODY_NODE_ID, HEAD_NODE_ID, HTML_NODE_ID, DOCUMENT_NODE_ID } from "../core/protocol.ts";
 
 const DANGEROUS_ATTR_NAMES = new Set(["srcdoc", "formaction"]);
 const DANGEROUS_URI_ATTR_NAMES = new Set(["href", "src", "data", "action", "xlink:href"]);
@@ -303,6 +304,20 @@ export class DomRenderer {
 
 	clear(): void {
 		this.nodeCache.clear();
+	}
+
+	/**
+	 * Clear the node cache but preserve structural nodes (BODY, HEAD, HTML, DOCUMENT).
+	 * Used during replay to allow re-creation of dynamic nodes while keeping the
+	 * root structure intact.
+	 */
+	clearNodeCache(): void {
+		this.nodeCache.clear();
+		// Re-seed structural nodes so replay createNode mutations work correctly
+		this.nodeCache.set(BODY_NODE_ID, this.root.body as unknown as Node);
+		this.nodeCache.set(HEAD_NODE_ID, this.root.head as unknown as Node);
+		this.nodeCache.set(HTML_NODE_ID, this.root.html);
+		this.nodeCache.set(DOCUMENT_NODE_ID, document as unknown as Node);
 	}
 
 	getRoot(): RendererRoot {

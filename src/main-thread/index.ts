@@ -707,6 +707,8 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 				stats: () => scheduler.getStats(),
 				frameLog: () => scheduler.getFrameLog(),
 				flush: () => scheduler.flush(),
+				stop: () => scheduler.stop(),
+				start: () => scheduler.start(),
 			},
 			getEventTraces: () => {
 				const traces: Array<{
@@ -800,19 +802,30 @@ export function createAsyncDom(config: AsyncDomConfig): AsyncDomInstance {
 			clearAndReapply: (
 				mutations: Array<{ mutation: DomMutation; batchUid?: number }>,
 				upToIndex: number,
+				appId?: string,
 			) => {
-				// Apply to first renderer
-				for (const renderer of renderers.values()) {
+				// Route to the correct renderer by appId, or fall back to first
+				let renderer: DomRenderer | undefined;
+				if (appId) {
+					renderer = renderers.get(appId as AppId);
+				}
+				if (!renderer) {
+					for (const r of renderers.values()) {
+						renderer = r;
+						break;
+					}
+				}
+				if (renderer) {
 					const root = renderer.getRoot();
 					if (root) {
 						root.body.textContent = "";
 						root.head.textContent = "";
 					}
+					renderer.clearNodeCache();
 					const end = Math.min(upToIndex, mutations.length);
 					for (let i = 0; i < end; i++) {
 						renderer.apply(mutations[i].mutation, mutations[i].batchUid);
 					}
-					break;
 				}
 			},
 			// Feature 15: Causality graph
