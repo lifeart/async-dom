@@ -1,7 +1,9 @@
 import type { MutationMessage } from "../core/protocol.ts";
 
+/** Configuration for the mutation replay log. */
 export interface MutationLogConfig {
-	maxEntries?: number; // default 10_000
+	/** Maximum number of mutation messages to retain for replay to new clients. Default: `10_000`. */
+	maxEntries?: number;
 }
 
 /**

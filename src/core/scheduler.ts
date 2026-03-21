@@ -7,31 +7,44 @@ import {
 } from "./constants.ts";
 import type { AppId, DomMutation, Priority } from "./protocol.ts";
 
+/** Configuration for the FrameScheduler. All fields are optional with sensible defaults. */
 export interface SchedulerConfig {
+	/** Maximum milliseconds to spend processing mutations per frame (default: 16ms for 60fps). */
 	frameBudgetMs?: number;
+	/** Whether to skip off-screen style mutations (default: true). */
 	enableViewportCulling?: boolean;
+	/** Whether to drop optional mutations under frame pressure (default: true). */
 	enablePrioritySkipping?: boolean;
 }
 
+/** Diagnostic record for a single frame, used by devtools flamechart visualization. */
 export interface FrameLogEntry {
+	/** Monotonically increasing frame counter. */
 	frameId: number;
+	/** Wall-clock time spent in this frame's tick(), in milliseconds. */
 	totalMs: number;
+	/** Number of mutations applied during this frame. */
 	actionCount: number;
+	/** Cumulative time per mutation action type (e.g., "setAttribute" -> 1.2ms). */
 	timingBreakdown: Map<string, number>;
-	/** Feature 18: per-app mutation counts and deferred counts per frame */
+	/** Per-app mutation counts and deferred counts per frame (multi-app mode). */
 	perApp?: Map<string, { mutations: number; deferred: number }>;
 }
 
 const MAX_FRAME_LOG = 30;
 
+/** Internal wrapper that tags each mutation with scheduling metadata. */
 interface PrioritizedMutation {
 	mutation: DomMutation;
 	priority: Priority;
+	/** Monotonic insertion order, used as a tiebreaker in priority sorting. */
 	uid: number;
 	appId: AppId;
+	/** UID of the MutationMessage batch this mutation came from. */
 	batchUid?: number;
 }
 
+/** Callback that applies a single mutation to the real DOM (typically DomRenderer.apply). */
 export type MutationApplier = (mutation: DomMutation, appId: AppId, batchUid?: number) => void;
 
 /**
@@ -45,24 +58,27 @@ export type MutationApplier = (mutation: DomMutation, appId: AppId, batchUid?: n
  * - Graceful degradation: skip optional mutations under pressure
  */
 export class FrameScheduler {
+	/** Priority-sorted queue of pending mutations awaiting application. */
 	private queue: PrioritizedMutation[] = [];
+	/** Most recent execution time per action type, used for adaptive batch sizing. */
 	private actionTimes = new Map<string, number>();
 	private frameId = 0;
 	private running = false;
 	private rafId = 0;
 	private uidCounter = 0;
 
-	// Performance tracking
 	private timePerLastFrame = 0;
 	private totalActionsLastFrame = 0;
+	/** True while the user is scrolling; triggers skipping of optional mutations. */
 	private isScrolling = false;
 	private scrollTimer: ReturnType<typeof setTimeout> | null = null;
 	private scrollAbort: AbortController | null = null;
 
-	// Viewport culling
 	private viewportHeight = 0;
 	private viewportWidth = 0;
+	/** Cache of element-id -> in-viewport results to avoid repeated getBoundingClientRect. */
 	private boundingRectCache = new Map<string, boolean>();
+	/** Frame number when each viewport cache entry was last computed. */
 	private boundingRectCacheFrame = new Map<string, number>();
 
 	private readonly frameBudgetMs: number;
@@ -71,25 +87,23 @@ export class FrameScheduler {
 
 	private applier: MutationApplier | null = null;
 
-	// Per-app fairness tracking
+	/** Number of active apps; enables per-app fairness budget splitting when > 1. */
 	private appCount = 0;
+	/** Per-app mutation count within the current frame, reset each tick. */
 	private appBudgets = new Map<AppId, number>();
 
-	// Health monitoring
 	private lastTickTime = 0;
 	private healthCheckTimer: ReturnType<typeof setTimeout> | null = null;
 	private queueOverflowWarned = false;
 
-	// Latency tracking: time from enqueue to next tick completion
 	private lastEnqueueTime = 0;
 
-	// Dropped frame counter: frames where delta > frameBudgetMs and mutations were processed
+	/** Count of frames where processing time exceeded the frame budget. */
 	private droppedFrameCount = 0;
 
-	// Worker-to-main latency tracking (from MutationMessage.sentAt)
 	private lastWorkerToMainLatencyMs = 0;
 
-	// Frame log for devtools flamechart
+	/** Rolling log of the last MAX_FRAME_LOG frames for devtools inspection. */
 	private frameLog: FrameLogEntry[] = [];
 
 	constructor(config: SchedulerConfig = {}) {
@@ -98,14 +112,26 @@ export class FrameScheduler {
 		this.enablePrioritySkipping = config.enablePrioritySkipping ?? true;
 	}
 
+	/** Set the function that applies each mutation to the real DOM. */
 	setApplier(applier: MutationApplier): void {
 		this.applier = applier;
 	}
 
+	/** Update the number of active apps for per-app fairness budgeting. */
 	setAppCount(count: number): void {
 		this.appCount = count;
 	}
 
+	/**
+	 * Add mutations to the scheduling queue.
+	 * Mutations are not applied immediately; they wait for the next frame tick.
+	 * Emits a warning if the queue exceeds 10,000 items (indicates a processing bottleneck).
+	 *
+	 * @param mutations - Array of DOM mutations to schedule
+	 * @param appId - Owning app, used for per-app fairness
+	 * @param priority - Scheduling priority (default: "normal")
+	 * @param batchUid - Optional batch identifier for grouping
+	 */
 	enqueue(
 		mutations: DomMutation[],
 		appId: AppId,
@@ -131,6 +157,7 @@ export class FrameScheduler {
 		}
 	}
 
+	/** Start the rAF loop. Sets up scroll detection and a 1-second health check. */
 	start(): void {
 		if (this.running) return;
 		this.running = true;
@@ -162,6 +189,7 @@ export class FrameScheduler {
 		}
 	}
 
+	/** Stop the rAF loop, cancel pending frames, and tear down scroll listeners. */
 	stop(): void {
 		this.running = false;
 		if (this.healthCheckTimer) {
@@ -184,6 +212,7 @@ export class FrameScheduler {
 		this.boundingRectCacheFrame.clear();
 	}
 
+	/** Synchronously apply all queued mutations, bypassing frame budget. Used for teardown. */
 	flush(): void {
 		const applier = this.applier;
 		if (!applier) return;
@@ -194,6 +223,7 @@ export class FrameScheduler {
 		this.queue.length = 0;
 	}
 
+	/** Number of mutations waiting to be applied. */
 	get pendingCount(): number {
 		return this.queue.length;
 	}
@@ -203,6 +233,7 @@ export class FrameScheduler {
 		this.lastWorkerToMainLatencyMs = Math.max(0, Date.now() - sentAt);
 	}
 
+	/** Return a snapshot of scheduler metrics for devtools and diagnostics. */
 	getStats(): {
 		pending: number;
 		frameId: number;
@@ -230,10 +261,22 @@ export class FrameScheduler {
 		};
 	}
 
+	/** Return a copy of the rolling frame log (last 30 frames). */
 	getFrameLog(): FrameLogEntry[] {
 		return this.frameLog.slice();
 	}
 
+	/**
+	 * Core frame loop. Processes as many queued mutations as the frame budget allows.
+	 *
+	 * Algorithm:
+	 * 1. Sort queue by priority (high > normal > low), then optional last, then FIFO
+	 * 2. Compute maxActions via getActionsForFrame() (adaptive batch sizing)
+	 * 3. Iterate queue, skipping optional mutations under pressure (shouldSkip)
+	 * 4. In multi-app mode, enforce per-app fairness caps (maxActions / appCount)
+	 * 5. Break if elapsed time exceeds frameBudgetMs (unless queue is critically large)
+	 * 6. Re-enqueue deferred items for the next frame
+	 */
 	private tick(_timestamp: number): void {
 		if (!this.running) return;
 
@@ -360,6 +403,7 @@ export class FrameScheduler {
 		this.scheduleNext(start);
 	}
 
+	/** Schedule the next tick, delaying if the frame finished early to avoid busy-spinning. */
 	private scheduleNext(frameStart: number): void {
 		const elapsed = performance.now() - frameStart;
 		if (elapsed + 1 >= this.frameBudgetMs) {
@@ -372,6 +416,18 @@ export class FrameScheduler {
 		}
 	}
 
+	/**
+	 * Determine how many mutations to attempt this frame using adaptive batch sizing.
+	 *
+	 * Strategy (escalating by queue pressure):
+	 * - Queue > 25k: emergency flush — process everything in one frame
+	 * - Queue >= MAX_QUEUE_BEFORE_FLUSH (3000): process FLUSH_BATCH_SIZE (500)
+	 * - Queue > CRITICAL_QUEUE_SIZE (1500): process up to CRITICAL_QUEUE_SIZE
+	 * - Otherwise: use the measured average action time to estimate how many
+	 *   actions fit in 3x the frame budget (the 3x multiplier allows the time-
+	 *   based break in tick() to be the real limiter, while ensuring enough
+	 *   work is attempted). Falls back to 2000 when no timing data exists yet.
+	 */
 	private getActionsForFrame(): number {
 		const queueLen = this.queue.length;
 
@@ -394,6 +450,13 @@ export class FrameScheduler {
 		return 2000;
 	}
 
+	/**
+	 * Decide whether to skip an optional mutation to preserve frame budget.
+	 * Non-optional mutations are never skipped. Optional mutations are skipped when:
+	 * - User is actively scrolling (visual updates would be wasted)
+	 * - Queue is large (> half of CRITICAL_QUEUE_SIZE), indicating backpressure
+	 * - Previous frame exceeded budget (prevent cascading frame drops)
+	 */
 	private shouldSkip(item: PrioritizedMutation): boolean {
 		if (!this.enablePrioritySkipping) return false;
 
@@ -421,6 +484,7 @@ export class FrameScheduler {
 		return false;
 	}
 
+	/** Record the execution time for an action type. The 0.02ms bias prevents zero-time entries from skewing averages. */
 	private recordTiming(action: string, ms: number): void {
 		if (ms > 0) {
 			this.actionTimes.set(action, ms + 0.02);
@@ -437,6 +501,11 @@ export class FrameScheduler {
 		this.viewportWidth = window.innerWidth || document.documentElement.clientWidth;
 	}
 
+	/**
+	 * Check if an element is within the viewport, using a per-frame cache to
+	 * avoid repeated getBoundingClientRect calls. Cache entries expire after
+	 * VIEWPORT_CACHE_FRAMES (60) frames.
+	 */
 	isInViewport(elem: Element): boolean {
 		const id = elem.id;
 		if (!id) return true;
@@ -480,6 +549,10 @@ export class FrameScheduler {
 	}
 }
 
+/**
+ * Sort comparator: high priority first, then non-optional before optional,
+ * then by insertion order (uid) for FIFO stability within the same level.
+ */
 function prioritySort(a: PrioritizedMutation, b: PrioritizedMutation): number {
 	const priorityOrder: Record<Priority, number> = { high: 0, normal: 1, low: 2 };
 	const pa = priorityOrder[a.priority];

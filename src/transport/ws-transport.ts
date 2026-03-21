@@ -2,9 +2,13 @@ import { WS_BASE_DELAY_MS, WS_MAX_DELAY_MS, WS_MAX_RETRIES } from "../core/const
 import type { Message } from "../core/protocol.ts";
 import type { Transport, TransportReadyState, TransportStats } from "./base.ts";
 
+/** Reconnection options for {@link WebSocketTransport}. */
 export interface WebSocketTransportOptions {
+	/** Maximum number of reconnection attempts before giving up. Default: `10`. */
 	maxRetries?: number;
+	/** Initial delay in ms before the first reconnection attempt. Default: `1000`. */
 	baseDelay?: number;
+	/** Maximum delay in ms between reconnection attempts (exponential backoff cap). Default: `30000`. */
 	maxDelay?: number;
 }
 

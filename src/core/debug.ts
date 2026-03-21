@@ -1,63 +1,119 @@
 import type { DomMutation } from "./protocol.ts";
 
+/**
+ * Options for enabling debug logging and the in-page devtools panel.
+ *
+ * Each `log*` flag enables a category of structured log output. Provide a
+ * custom `logger` to redirect output (e.g. to a remote telemetry service).
+ */
 export interface DebugOptions {
+	/** Log every DOM mutation applied by the renderer. */
 	logMutations?: boolean;
+	/** Log event serialization and dispatch timing. */
 	logEvents?: boolean;
+	/** Log synchronous DOM read requests (getBoundingClientRect, computedStyle, etc.). */
 	logSyncReads?: boolean;
+	/** Log per-frame scheduler statistics (actions processed, frame time, queue depth). */
 	logScheduler?: boolean;
+	/** Log warnings such as missing nodes, sync timeouts, and blocked properties. */
 	logWarnings?: boolean;
+	/** Custom logger implementation. Unset methods fall back to `console.*`. */
 	logger?: Partial<DebugLogger>;
+	/** Expose `__ASYNC_DOM_DEVTOOLS__` on `globalThis` and inject the in-page devtools panel. */
 	exposeDevtools?: boolean;
 }
 
+/**
+ * Custom logger that receives structured debug entries.
+ *
+ * Implement any subset of these methods and pass via `DebugOptions.logger`.
+ */
 export interface DebugLogger {
+	/** Called for each DOM mutation applied on the main thread. */
 	mutation(entry: MutationLogEntry): void;
+	/** Called for event serialization and dispatch timing. */
 	event(entry: EventLogEntry): void;
+	/** Called for each synchronous DOM read request. */
 	syncRead(entry: SyncReadLogEntry): void;
+	/** Called once per scheduler frame with aggregate statistics. */
 	scheduler(entry: SchedulerLogEntry): void;
+	/** Called for async-dom warnings (missing nodes, timeouts, etc.). */
 	warning(entry: WarningLogEntry): void;
 }
 
+/** A single DOM mutation log entry emitted by the debug system. */
 export interface MutationLogEntry {
+	/** Which thread generated this entry. */
 	side: "worker" | "main";
+	/** The mutation action name (e.g. "createElement", "setAttribute"). */
 	action: string;
+	/** The full mutation payload. */
 	mutation: DomMutation;
+	/** High-resolution timestamp (via `performance.now()`). */
 	timestamp: number;
+	/** Batch UID that groups related mutations from a single flush. */
 	batchUid?: number;
 }
 
+/** A single event timing log entry emitted by the debug system. */
 export interface EventLogEntry {
+	/** Which thread generated this entry. */
 	side: "worker" | "main";
+	/** Whether this captures serialization or dispatch timing. */
 	phase: "serialize" | "dispatch";
+	/** The DOM event type (e.g. "click", "input"). */
 	eventType: string;
+	/** Unique listener identifier. */
 	listenerId: string;
+	/** Node ID of the event target, or `null` if unavailable. */
 	targetId: string | null;
+	/** High-resolution timestamp (via `performance.now()`). */
 	timestamp: number;
+	/** Time in ms the event spent in transport between threads. */
 	transportMs?: number;
+	/** Time in ms the worker spent dispatching the event handler. */
 	dispatchMs?: number;
+	/** Number of DOM mutations produced by the event handler. */
 	mutationCount?: number;
 }
 
+/** A single synchronous DOM read log entry. */
 export interface SyncReadLogEntry {
+	/** The query type enum value (BoundingRect, ComputedStyle, etc.). */
 	queryType: number;
+	/** The target node ID as a string. */
 	nodeId: string;
+	/** Round-trip latency in milliseconds. */
 	latencyMs: number;
+	/** Whether the read succeeded, timed out, or threw an error. */
 	result: "success" | "timeout" | "error";
+	/** High-resolution timestamp (via `performance.now()`). */
 	timestamp: number;
 }
 
+/** A single scheduler frame log entry. */
 export interface SchedulerLogEntry {
+	/** Monotonically increasing frame counter. */
 	frameId: number;
+	/** Number of mutations processed in this frame. */
 	actionsProcessed: number;
+	/** Total wall-clock time spent processing this frame in ms. */
 	frameTimeMs: number;
+	/** Number of mutations remaining in the queue after this frame. */
 	queueDepth: number;
+	/** High-resolution timestamp (via `performance.now()`). */
 	timestamp: number;
 }
 
+/** A warning entry emitted when async-dom detects a potential problem. */
 export interface WarningLogEntry {
+	/** Machine-readable warning code (see `WarningCode`). */
 	code: string;
+	/** Human-readable description of the problem. */
 	message: string;
+	/** Additional context data relevant to the warning. */
 	context: Record<string, unknown>;
+	/** High-resolution timestamp (via `performance.now()`). */
 	timestamp: number;
 }
 

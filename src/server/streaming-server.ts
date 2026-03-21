@@ -7,19 +7,31 @@ import { createWorkerDom } from "../worker-thread/index.ts";
 import type { BroadcastTransportConfig } from "./broadcast-transport.ts";
 import { BroadcastTransport } from "./broadcast-transport.ts";
 
+/** Configuration for {@link createStreamingServer}. */
 export interface StreamingServerConfig {
+	/** The application entry point. Receives a virtual DOM environment shared across all clients. */
 	createApp: (dom: WorkerDomResult) => void | Promise<void>;
+	/** Optional overrides for the underlying `WorkerDomConfig` (transport is managed internally). */
 	workerDomConfig?: Partial<Omit<WorkerDomConfig, "transport">>;
+	/** Configuration for the broadcast transport (mutation log size, max clients, etc.). */
 	broadcast?: BroadcastTransportConfig;
 }
 
+/** Handle returned by {@link createStreamingServer}. */
 export interface StreamingServerInstance {
+	/** Register a new WebSocket client. Returns the assigned `ClientId`. */
 	handleConnection(socket: WebSocketLike, clientId?: string): ClientId;
+	/** Disconnect and clean up a client by its `ClientId`. */
 	disconnectClient(clientId: ClientId): void;
+	/** Return the number of currently connected clients. */
 	getClientCount(): number;
+	/** Return the IDs of all currently connected clients. */
 	getClientIds(): ClientId[];
+	/** Access the shared virtual DOM instance. */
 	getDom(): WorkerDomResult;
+	/** Shut down the server, disconnecting all clients and destroying the virtual DOM. */
 	destroy(): void;
+	/** Resolves when the app module has finished initializing. */
 	ready: Promise<void>;
 }
 

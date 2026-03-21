@@ -17,12 +17,22 @@ function isDangerousURI(value: string): boolean {
 	);
 }
 
+/**
+ * Security permissions controlling which mutation types the renderer will execute.
+ * Defaults are restrictive; enable only what the app needs.
+ */
 export interface RendererPermissions {
+	/** Allow appending nodes directly to <head> (e.g., for injecting styles). */
 	allowHeadAppend: boolean;
+	/** Allow appending nodes directly to <body>. */
 	allowBodyAppend: boolean;
+	/** Allow history.pushState/replaceState calls. */
 	allowNavigation: boolean;
+	/** Allow window.scrollTo calls. */
 	allowScroll: boolean;
+	/** Bypass HTML sanitization for innerHTML/insertAdjacentHTML. */
 	allowUnsafeHTML: boolean;
+	/** Additional DOM property names allowed for setProperty beyond the built-in list. */
 	additionalAllowedProperties?: string[];
 }
 
@@ -126,26 +136,48 @@ const SVG_TAGS = new Set([
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
+/**
+ * Root elements for the renderer's DOM mount point.
+ * Defaults to document.body/head/documentElement but can be overridden
+ * to render into a shadow DOM or iframe.
+ */
 export interface RendererRoot {
+	/** The element or shadow root that serves as the `<body>` equivalent. */
 	body: Element | ShadowRoot;
+	/** The element or shadow root that serves as the `<head>` equivalent. */
 	head: Element | ShadowRoot;
+	/** The element that serves as the `<html>` equivalent. */
 	html: Element;
 }
 
 /**
- * Applies DOM mutations to the real DOM.
- * Stateless except for the node cache mapping NodeIds to DOM nodes.
+ * Configuration for automatic content-visibility: auto on top-level children
+ * of the mount point, enabling the browser to skip rendering off-screen subtrees.
  */
 export interface ContentVisibilityConfig {
+	/** Whether the optimization is active. */
 	enabled: boolean;
+	/** CSS `contain-intrinsic-size` value applied to container elements (e.g. `"auto 500px"`). */
 	intrinsicSize: string;
 }
 
+/**
+ * Applies DOM mutations from the worker thread to the real browser DOM.
+ *
+ * Maintains a NodeCache mapping worker-side NodeIds to real DOM Node references.
+ * Each mutation type is dispatched through the apply() method, which acts as
+ * the single entry point for the scheduler.
+ *
+ * Security: blocks on* attribute handlers, javascript: URIs, and restricts
+ * which DOM properties can be set via an allowlist.
+ */
 export class DomRenderer {
+	/** Maps NodeId -> real DOM Node for O(1) lookup during mutation application. */
 	private nodeCache: NodeCache;
 	private permissions: RendererPermissions;
 	private root: RendererRoot;
 	private _additionalAllowedProperties: Set<string>;
+	/** Callback invoked when a node is removed, allowing EventBridge to detach listeners. */
 	onNodeRemoved: ((id: NodeId) => void) | null = null;
 	private _onWarning: ((entry: WarningLogEntry) => void) | null = null;
 	private _onMutation: ((entry: MutationLogEntry) => void) | null = null;
@@ -194,6 +226,15 @@ export class DomRenderer {
 		};
 	}
 
+	/**
+	 * Apply a single DOM mutation to the real DOM.
+	 * This is the main entry point called by the FrameScheduler's applier callback.
+	 * Event-related mutations (addEventListener, configureEvent, removeEventListener)
+	 * are no-ops here as they are handled by EventBridge.
+	 *
+	 * @param mutation - The mutation to apply
+	 * @param batchUid - Optional batch identifier for debug logging
+	 */
 	apply(mutation: DomMutation, batchUid?: number): void {
 		if (this._onMutation) {
 			this._onMutation({
@@ -298,6 +339,7 @@ export class DomRenderer {
 		}
 	}
 
+	/** Look up the real DOM node for a given NodeId, or null if not cached. */
 	getNode(id: NodeId): Node | null {
 		return this.nodeCache.get(id);
 	}
@@ -324,6 +366,12 @@ export class DomRenderer {
 		return this.root;
 	}
 
+	/**
+	 * Create a DOM element or text node and store it in the node cache.
+	 * Structural tags (HTML, BODY, HEAD) are mapped to existing DOM elements rather than created.
+	 * Tags starting with "#" are treated as text nodes.
+	 * SVG tags are created with the SVG namespace.
+	 */
 	private createNode(id: NodeId, tag: string, textContent?: string): void {
 		if (this.nodeCache.has(id)) return;
 
@@ -545,6 +593,10 @@ export class DomRenderer {
 		if (node) (this.root.body as unknown as Node).appendChild(node);
 	}
 
+	/**
+	 * Call a whitelisted method on a DOM node (e.g., focus, play, showModal).
+	 * Methods not in ALLOWED_METHODS are silently blocked.
+	 */
 	private callMethod(id: NodeId, method: string, args: unknown[]): void {
 		const node = this.nodeCache.get(id);
 		if (!node) return;

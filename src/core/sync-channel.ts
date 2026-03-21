@@ -23,15 +23,23 @@ const SIGNAL_RESPONSE = 2;
 const MAX_RETRIES = 5;
 const WAIT_TIMEOUT_MS = 100;
 
+/** Type of synchronous query that a worker can make to the main thread. */
 export enum QueryType {
+	/** Request element.getBoundingClientRect() result. */
 	BoundingRect = 0,
+	/** Request window.getComputedStyle() result for a property. */
 	ComputedStyle = 1,
+	/** Request a DOM node property (e.g., clientWidth, scrollTop). */
 	NodeProperty = 2,
+	/** Request a window property (e.g., innerWidth). */
 	WindowProperty = 3,
 }
 
+/** A pending query read from the shared buffer by the main-thread host. */
 export interface PendingQuery {
+	/** Which type of DOM query to execute. */
 	queryType: QueryType;
+	/** JSON-encoded request payload (e.g., `{"nodeId": 42, "property": "clientWidth"}`). */
 	data: string;
 }
 
@@ -58,6 +66,11 @@ export class SyncChannel {
 		);
 	}
 
+	/**
+	 * Create a new SyncChannel with a fresh SharedArrayBuffer.
+	 * The returned buffer must be transferred to the worker via postMessage.
+	 * @param size - Total buffer size in bytes (default: 64KB)
+	 */
 	static create(size: number = DEFAULT_BUFFER_SIZE): {
 		channel: SyncChannel;
 		buffer: SharedArrayBuffer;
@@ -66,13 +79,24 @@ export class SyncChannel {
 		return { channel: new SyncChannel(buffer), buffer };
 	}
 
+	/** Attach to an existing SharedArrayBuffer received from the main thread. */
 	static fromBuffer(sab: SharedArrayBuffer): SyncChannel {
 		return new SyncChannel(sab);
 	}
 
 	/**
 	 * Send a synchronous request to the main thread and block until response.
-	 * Returns the parsed response or a fallback value on timeout.
+	 *
+	 * Protocol:
+	 * 1. Write JSON-encoded request data to the request region
+	 * 2. Set query type and data length in the header via Atomics.store (memory fence)
+	 * 3. Set signal to SIGNAL_REQUEST and notify the main thread
+	 * 4. Block with Atomics.wait until signal changes or timeout (100ms per retry, 5 retries max)
+	 * 5. Read JSON-encoded response from the response region
+	 *
+	 * @param queryType - The type of DOM query to execute
+	 * @param data - JSON-encoded request payload
+	 * @returns Parsed response object, or null on timeout or parse failure
 	 */
 	request(queryType: QueryType, data: string): unknown {
 		const encoded = this.encoder.encode(data);
@@ -193,6 +217,12 @@ export class SyncChannelHost {
 
 	/**
 	 * Start polling for requests using a MessageChannel for lowest-latency scheduling.
+	 *
+	 * Uses MessageChannel.postMessage for microtask-level poll frequency when active,
+	 * with exponential backoff (up to 16ms) when idle to reduce CPU usage.
+	 * Falls back to setInterval(4ms) when MessageChannel is unavailable.
+	 *
+	 * @param handler - Synchronous function that executes the query and returns the result
 	 */
 	startPolling(handler: (query: PendingQuery) => unknown): void {
 		if (this.polling) return;

@@ -17,37 +17,88 @@ import {
 } from "./observers.ts";
 import { ScopedStorage } from "./storage.ts";
 
+/**
+ * Configuration for {@link createWorkerDom}.
+ *
+ * All fields are optional — sensible defaults are chosen for standard
+ * Web Worker usage.
+ */
 export interface WorkerDomConfig {
+	/** Explicit app ID. If omitted, a unique ID is generated automatically. */
 	appId?: AppId;
+	/** Custom transport to use instead of the default `WorkerSelfTransport`. */
 	transport?: Transport;
+	/** Debug logging options (same as the main-thread `DebugOptions`). */
 	debug?: DebugOptions;
+	/**
+	 * Sandbox mode for the worker environment.
+	 *
+	 * - `"global"` — Patches `globalThis` so bare references to `document`, `window`, etc.
+	 *   resolve to the virtual DOM objects.
+	 * - `"eval"` — Enables `window.eval()` with a sandboxed scope that uses the virtual DOM.
+	 * - `true` — Enables both `"global"` and `"eval"` modes.
+	 * - `false` (default) — No patching; access virtual DOM explicitly via the returned objects.
+	 */
 	sandbox?: boolean | "global" | "eval";
+	/** Custom platform host for non-browser environments (e.g. Node.js). Auto-detected if omitted. */
 	platform?: PlatformHost;
 }
 
+/**
+ * The result of calling {@link createWorkerDom}.
+ *
+ * Provides a virtual `document` and `window` that mirror the real DOM API.
+ * All mutations are automatically serialized and sent to the main thread.
+ */
 export interface WorkerDomResult {
+	/** Virtual document implementing a subset of the DOM `Document` API. */
 	document: VirtualDocument;
+	/** Virtual window providing `location`, `history`, `screen`, timers, observers, and more. */
 	window: WorkerWindow;
+	/** Tear down the virtual DOM, cancel timers, and close the transport. */
 	destroy: () => void;
 }
 
+/**
+ * Virtual `window` object available inside a worker.
+ *
+ * Provides browser-like globals (`document`, `location`, `history`, `localStorage`,
+ * observers, timers, etc.) backed by the virtual DOM and sync-channel reads.
+ */
 export interface WorkerWindow {
+	/** The virtual document for this worker app. */
 	document: VirtualDocument;
+	/** Emulated `window.location` that syncs navigation to the main thread. */
 	location: WorkerLocation;
+	/** Emulated `window.history` that syncs pushState/replaceState to the main thread. */
 	history: WorkerHistory;
+	/** Screen dimensions (resolved via sync channel when available, fallback 1280x720). */
 	screen: { width: number; height: number };
+	/** Viewport width (resolved via sync channel when available, fallback 1280). */
 	innerWidth: number;
+	/** Viewport height (resolved via sync channel when available, fallback 720). */
 	innerHeight: number;
+	/** App-scoped localStorage backed by sync channel reads to the real `localStorage`. */
 	localStorage: ScopedStorage;
+	/** App-scoped in-memory sessionStorage (tied to worker lifecycle). */
 	sessionStorage: ScopedStorage;
+	/** Add a document-level event listener. */
 	addEventListener(name: string, callback: (e: unknown) => void): void;
+	/** Remove a document-level event listener. */
 	removeEventListener(name: string, callback: (e: unknown) => void): void;
+	/** Scroll the main-thread viewport to the given coordinates. */
 	scrollTo(x: number, y: number): void;
+	/** Read computed style for a virtual element via the sync channel. */
 	getComputedStyle(el: unknown): Record<string, string>;
+	/** Polyfilled `requestAnimationFrame` using `setTimeout` (~16ms). */
 	requestAnimationFrame(cb: (time: number) => void): number;
+	/** Cancel a pending `requestAnimationFrame` callback. */
 	cancelAnimationFrame(id: number): void;
+	/** Virtual `MutationObserver` for observing virtual DOM mutations. */
 	MutationObserver: typeof VirtualMutationObserver;
+	/** Virtual `ResizeObserver` stub. */
 	ResizeObserver: typeof VirtualResizeObserver;
+	/** Virtual `IntersectionObserver` stub. */
 	IntersectionObserver: typeof VirtualIntersectionObserver;
 	setTimeout: typeof setTimeout;
 	setInterval: typeof setInterval;
@@ -64,6 +115,7 @@ export interface WorkerWindow {
 	navigator: PlatformHost["navigator"];
 	Event: typeof VirtualEvent;
 	CustomEvent: typeof VirtualCustomEvent;
+	/** Standard DOM node type constants. */
 	Node: {
 		ELEMENT_NODE: 1;
 		TEXT_NODE: 3;
@@ -73,22 +125,30 @@ export interface WorkerWindow {
 	};
 	HTMLElement: typeof VirtualElement;
 	devicePixelRatio: number;
+	/** Stub `matchMedia` that always returns `matches: false`. */
 	matchMedia: (query: string) => {
 		matches: boolean;
 		media: string;
 		addEventListener: () => void;
 		removeEventListener: () => void;
 	};
+	/** Stub `getSelection` that returns an empty selection. */
 	getSelection: () => {
 		rangeCount: number;
 		getRangeAt: () => null;
 		addRange: () => void;
 		removeAllRanges: () => void;
 	};
+	/** Dispatch an event on the virtual document. */
 	dispatchEvent: (event: unknown) => boolean;
+	/**
+	 * Evaluate code in a sandboxed scope. Only available when `sandbox` includes `"eval"`.
+	 * Throws if sandbox eval is not enabled.
+	 */
 	eval: (code: string) => unknown;
 }
 
+/** Emulated `Location` object synced from the main thread. Navigation calls generate mutations. */
 interface WorkerLocation {
 	hash: string;
 	href: string;
@@ -105,6 +165,7 @@ interface WorkerLocation {
 	reload(): void;
 }
 
+/** Emulated `History` object. `pushState`/`replaceState` calls generate navigation mutations. */
 interface WorkerHistory {
 	state: unknown;
 	pushState(state: unknown, title: string, url: string): void;

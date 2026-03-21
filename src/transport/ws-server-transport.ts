@@ -6,12 +6,19 @@ import type { Transport, TransportReadyState, TransportStats } from "./base.ts";
  * (ws, uWebSockets.js, Deno, Bun, etc.) without importing their types.
  */
 export interface WebSocketLike {
+	/** Send a string message through the socket. */
 	send(data: string): void;
+	/** Close the socket with an optional status code and reason. */
 	close(code?: number, reason?: string): void;
+	/** WebSocket readyState constant (0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED). */
 	readonly readyState: number;
+	/** Number of bytes queued for sending but not yet transmitted. */
 	readonly bufferedAmount: number;
+	/** Handler called when a message is received. */
 	onmessage: ((event: { data: unknown }) => void) | null;
+	/** Handler called when the connection closes. */
 	onclose: ((event: { code: number; reason: string }) => void) | null;
+	/** Handler called when a connection error occurs. */
 	onerror: ((event: unknown) => void) | null;
 }
 

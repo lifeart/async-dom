@@ -10,6 +10,7 @@ import {
 } from "./selector-engine.ts";
 import { createStyleProxy, toKebabCase } from "./style-proxy.ts";
 
+/** Union of all virtual node types that can appear in the worker-side DOM tree. */
 export type VirtualNode = VirtualElement | VirtualTextNode | VirtualCommentNode;
 
 function kebabToCamel(str: string): string {
@@ -46,6 +47,20 @@ const VOID_ELEMENTS = new Set([
 /**
  * Virtual DOM element that records mutations via the MutationCollector
  * instead of touching real DOM.
+ *
+ * Implements a broad subset of the HTMLElement API:
+ * - Attributes: setAttribute, getAttribute, removeAttribute, dataset
+ * - Children: appendChild, removeChild, insertBefore, replaceChild, etc.
+ * - Text/HTML: textContent, innerHTML, outerHTML, insertAdjacentHTML
+ * - Input state: value, checked, disabled, selectedIndex (with main-thread sync)
+ * - Media state: currentTime, duration, paused, ended, readyState
+ * - Events: addEventListener, removeEventListener, on* handlers, dispatchEvent
+ * - Layout queries: getBoundingClientRect, clientWidth/Height, etc. (via SyncChannel)
+ * - CSS: style proxy, classList, className
+ * - Traversal: querySelector, closest, contains, parentNode, children, etc.
+ *
+ * Every mutating operation emits a DomMutation to the collector. Layout queries
+ * use the SyncChannel to synchronously read values from the main thread's DOM.
  */
 export class VirtualElement {
 	static readonly ELEMENT_NODE = 1;
@@ -167,6 +182,10 @@ export class VirtualElement {
 		this.collector.add(mutation);
 	}
 
+	/**
+	 * Synchronously read a numeric DOM property from the main thread via SyncChannel.
+	 * Returns null if no sync channel is available (e.g., no SharedArrayBuffer support).
+	 */
 	private _readNodeProperty(prop: string): number | null {
 		const channel = this._ownerDocument?._syncChannel;
 		if (channel) {
@@ -590,6 +609,11 @@ export class VirtualElement {
 		this.collector.add(mutation);
 	}
 
+	/**
+	 * Sync input state from a main-thread event without emitting mutations.
+	 * Called by VirtualDocument.dispatchEvent to keep the worker's model in sync
+	 * with real DOM input values after user interaction.
+	 */
 	_updateInputState(state: { value?: string; checked?: boolean; selectedIndex?: number }): void {
 		if (state.value !== undefined) this._value = state.value;
 		if (state.checked !== undefined) this._checked = state.checked;
@@ -634,6 +658,7 @@ export class VirtualElement {
 		return this._readyState;
 	}
 
+	/** Sync media element state from a main-thread event without emitting mutations. */
 	_updateMediaState(state: Record<string, unknown>): void {
 		if (state.currentTime !== undefined) this._currentTime = state.currentTime as number;
 		if (state.duration !== undefined) this._duration = state.duration as number;
@@ -667,10 +692,18 @@ export class VirtualElement {
 
 	// --- Events ---
 
+	/** Map of listenerId -> callback for event dispatch. */
 	private _eventListeners = new Map<string, (e: unknown) => void>();
+	/** Map of listenerId -> event name, used to match removeEventListener by name+callback. */
 	private _listenerEventNames = new Map<string, string>();
+	/** Map of event name -> callback for on* property handlers (e.g., onclick). */
 	private _onHandlers = new Map<string, (e: unknown) => void>();
 
+	/**
+	 * Register an event listener. Emits an addEventListener mutation so the main thread
+	 * attaches a real DOM listener that will serialize and forward events back.
+	 * Supports the `once` option by wrapping the callback with auto-removal.
+	 */
 	addEventListener(
 		name: string,
 		callback: (e: unknown) => void,
@@ -709,6 +742,7 @@ export class VirtualElement {
 		return this._eventListeners.get(listenerId);
 	}
 
+	/** Remove a listener by event name and callback reference. Emits a removeEventListener mutation. */
 	removeEventListener(_name: string, callback: (e: unknown) => void): void {
 		for (const [listenerId, cb] of this._eventListeners.entries()) {
 			if (cb === callback && this._listenerEventNames.get(listenerId) === _name) {
@@ -726,6 +760,7 @@ export class VirtualElement {
 		}
 	}
 
+	/** Invoke all listeners matching the event type. Called during bubbling by VirtualDocument.dispatchEvent. */
 	_dispatchBubbledEvent(event: { type: string; immediatePropagationStopped?: boolean }): void {
 		for (const [listenerId, cb] of this._eventListeners.entries()) {
 			if (this._listenerEventNames.get(listenerId) === event.type) {
@@ -765,6 +800,7 @@ export class VirtualElement {
 		}
 	}
 
+	/** Emit a configureEvent mutation to tell the main thread to call preventDefault for this event. */
 	preventDefaultFor(eventName: string): void {
 		const mutation: DomMutation = {
 			action: "configureEvent",
@@ -775,6 +811,7 @@ export class VirtualElement {
 		this.collector.add(mutation);
 	}
 
+	/** Implement on* handler properties (onclick, etc.) by managing a single listener per event name. */
 	private _setOnHandler(eventName: string, cb: ((e: unknown) => void) | null): void {
 		const prev = this._onHandlers.get(eventName);
 		if (prev) this.removeEventListener(eventName, prev);
@@ -1127,6 +1164,10 @@ export class VirtualElement {
 		this.collector.add({ action: "callMethod", id: this._nodeId, method: "close", args: [] });
 	}
 
+	/**
+	 * Synchronously query the main thread for this element's bounding rect via SyncChannel.
+	 * Returns a zero rect if no sync channel is available.
+	 */
 	getBoundingClientRect(): {
 		top: number;
 		left: number;
@@ -1160,6 +1201,7 @@ export class VirtualElement {
 		return { top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0 };
 	}
 
+	/** Parse a CSS style string (e.g., "color: red; font-size: 14px") and set each property individually. */
 	private _parseAndSetStyles(value: string): void {
 		for (const part of value.split(";")) {
 			const colonIdx = part.indexOf(":");
@@ -1174,7 +1216,8 @@ export class VirtualElement {
 }
 
 /**
- * Virtual text node.
+ * Virtual text node (nodeType 3). Setting nodeValue emits a setProperty mutation
+ * so the main thread updates the real text node.
  */
 export class VirtualTextNode {
 	static readonly ELEMENT_NODE = 1;
@@ -1270,7 +1313,8 @@ export class VirtualTextNode {
 }
 
 /**
- * Virtual comment node.
+ * Virtual comment node (nodeType 8). Used primarily as DOM markers by frameworks.
+ * Comment nodes do not emit mutations on value changes.
  */
 export class VirtualCommentNode {
 	static readonly ELEMENT_NODE = 1;
@@ -1353,6 +1397,7 @@ export class VirtualCommentNode {
 	}
 }
 
+/** DOMTokenList-compatible classList implementation that delegates to VirtualElement.className. */
 class VirtualClassList {
 	constructor(private element: VirtualElement) {}
 

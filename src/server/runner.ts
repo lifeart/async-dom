@@ -2,8 +2,11 @@ import type { Transport } from "../transport/base.ts";
 import type { WorkerDomResult } from "../worker-thread/index.ts";
 import { createWorkerDom } from "../worker-thread/index.ts";
 
+/** Configuration for {@link createServerApp}. */
 export interface ServerAppOptions {
+	/** The transport connecting this server-side app to its main-thread client. */
 	transport: Transport;
+	/** The user's application entry point. Receives a virtual DOM environment. May return a Promise. */
 	appModule: (dom: WorkerDomResult) => void | Promise<void>;
 }
 

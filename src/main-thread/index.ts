@@ -61,40 +61,86 @@ const ALLOWED_WINDOW_PROPERTIES = new Set([
 	"sessionStorage.key",
 ]);
 
+/**
+ * Configuration for {@link createAsyncDom}.
+ *
+ * At minimum, provide a `target` element where worker-rendered DOM will be mounted.
+ * Optionally pass a `worker` to immediately register the first app.
+ */
 export interface AsyncDomConfig {
+	/** The DOM element that serves as the rendering root for worker-produced mutations. */
 	target: Element;
+	/** Optional initial worker. If provided, it is registered as the first app automatically. */
 	worker?: Worker;
+	/** Frame-budget scheduler tuning options. */
 	scheduler?: SchedulerConfig;
+	/** Debug logging and devtools panel options. */
 	debug?: DebugOptions;
-	/** Enable content-visibility: auto on top-level container elements for off-screen rendering optimization. */
+	/**
+	 * Enable `content-visibility: auto` on top-level container elements for off-screen
+	 * rendering optimization. Pass `true` for defaults, or an object with a custom
+	 * `intrinsicSize` (CSS value, default `"auto 500px"`).
+	 */
 	contentVisibility?: boolean | { intrinsicSize?: string };
 }
 
+/**
+ * Configuration for adding a worker-backed app via {@link AsyncDomInstance.addApp}.
+ */
 export interface AppConfig {
+	/** The Web Worker instance that runs this app's UI logic. */
 	worker: Worker;
-	/** Human-readable name for this app (shown in DevTools instead of a random hash) */
+	/** Human-readable name for this app (shown in DevTools instead of a random hash). */
 	name?: string;
+	/** CSS selector or Element where this app's DOM will be mounted. Defaults to the instance root. */
 	mountPoint?: string | Element;
+	/** Attach to a Shadow DOM root for CSS isolation. Pass `true` for `{ mode: "open" }` or a custom `ShadowRootInit`. */
 	shadow?: boolean | ShadowRootInit;
+	/** Custom transport to use instead of the default `WorkerTransport`. */
 	transport?: import("../transport/base.ts").Transport;
+	/** Called when the worker reports an unhandled error or unhandled promise rejection. */
 	onError?: (error: import("../core/protocol.ts").SerializedError, appId: AppId) => void;
 }
 
+/**
+ * Configuration for adding a remote (non-worker) app via {@link AsyncDomInstance.addRemoteApp}.
+ *
+ * Remote apps communicate over a custom transport (e.g. WebSocket) rather than
+ * a local Web Worker.
+ */
 export interface RemoteAppConfig {
+	/** The transport used to communicate with the remote process. */
 	transport: import("../transport/base.ts").Transport;
+	/** Human-readable name for this app (shown in DevTools instead of a random hash). */
 	name?: string;
+	/** CSS selector or Element where this app's DOM will be mounted. Defaults to the instance root. */
 	mountPoint?: string | Element;
+	/** Attach to a Shadow DOM root for CSS isolation. Pass `true` for `{ mode: "open" }` or a custom `ShadowRootInit`. */
 	shadow?: boolean | ShadowRootInit;
+	/** Called when the remote process reports an unhandled error. */
 	onError?: (error: import("../core/protocol.ts").SerializedError, appId: AppId) => void;
+	/** Enable `SharedArrayBuffer`-based sync channel for synchronous DOM reads. Default: `false`. */
 	enableSyncChannel?: boolean;
 }
 
+/**
+ * Handle returned by {@link createAsyncDom}.
+ *
+ * Controls the lifecycle of the async-dom instance: starting/stopping the
+ * scheduler, adding/removing apps, and tearing down all resources.
+ */
 export interface AsyncDomInstance {
+	/** Start the frame-budget scheduler. Mutations begin applying to the DOM. */
 	start(): void;
+	/** Pause the scheduler. Mutations are queued but not applied until `start()` is called. */
 	stop(): void;
+	/** Stop the scheduler, flush remaining mutations, tear down all apps, and release all resources. */
 	destroy(): void;
+	/** Register a new worker-backed app. Returns a unique `AppId` for later removal. */
 	addApp(config: AppConfig): AppId;
+	/** Register a new remote app using a custom transport. Returns a unique `AppId` for later removal. */
 	addRemoteApp(config: RemoteAppConfig): AppId;
+	/** Remove an app by its `AppId`, detaching its event listeners and clearing its rendered DOM. */
 	removeApp(appId: AppId): void;
 }
 

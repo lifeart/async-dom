@@ -4,10 +4,15 @@ import type { Transport, TransportReadyState } from "../transport/base.ts";
 import type { MutationLogConfig } from "./mutation-log.ts";
 import { MutationLog } from "./mutation-log.ts";
 
+/** Configuration for the broadcast transport used by the streaming server. */
 export interface BroadcastTransportConfig {
+	/** Settings for the mutation replay log sent to newly connecting clients. */
 	mutationLog?: MutationLogConfig;
+	/** Maximum number of concurrent clients. New connections are rejected when the limit is reached. */
 	maxClients?: number;
+	/** Called when a new client connects. */
 	onClientConnect?: (clientId: ClientId) => void;
+	/** Called when a client disconnects. */
 	onClientDisconnect?: (clientId: ClientId) => void;
 }
 

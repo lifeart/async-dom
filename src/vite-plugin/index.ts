@@ -1,6 +1,7 @@
 import type { Plugin, ViteDevServer } from "vite";
 import { workerErrorSnippet } from "./error-snippet.ts";
 
+/** Configuration options for the async-dom Vite plugin. */
 export interface AsyncDomPluginOptions {
 	/** Enable COOP/COEP headers for SharedArrayBuffer support (default: true) */
 	headers?: boolean;

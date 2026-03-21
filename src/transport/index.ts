@@ -1,4 +1,4 @@
-export type { Transport, TransportReadyState } from "./base.ts";
+export type { Transport, TransportReadyState, TransportStats } from "./base.ts";
 export {
 	BinaryWorkerSelfTransport,
 	BinaryWorkerTransport,

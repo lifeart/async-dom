@@ -5,12 +5,23 @@
  * unions for compile-time safety and exhaustive switch handling.
  */
 
-// Branded types for type safety
+/**
+ * Branded numeric type for DOM node identifiers.
+ * The brand prevents accidental use of plain numbers as NodeIds.
+ */
 export type NodeId = number & { readonly __brand: "NodeId" };
+
+/** Branded string type identifying an application instance. */
 export type AppId = string & { readonly __brand: "AppId" };
+
+/** Branded string type identifying a connected client (for multi-client server mode). */
 export type ClientId = string & { readonly __brand: "ClientId" };
 
-// Reserved structural node IDs
+/**
+ * Reserved structural node IDs.
+ * These correspond to the well-known DOM nodes that always exist.
+ * Dynamic node IDs start at 11 to avoid collisions.
+ */
 export const BODY_NODE_ID = 1 as NodeId;
 export const HEAD_NODE_ID = 2 as NodeId;
 export const HTML_NODE_ID = 3 as NodeId;
@@ -32,17 +43,33 @@ export function _resetNodeIdCounter(): void {
 	_nodeIdCounter = 10;
 }
 
+/** Cast a plain string to a branded AppId. */
 export function createAppId(id: string): AppId {
 	return id as AppId;
 }
 
+/** Cast a plain string to a branded ClientId. */
 export function createClientId(id: string): ClientId {
 	return id as ClientId;
 }
 
+/** Standard DOM insertAdjacentHTML position values. */
 export type InsertPosition = "beforebegin" | "afterbegin" | "beforeend" | "afterend";
 
-// Worker → Main thread mutations
+/**
+ * Discriminated union of all DOM mutations sent from worker to main thread.
+ *
+ * Mutation lifecycle:
+ * 1. Worker-side VirtualElement/VirtualDocument methods create DomMutation objects
+ * 2. Mutations are collected by MutationCollector into batches
+ * 3. Batches are wrapped in a MutationMessage and sent via Transport
+ * 4. Main-thread FrameScheduler queues and prioritizes mutations
+ * 5. DomRenderer.apply() executes each mutation against the real DOM
+ *
+ * Each variant carries the target node's `id` plus action-specific data.
+ * Mutations marked `optional: true` (e.g., style updates) may be dropped
+ * by the scheduler under frame budget pressure.
+ */
 export type DomMutation =
 	| { action: "createNode"; id: NodeId; tag: string; textContent?: string }
 	| { action: "createComment"; id: NodeId; textContent: string }
@@ -96,11 +123,16 @@ export type DomMutation =
 	| { action: "removeEventListener"; id: NodeId; listenerId: string }
 	| { action: "callMethod"; id: NodeId; method: string; args: unknown[] };
 
+/** Convenience union of all possible mutation action string literals. */
 export type MutationAction = DomMutation["action"];
 
+/** Scheduler priority level. High-priority mutations are processed first each frame. */
 export type Priority = "high" | "normal" | "low";
 
-// Envelope wrapping mutations with metadata
+/**
+ * Envelope wrapping a batch of mutations with routing and timing metadata.
+ * Sent from worker thread to main thread via Transport.
+ */
 export interface MutationMessage {
 	type: "mutation";
 	appId: AppId;
@@ -112,7 +144,11 @@ export interface MutationMessage {
 	causalEvent?: { eventType: string; listenerId: string; timestamp: number };
 }
 
-// Serialized event data sent from main thread to worker
+/**
+ * Serialized event data sent from main thread to worker.
+ * Contains a flat subset of DOM event properties that can be transferred via postMessage.
+ * Target and relatedTarget are serialized as NodeId strings, not DOM references.
+ */
 export interface SerializedEvent {
 	type: string;
 	target: string | null;
@@ -167,7 +203,7 @@ export interface SerializedEvent {
 	readyState?: number;
 }
 
-// Main thread → Worker events
+/** Event message sent from main thread to worker to dispatch a DOM event. */
 export interface EventMessage {
 	type: "event";
 	appId: AppId;
@@ -176,7 +212,7 @@ export interface EventMessage {
 	clientId?: ClientId;
 }
 
-// Serialized location data
+/** Serialized window.location data sent during app initialization. */
 export interface SerializedLocation {
 	hash: string;
 	href: string;
@@ -190,7 +226,7 @@ export interface SerializedLocation {
 	state: unknown;
 }
 
-// Serialized error data
+/** Serialized error data for cross-thread error reporting, including causal chain via `cause`. */
 export interface SerializedError {
 	message: string;
 	stack?: string;
@@ -202,7 +238,10 @@ export interface SerializedError {
 	isUnhandledRejection?: boolean;
 }
 
-// System messages
+/**
+ * System-level control messages exchanged between main thread and worker.
+ * Includes lifecycle events (init/ready), sync queries, diagnostics, and multi-client management.
+ */
 export type SystemMessage =
 	| { type: "init"; appId: AppId; location: SerializedLocation; sharedBuffer?: SharedArrayBuffer }
 	| { type: "ready"; appId: AppId }
@@ -243,17 +282,20 @@ export interface PerfEntryData {
 	entryType: string;
 }
 
+/** Top-level discriminated union of all messages in the async-dom protocol. */
 export type Message = MutationMessage | EventMessage | SystemMessage;
 
-// Type guards
+/** Type guard: narrows a Message to MutationMessage. */
 export function isMutationMessage(msg: Message): msg is MutationMessage {
 	return msg.type === "mutation";
 }
 
+/** Type guard: narrows a Message to EventMessage. */
 export function isEventMessage(msg: Message): msg is EventMessage {
 	return msg.type === "event";
 }
 
+/** Type guard: narrows a Message to SystemMessage. */
 export function isSystemMessage(msg: Message): msg is SystemMessage {
 	return !isMutationMessage(msg) && !isEventMessage(msg);
 }

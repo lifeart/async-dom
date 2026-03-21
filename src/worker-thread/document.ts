@@ -22,7 +22,19 @@ import {
 
 /**
  * Virtual Document that exists in a worker thread.
- * All DOM mutations are recorded and batched via MutationCollector.
+ *
+ * Mirrors a subset of the browser's Document API, allowing framework code
+ * to call createElement, querySelector, addEventListener, etc. without
+ * touching the real DOM. Every mutating operation records a DomMutation via
+ * the MutationCollector, which batches and sends them to the main thread.
+ *
+ * Key subsystems:
+ * - Element creation: createElement, createTextNode, createComment
+ * - Event dispatch: routes serialized events from the main thread to the
+ *   correct VirtualElement listener using O(1) listenerId lookup
+ * - ID registries: maintains both user-visible id attributes (_ids) and
+ *   internal NodeId -> VirtualElement mappings (_nodeIdToElement)
+ * - Sync channel: optional SharedArrayBuffer channel for blocking DOM queries
  */
 export class VirtualDocument {
 	readonly body: VirtualElement;
@@ -31,17 +43,24 @@ export class VirtualDocument {
 	readonly nodeType = 9;
 	readonly nodeName = "#document";
 
+	/** Collects mutations and batches them for transport to the main thread. */
 	readonly collector: MutationCollector;
 
+	/** Reference to the VirtualWindow, providing location/navigator access. */
 	_defaultView: unknown = null;
+	/** Optional sync channel for blocking DOM queries (e.g., getBoundingClientRect). */
 	_syncChannel: SyncChannel | null = null;
 
 	private _title = "";
 	private _cookie = "";
 
+	/** Map of user-visible id attribute -> VirtualElement for getElementById. */
 	private _ids = new Map<string, VirtualElement>();
+	/** Map of internal NodeId -> VirtualElement for event target resolution. */
 	private _nodeIdToElement = new Map<NodeId, VirtualElement>();
+	/** Document-level event listeners keyed by listenerId. */
 	private _listenerMap = new Map<string, (e: unknown) => void>();
+	/** Map of listenerId -> owning VirtualElement for O(1) event dispatch routing. */
 	private _listenerToElement = new Map<string, VirtualElement>();
 	private _listenerCounter = 0;
 
@@ -69,6 +88,10 @@ export class VirtualDocument {
 		this.collector.flush();
 	}
 
+	/**
+	 * Create a new virtual element and emit a createNode mutation.
+	 * The element is registered by NodeId for event target resolution.
+	 */
 	createElement(tag: string): VirtualElement {
 		const id = createNodeId();
 		const element = new VirtualElement(tag, this.collector, id);
@@ -85,12 +108,14 @@ export class VirtualDocument {
 		return element;
 	}
 
+	/** Create a namespaced element (e.g., SVG). Delegates to createElement then sets the namespace. */
 	createElementNS(ns: string, tag: string): VirtualElement {
 		const el = this.createElement(tag);
 		el._setNamespaceURI(ns);
 		return el;
 	}
 
+	/** Create a virtual text node and emit a createNode mutation with tag "#text". */
 	createTextNode(text: string): VirtualTextNode {
 		const id = createNodeId();
 		const node = new VirtualTextNode(text, id, this.collector);
@@ -106,6 +131,7 @@ export class VirtualDocument {
 		return node;
 	}
 
+	/** Create a virtual comment node and emit a createComment mutation. */
 	createComment(text: string): VirtualCommentNode {
 		const id = createNodeId();
 		const node = new VirtualCommentNode(text, id, this.collector);
@@ -131,7 +157,10 @@ export class VirtualDocument {
 		return this._ids.get(id) ?? null;
 	}
 
-	// Event listener routing
+	/**
+	 * Add a document-level event listener. The listener is stored locally and
+	 * a mutation is emitted to tell the main thread to attach a real listener.
+	 */
 	addEventListener(name: string, callback: (e: unknown) => void): void {
 		if (!name) return;
 		const listenerId = `document_${name}_${++this._listenerCounter}`;
@@ -145,6 +174,7 @@ export class VirtualDocument {
 		this.collector.add(mutation);
 	}
 
+	/** Remove a document-level listener by callback reference. Emits a removeEventListener mutation. */
 	removeEventListener(_name: string, callback: (e: unknown) => void): void {
 		for (const [listenerId, cb] of this._listenerMap.entries()) {
 			if (cb === callback) {
@@ -180,6 +210,16 @@ export class VirtualDocument {
 		return null;
 	}
 
+	/**
+	 * Route a serialized event from the main thread to the appropriate listener.
+	 *
+	 * Flow:
+	 * 1. Resolve serialized target/currentTarget/relatedTarget IDs to VirtualElement refs
+	 * 2. Wrap the event data in a VirtualEvent for bubbling support
+	 * 3. Tag the MutationCollector with causal event info for causality tracking
+	 * 4. Sync input/media state from the event to the target element
+	 * 5. Dispatch to document-level listeners, or bubble through the element tree
+	 */
 	dispatchEvent(listenerId: string, event: unknown): void {
 		const evt = event as Record<string, unknown>;
 		// Resolve event target references from NodeIds to VirtualElement refs
@@ -324,6 +364,7 @@ export class VirtualDocument {
 		this._listenerToElement.delete(listenerId);
 	}
 
+	/** Stub implementation of document.createEvent for legacy API compatibility. */
 	createEvent(_type: string): Record<string, unknown> {
 		return {
 			type: "",
@@ -344,6 +385,7 @@ export class VirtualDocument {
 		return this.body;
 	}
 
+	/** Stub implementation of document.createRange for framework compatibility. */
 	createRange(): unknown {
 		const doc = this;
 		return {
@@ -360,6 +402,7 @@ export class VirtualDocument {
 		};
 	}
 
+	/** Simplified TreeWalker that pre-collects all descendant nodes for sequential traversal. */
 	createTreeWalker(
 		root: VirtualElement,
 		_whatToShow?: number,
@@ -511,6 +554,7 @@ export class VirtualDocument {
 		this._defaultView = null;
 	}
 
+	/** Serialize the entire virtual DOM tree to a JSON-compatible structure for debugging. */
 	toJSON(): unknown {
 		return this._serializeNode(this.documentElement);
 	}
